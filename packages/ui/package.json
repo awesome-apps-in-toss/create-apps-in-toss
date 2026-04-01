@@ -1,0 +1,23 @@
+{
+  "name": "@barreleye/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@barreleye/eslint-config": "workspace:*",
+    "@barreleye/tsconfig": "workspace:*",
+    "@types/react": "^18.3.18",
+    "eslint": "^9.18.0",
+    "typescript": "^5.6.3"
+  }
+}
