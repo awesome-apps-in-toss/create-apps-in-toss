@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 600px;
+      height: 600px;
+      background: #3182F6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .symbol {
+      position: relative;
+      width: 320px;
+      height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 바깥 원형 링 */
+    .ring-outer {
+      position: absolute;
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      border: 18px solid rgba(255, 255, 255, 0.20);
+    }
+
+    /* 안쪽 원형 링 */
+    .ring-inner {
+      position: absolute;
+      width: 228px;
+      height: 228px;
+      border-radius: 50%;
+      border: 12px solid rgba(255, 255, 255, 0.35);
+    }
+
+    /* 중앙 카드 아이콘 — 미니앱 화면 추상화 */
+    .card-icon {
+      position: absolute;
+      width: 116px;
+      height: 136px;
+      background: white;
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 11px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+    }
+
+    /* 제목 라인 */
+    .line-title {
+      width: 72px;
+      height: 13px;
+      background: #191F28;
+      border-radius: 5px;
+    }
+
+    /* 본문 라인 1 */
+    .line-body {
+      width: 60px;
+      height: 9px;
+      background: #8B95A1;
+      border-radius: 4px;
+    }
+
+    /* 본문 라인 2 */
+    .line-body-2 {
+      width: 48px;
+      height: 9px;
+      background: #E5E8EB;
+      border-radius: 4px;
+    }
+
+    /* 장식 점들 */
+    .dot {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .dot-1 { width: 22px; height: 22px; top: 22px; right: 60px; }
+    .dot-2 { width: 14px; height: 14px; bottom: 38px; left: 44px; }
+    .dot-3 { width: 9px;  height: 9px;  top: 70px;  left: 36px; }
+  </style>
+</head>
+<body>
+  <div class="symbol">
+    <div class="ring-outer"></div>
+    <div class="ring-inner"></div>
+    <div class="card-icon">
+      <div class="line-title"></div>
+      <div class="line-body"></div>
+      <div class="line-body-2"></div>
+    </div>
+    <div class="dot dot-1"></div>
+    <div class="dot dot-2"></div>
+    <div class="dot dot-3"></div>
+  </div>
+</body>
+</html>
