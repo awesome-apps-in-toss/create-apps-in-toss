@@ -104,7 +104,7 @@ export default function AppDetail() {
   const [running, setRunning] = useState(false);
   const [runningSkill, setRunningSkill] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [pipelineExpanded, setPipelineExpanded] = useState(false);
+  const [pipelineExpanded, setPipelineExpanded] = useState(true);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const skillEsRef = useRef<EventSource | null>(null);
 
@@ -246,16 +246,11 @@ export default function AppDetail() {
           <h2 className="detail-section-title">출시 파이프라인</h2>
           <div className="pipeline-header-actions">
             <button
-              className={`btn-utility ${runningSkill === 'ait-launch' ? 'btn-utility--running' : ''}`}
-              onClick={() => void runSkill('ait-launch')}
-              disabled={running}
-              title="7단계 파이프라인 순차 실행"
+              className={`btn-cli-copy ${copiedCmd === 'ait-launch' ? 'btn-cli-copy--copied' : ''}`}
+              onClick={() => void copyCliCommand('ait-launch')}
+              title="CLI에서 7단계 파이프라인 순차 실행 (클립보드 복사)"
             >
-              {runningSkill === 'ait-launch' ? (
-                <><span className="pipeline-spinner" /> 실행 중...</>
-              ) : (
-                '전체 실행'
-              )}
+              {copiedCmd === 'ait-launch' ? '복사됨' : 'claude -p /ait-launch'}
             </button>
             <button
               className="btn-pipeline-toggle"
