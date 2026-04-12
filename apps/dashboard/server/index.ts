@@ -25,21 +25,27 @@ app.get('/api/events', (req, res) => {
   req.on('close', () => sseClients.delete(res));
 });
 
+// ── 앱 ID 검증 (경로 탈출 방지) ──
+const APP_ID_RE = /^[a-z0-9][a-z0-9._-]*$/;
+function validateAppId(id: string | undefined): id is string {
+  return !!id && APP_ID_RE.test(id) && !id.includes('..');
+}
+
 // 앱 에셋 서빙: GET /api/apps/:id/asset?path=.meta/assets/logo.png
 // path는 앱 폴더 기준 상대경로
 app.get('/api/apps/:id/asset', (req, res) => {
   const appId = req.params['id'];
   const relPath = req.query['path'] as string;
 
-  if (!appId || !relPath) {
-    res.status(400).json({ error: 'id and path required' });
+  if (!validateAppId(appId) || !relPath) {
+    res.status(400).json({ error: 'Valid id and path required' });
     return;
   }
 
   // 경로 탈출 방지: 앱 폴더 밖으로 나가지 못하게
-  const appDir = path.join(APPS_DIR, appId);
+  const appDir = path.resolve(APPS_DIR, appId);
   const resolved = path.resolve(appDir, relPath);
-  if (!resolved.startsWith(appDir)) {
+  if (!resolved.startsWith(appDir + path.sep)) {
     res.status(403).json({ error: 'Forbidden' });
     return;
   }

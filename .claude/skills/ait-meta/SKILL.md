@@ -11,8 +11,8 @@ allowed-tools: Read, Bash, Glob, Write
 ## 호출 형식
 
 ```
-/init-dashboard-meta              # 특정 앱 폴더에서 실행
-/init-dashboard-meta              # 레포 루트에서 실행 (앱 선택 필요)
+/ait-meta                         # 특정 앱 폴더에서 실행
+/ait-meta                         # 레포 루트에서 실행 (앱 선택 필요)
 ```
 
 ---

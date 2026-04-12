@@ -29,8 +29,8 @@ export interface AppConsoleConfig {
   keywords: string[];
   // 이미지 에셋 경로 (앱 폴더 기준 상대경로)
   logoPath: string | null; // 600×600
-  thumbnailPath: string | null; // 1932×828 가로형
-  screenshotPaths: string[]; // 세로 636×1048 ≥3장 or 가로 1504×741 ≥1장
+  thumbnailPath: string | null; // 가로형 1932×828 (assets/thumbnail-wide.png)
+  screenshotPaths: string[]; // 정사각형 1000×1000 (assets/thumbnail-square.png) 등
   // 문서 경로 (앱 폴더 기준 상대경로)
   prdPath: string | null;
   utPath: string | null;
@@ -132,7 +132,7 @@ export const PIPELINE_SKILLS = [
 export const UTILITY_SKILLS = [
   { skill: 'ait-meta', label: '메타 생성', description: '.meta-dashboard.json 자동 생성', mode: 'automated' as SkillMode, requiresData: 'PRD 또는 코드' },
   { skill: 'ait-ut', label: 'UT 시뮬레이션', description: '페르소나 기반 사용성 테스트', mode: 'automated' as SkillMode, requiresData: '구현된 앱' },
-  { skill: 'ait-launch', label: '전체 실행', description: '7단계 파이프라인 순차 실행', mode: 'automated' as SkillMode, requiresData: null },
+  { skill: 'ait-launch', label: '전체 실행', description: '7단계 파이프라인 순차 실행', mode: 'interactive' as SkillMode, requiresData: null },
 ] as const;
 
 export type PipelineSkill = (typeof PIPELINE_SKILLS)[number]['skill'];

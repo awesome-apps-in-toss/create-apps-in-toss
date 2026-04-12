@@ -1,7 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
+import type { ReactNode } from 'react';
 import type { AppInfo } from '@/types';
 
-export function useApps() {
+interface AppsContextValue {
+  apps: AppInfo[];
+  loading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+}
+
+const AppsContext = createContext<AppsContextValue | null>(null);
+
+export function AppsProvider({ children }: { children: ReactNode }) {
   const [apps, setApps] = useState<AppInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,5 +38,15 @@ export function useApps() {
     return () => es.close();
   }, []);
 
-  return { apps, loading, error, refetch: fetchApps };
+  return (
+    <AppsContext.Provider value={{ apps, loading, error, refetch: fetchApps }}>
+      {children}
+    </AppsContext.Provider>
+  );
+}
+
+export function useApps() {
+  const ctx = useContext(AppsContext);
+  if (!ctx) throw new Error('useApps must be used within AppsProvider');
+  return ctx;
 }

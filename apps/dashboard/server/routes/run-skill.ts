@@ -8,6 +8,27 @@ const router = Router();
 const APPS_DIR = path.resolve(process.cwd(), '../');
 const REPO_ROOT = path.resolve(process.cwd(), '../../');
 
+// ── 앱 ID 검증 (경로 탈출 방지) ──
+const APP_ID_RE = /^[a-z0-9][a-z0-9._-]*$/;
+function validateAppId(id: string | undefined): id is string {
+  return !!id && APP_ID_RE.test(id) && !id.includes('..');
+}
+
+// ── 동시 쓰기 방지 뮤텍스 ──
+const writeLocks = new Map<string, Promise<unknown>>();
+async function withWriteLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  while (writeLocks.has(key)) {
+    await writeLocks.get(key);
+  }
+  const promise = fn();
+  writeLocks.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    writeLocks.delete(key);
+  }
+}
+
 const ALLOWED_SKILLS = [
   // Pipeline (7-step sequential)
   'ait-plan',
@@ -45,6 +66,11 @@ router.get('/stream', (req, res) => {
 
   if (!skill || !appName) {
     res.status(400).json({ error: 'skill and app params required' });
+    return;
+  }
+
+  if (!validateAppId(appName)) {
+    res.status(400).json({ error: 'Invalid app name' });
     return;
   }
 
@@ -205,35 +231,38 @@ async function detectSkillArtifacts(
 async function recordPipelineProgress(appName: string, step: number): Promise<void> {
   const appDir = path.join(APPS_DIR, appName);
   const metaPath = path.join(appDir, '.meta-dashboard.json');
-  let meta: Record<string, unknown> = {};
-  try {
-    const raw = await fs.readFile(metaPath, 'utf-8');
-    meta = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    // 파일이 없으면 새로 생성
-  }
 
-  // 산출물 감지
-  const { artifacts, configUpdates } = await detectSkillArtifacts(appDir, step);
-
-  // 파이프라인 진행 상태 기록
-  const progress = (meta['pipelineProgress'] as Record<string, unknown>) ?? {};
-  progress[String(step)] = {
-    completedAt: new Date().toISOString().slice(0, 10),
-    ...(Object.keys(artifacts).length > 0 ? { artifacts } : {}),
-  };
-  meta['pipelineProgress'] = progress;
-  meta['updatedAt'] = new Date().toISOString().slice(0, 10);
-
-  // 스킬 산출물 경로를 config 필드에도 반영
-  for (const [key, value] of Object.entries(configUpdates)) {
-    // 기존 값이 없거나 빈 값인 경우에만 덮어쓰기
-    if (!meta[key]) {
-      meta[key] = value;
+  await withWriteLock(appName, async () => {
+    let meta: Record<string, unknown> = {};
+    try {
+      const raw = await fs.readFile(metaPath, 'utf-8');
+      meta = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      // 파일이 없으면 새로 생성
     }
-  }
 
-  await fs.writeFile(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
+    // 산출물 감지
+    const { artifacts, configUpdates } = await detectSkillArtifacts(appDir, step);
+
+    // 파이프라인 진행 상태 기록
+    const progress = (meta['pipelineProgress'] as Record<string, unknown>) ?? {};
+    progress[String(step)] = {
+      completedAt: new Date().toISOString().slice(0, 10),
+      ...(Object.keys(artifacts).length > 0 ? { artifacts } : {}),
+    };
+    meta['pipelineProgress'] = progress;
+    meta['updatedAt'] = new Date().toISOString().slice(0, 10);
+
+    // 스킬 산출물 경로를 config 필드에도 반영
+    for (const [key, value] of Object.entries(configUpdates)) {
+      // 기존 값이 없거나 빈 값인 경우에만 덮어쓰기
+      if (!meta[key]) {
+        meta[key] = value;
+      }
+    }
+
+    await fs.writeFile(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
+  });
 }
 
 export { router as runSkillRouter };

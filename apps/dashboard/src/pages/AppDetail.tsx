@@ -106,6 +106,14 @@ export default function AppDetail() {
   const [copied, setCopied] = useState<string | null>(null);
   const [pipelineExpanded, setPipelineExpanded] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
+  const skillEsRef = useRef<EventSource | null>(null);
+
+  // 언마운트 시 실행 중인 스킬 EventSource 정리
+  useEffect(() => {
+    return () => {
+      skillEsRef.current?.close();
+    };
+  }, []);
 
   async function copyCliCommand(skill: string) {
     const cmd = `claude -p /${skill}`;
@@ -149,13 +157,16 @@ export default function AppDetail() {
       } else if ((edit.field === 'prdPath' || edit.field === 'utPath') && !edit.value.trim()) {
         value = null;
       }
-      await fetch(`/api/apps/${app.folderName}/console`, {
+      const res = await fetch(`/api/apps/${app.folderName}/console`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [edit.field]: value }),
       });
+      if (!res.ok) throw new Error('저장에 실패했습니다.');
       setEdit({ field: null, value: '' });
       await refetch();
+    } catch {
+      // 실패 시 편집 상태 유지 (사용자가 재시도 가능)
     } finally {
       setSaving(false);
     }
@@ -171,23 +182,27 @@ export default function AppDetail() {
 
   async function runSkill(skill: AllowedSkill) {
     if (running || !app) return;
+    skillEsRef.current?.close();
     setRunning(true);
     setRunningSkill(skill);
     setLogLines([]);
     const es = new EventSource(`/api/run-skill/stream?skill=${skill}&app=${app.folderName}`);
+    skillEsRef.current = es;
     es.addEventListener('log', (e) => {
-      setLogLines((prev) => [...prev, e.data as string].slice(-200));
+      setLogLines((prev) => [...prev, e.data].slice(-200));
     });
     es.addEventListener('done', () => {
       setRunning(false);
       setRunningSkill(null);
       es.close();
+      skillEsRef.current = null;
       void refetch();
     });
     es.addEventListener('error', () => {
       setRunning(false);
       setRunningSkill(null);
       es.close();
+      skillEsRef.current = null;
       setLogLines((prev) => [...prev, '[오류] 스킬 실행 중 오류가 발생했습니다.']);
     });
   }
