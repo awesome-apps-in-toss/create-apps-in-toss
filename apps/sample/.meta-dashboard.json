@@ -10,7 +10,12 @@
   "logoPath": "",
   "thumbnailPath": "",
   "screenshotPaths": [],
-  "prdPath": "",
+  "prdPath": "docs/prd/test.md",
   "utPath": "",
-  "updatedAt": "2026-04-12T07:10:08.078Z"
+  "pipelineProgress": {
+    "2": {
+      "completedAt": "2026-04-12"
+    }
+  },
+  "updatedAt": "2026-04-12"
 }
