@@ -1,0 +1,4 @@
+
+> @barreleye/dashboard@0.0.1 typecheck /Users/yurim/Documents/programming/barreleye/apps/dashboard
+> tsc --noEmit
+

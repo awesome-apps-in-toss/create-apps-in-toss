@@ -3,8 +3,8 @@
   "private": true,
   "packageManager": "pnpm@9.15.9",
   "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
+    "dev": "turbo dev --filter=@barreleye/dashboard",
+    "dev:apps": "turbo dev --filter=!@barreleye/dashboard",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "format": "prettier --write .",
