@@ -5,7 +5,10 @@
 여러 미니앱을 모노레포로 관리하고, 각 앱의 출시 준비 상태를 대시보드 UI로 확인하세요.
 공통 설정은 한 번만, 막히는 단계는 AI에게 맡기세요.
 
+![Barreleye 대시보드](apps/dashboard/assets/dashboard-screenshot.png)
+
 **[→ 데모 보기](https://awesome-apps-in-toss.github.io/create-apps-in-toss/)**
+
 
 ---
 
