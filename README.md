@@ -110,8 +110,21 @@ barreleye/
 | `pnpm dev` | 대시보드 개발 서버 실행 |
 | `pnpm build` | 전체 빌드 |
 | `pnpm new-app <name>` | 새 미니앱 생성 |
+| `pnpm update-template` | 원본 템플릿(스킬·스크립트·대시보드)을 최신 버전으로 동기화 |
 | `pnpm lint` | 전체 린트 검사 |
 | `pnpm typecheck` | 전체 타입 체크 |
+
+---
+
+## 템플릿 업데이트 받기
+
+클론한 뒤에도 원본 레포의 스킬·스크립트·대시보드 개선사항을 계속 받아올 수 있습니다. `apps/*`(당신이 만든 앱)는 건드리지 않고 템플릿 영역만 동기화됩니다.
+
+```bash
+pnpm update-template
+```
+
+자세한 내용은 [docs/guides/update-template.md](docs/guides/update-template.md)를 참고하세요.
 
 ---
 
