@@ -94,7 +94,7 @@ function getStepState(
 export default function AppDetail() {
   const { appId } = useParams<{ appId: string }>();
   const navigate = useNavigate();
-  const { apps, refetch } = useApps();
+  const { apps, refetch, isDemo } = useApps();
   const appIndex = apps.findIndex((a) => a.folderName === appId);
   const app = apps[appIndex];
 
@@ -145,7 +145,7 @@ export default function AppDetail() {
   }
 
   async function saveField() {
-    if (!edit.field || !app) return;
+    if (!edit.field || !app || isDemo) return;
     setSaving(true);
     try {
       let value: string | string[] | null = edit.value;
@@ -181,7 +181,7 @@ export default function AppDetail() {
   }
 
   async function runSkill(skill: AllowedSkill) {
-    if (running || !app) return;
+    if (running || !app || isDemo) return;
     skillEsRef.current?.close();
     setRunning(true);
     setRunningSkill(skill);
@@ -322,8 +322,8 @@ export default function AppDetail() {
                     <button
                       className="pipeline-detail-btn pipeline-detail-btn--link"
                       onClick={() => document.getElementById('plan-section')?.scrollIntoView({ behavior: 'smooth' })}
-                      disabled={isLocked}
-                      title={isLocked ? `전제 조건 미충족: ${item.requires}` : '아래 기획 섹션으로 이동'}
+                      disabled={isLocked || isDemo}
+                      title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : isLocked ? `전제 조건 미충족: ${item.requires}` : '아래 기획 섹션으로 이동'}
                     >
                       {isCompleted ? '기획서 보기' : '기획하기'}
                     </button>
@@ -331,8 +331,8 @@ export default function AppDetail() {
                     <button
                       className="pipeline-detail-btn"
                       onClick={() => void runSkill(item.skill as AllowedSkill)}
-                      disabled={running || isLocked}
-                      title={isLocked ? `전제 조건 미충족: ${item.requires}` : item.description}
+                      disabled={running || isLocked || isDemo}
+                      title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : isLocked ? `전제 조건 미충족: ${item.requires}` : item.description}
                     >
                       {runningSkill === item.skill ? (
                         <span className="pipeline-spinner" />
@@ -382,6 +382,7 @@ export default function AppDetail() {
               <PrdDropZone
                 appId={app.folderName}
                 onUploaded={() => void refetch()}
+                isDemo={isDemo}
               />
               <div className="plan-entry">
                 <div className="plan-entry-icon">&#x1F4BB;</div>
@@ -478,7 +479,8 @@ export default function AppDetail() {
                     <button
                       className="btn-skill btn-skill-sm"
                       onClick={() => void runSkill('ait-assets')}
-                      disabled={running}
+                      disabled={running || isDemo}
+                      title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : undefined}
                     >
                       /ait-assets
                     </button>
@@ -549,7 +551,12 @@ export default function AppDetail() {
                               {copied === field.key ? '복사됨' : '복사'}
                             </button>
                           )}
-                          <button className="btn-edit" onClick={() => startEdit(field.key)}>
+                          <button
+                            className="btn-edit"
+                            onClick={() => startEdit(field.key)}
+                            disabled={isDemo}
+                            title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : undefined}
+                          >
                             편집
                           </button>
                         </div>
@@ -579,7 +586,8 @@ export default function AppDetail() {
                     <button
                       className="btn-skill btn-skill-sm"
                       onClick={() => void runSkill('ait-assets')}
-                      disabled={running}
+                      disabled={running || isDemo}
+                      title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : undefined}
                     >
                       /ait-assets
                     </button>
@@ -636,7 +644,8 @@ export default function AppDetail() {
               <button
                 className="btn-skill btn-skill-sm"
                 onClick={() => void runSkill('ait-ut')}
-                disabled={running}
+                disabled={running || isDemo}
+                title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : undefined}
               >
                 /ait-ut
               </button>
@@ -780,9 +789,11 @@ function MarkdownViewer({
 function PrdDropZone({
   appId,
   onUploaded,
+  isDemo,
 }: {
   appId: string;
   onUploaded: () => void;
+  isDemo?: boolean;
 }) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -791,6 +802,7 @@ function PrdDropZone({
 
   const handleFile = useCallback(
     async (file: File) => {
+      if (isDemo) return;
       if (!file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
         setError('.md 또는 .txt 파일만 업로드할 수 있습니다.');
         return;
@@ -815,12 +827,12 @@ function PrdDropZone({
         setUploading(false);
       }
     },
-    [appId, onUploaded]
+    [appId, isDemo, onUploaded]
   );
 
   return (
     <div
-      className={`plan-entry plan-entry--drop ${dragOver ? 'plan-entry--drag-over' : ''}`}
+      className={`plan-entry plan-entry--drop ${dragOver && !isDemo ? 'plan-entry--drag-over' : ''} ${isDemo ? 'plan-entry--disabled' : ''}`}
       onDragOver={(e) => {
         e.preventDefault();
         setDragOver(true);

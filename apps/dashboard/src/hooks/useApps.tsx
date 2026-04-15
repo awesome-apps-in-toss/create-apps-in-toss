@@ -1,22 +1,28 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type { AppInfo } from '@/types';
+import { MOCK_APPS } from '@/demo/mockData';
+
+// GitHub Pages 정적 배포 시 demo 모드
+const IS_STATIC = import.meta.env.PROD;
 
 interface AppsContextValue {
   apps: AppInfo[];
   loading: boolean;
   error: string | null;
+  isDemo: boolean;
   refetch: () => Promise<void>;
 }
 
 const AppsContext = createContext<AppsContextValue | null>(null);
 
 export function AppsProvider({ children }: { children: ReactNode }) {
-  const [apps, setApps] = useState<AppInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [apps, setApps] = useState<AppInfo[]>(IS_STATIC ? MOCK_APPS : []);
+  const [loading, setLoading] = useState(!IS_STATIC);
   const [error, setError] = useState<string | null>(null);
 
   async function fetchApps() {
+    if (IS_STATIC) return;
     try {
       const res = await fetch('/api/apps');
       if (!res.ok) throw new Error('Failed to fetch apps');
@@ -30,6 +36,8 @@ export function AppsProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    if (IS_STATIC) return;
+
     void fetchApps();
 
     // SSE로 파일 변경 감지 → 앱 목록 갱신
@@ -39,7 +47,7 @@ export function AppsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AppsContext.Provider value={{ apps, loading, error, refetch: fetchApps }}>
+    <AppsContext.Provider value={{ apps, loading, error, isDemo: IS_STATIC, refetch: fetchApps }}>
       {children}
     </AppsContext.Provider>
   );
