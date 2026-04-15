@@ -1107,7 +1107,12 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
+  padding: 10px 16px;
+  border: none;
+  background: #111827;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
   border-bottom: 1px solid #1f2937;
 }
 
@@ -1115,6 +1120,7 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: #e5e7eb;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
 }
 
 .log-stream-badge {
@@ -1135,6 +1141,30 @@ body {
   color: #9ca3af;
 }
 
+.log-stream-badge.error {
+  background: #7f1d1d;
+  color: #fca5a5;
+}
+
+.log-stream-count {
+  font-size: 11px;
+  color: #6b7280;
+  margin-left: auto;
+}
+
+.log-stream-toggle {
+  font-size: 11px;
+  color: #6b7280;
+  padding: 2px 8px;
+  border: 1px solid #374151;
+  border-radius: 4px;
+}
+
+.log-stream-header:hover .log-stream-toggle {
+  border-color: #6b7280;
+  color: #9ca3af;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
@@ -1149,10 +1179,28 @@ body {
   line-height: 1.6;
 }
 
+.log-stream-summary {
+  padding: 6px 16px 10px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  font-size: 11px;
+}
+
+.log-line-preview {
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
 .log-line {
   color: #d1d5db;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.log-line--error {
+  color: #fca5a5;
 }
 
 /* ========================
@@ -1679,4 +1727,680 @@ body {
 
 .new-app-btn-primary:hover {
   background: #1d4ed8;
+}
+
+/* ========================
+   Completion Checklist
+   ======================== */
+
+.checklist-section {
+  padding-bottom: 16px !important;
+}
+
+.checklist-progress {
+  margin-bottom: 16px;
+}
+
+.checklist-progress-track {
+  height: 6px;
+  background: #f3f4f6;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.checklist-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #10b981);
+  transition: width 0.4s ease;
+}
+
+.checklist-groups {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 800px) {
+  .checklist-groups {
+    grid-template-columns: 1fr;
+  }
+}
+
+.checklist-group {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #f3f4f6;
+}
+
+.checklist-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.checklist-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.checklist-group-source {
+  font-size: 10px;
+  font-family: 'SF Mono', 'Monaco', monospace;
+  color: #9ca3af;
+}
+
+.checklist-group-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Monaco', monospace;
+  color: #6b7280;
+}
+
+.checklist-items {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b7280;
+  padding: 3px 0;
+}
+
+.checklist-item--done {
+  color: #374151;
+}
+
+.checklist-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.checklist-item--done .checklist-check {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.checklist-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.checklist-action {
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-family: 'SF Mono', 'Monaco', monospace;
+  color: #6b7280;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.checklist-action:hover:not(:disabled) {
+  border-color: #3b82f6;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.checklist-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* checklist group color accents */
+.checklist-group--blue { border-left: 3px solid #3b82f6; }
+.checklist-group--purple { border-left: 3px solid #8b5cf6; }
+.checklist-group--green { border-left: 3px solid #10b981; }
+
+/* ========================
+   Detail Header Completion
+   ======================== */
+
+.detail-header-completion {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.completion-label {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.completion-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  font-family: 'SF Mono', 'Monaco', monospace;
+  line-height: 1;
+}
+
+.completion-fraction {
+  font-size: 12px;
+  color: #9ca3af;
+  font-family: 'SF Mono', 'Monaco', monospace;
+}
+
+/* ========================
+   Planning (PRD)
+   ======================== */
+
+.plan-empty-desc {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+.plan-entries {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.plan-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+  gap: 6px;
+  cursor: default;
+}
+
+.plan-entry--drop {
+  cursor: pointer;
+  border: 2px dashed #d1d5db;
+  background: #f9fafb;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.plan-entry--drop:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.plan-entry--drag-over {
+  border-color: #3b82f6;
+  background: #dbeafe;
+}
+
+.plan-entry--coming {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.plan-entry-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.plan-entry-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.plan-entry-badge {
+  font-size: 10px;
+  font-weight: 500;
+  color: #9ca3af;
+  background: #f3f4f6;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.plan-entry-desc {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.plan-entry-error {
+  font-size: 11px;
+  color: #dc2626;
+  margin-top: 4px;
+}
+
+/* ========================
+   Pipeline
+   ======================== */
+
+.pipeline-section {
+  overflow: visible;
+}
+
+.pipeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pipeline-header .detail-section-title {
+  margin-bottom: 0;
+}
+
+.pipeline-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-launch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  background: #111827;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.btn-launch:hover:not(:disabled) {
+  background: #374151;
+}
+
+.btn-launch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-pipeline-toggle {
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-pipeline-toggle:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* Mini stepper (always visible) */
+.pipeline-mini-stepper {
+  display: flex;
+  align-items: center;
+  padding: 8px 0 4px;
+}
+
+.pipeline-mini-step-wrap {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.pipeline-mini-step-wrap:first-child {
+  flex: 0;
+}
+
+.pipeline-mini-connector {
+  flex: 1;
+  height: 2px;
+  background: #e5e7eb;
+  min-width: 16px;
+}
+
+.pipeline-mini-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* 완료 상태 */
+.pipeline-mini-dot--completed {
+  background: #10b981;
+}
+
+.pipeline-mini-check {
+  font-size: 8px;
+  color: white;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* 활성 상태 */
+.pipeline-mini-dot--enabled {
+  background: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+/* 잠금 상태 */
+.pipeline-mini-dot--locked {
+  background: #e5e7eb;
+  opacity: 0.5;
+}
+
+/* 실행 중 (모든 상태 위에 적용) */
+.pipeline-mini-dot--running {
+  background: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  animation: pulse 1.5s infinite;
+}
+
+/* 완료된 구간 커넥터 */
+.pipeline-mini-connector--done {
+  background: #10b981;
+}
+
+/* Detail list (expanded view) */
+.pipeline-detail-list {
+  margin-top: 8px;
+  border: 1px solid #f3f4f6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pipeline-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 13px;
+  transition: background 0.1s;
+}
+
+.pipeline-detail-row:last-child {
+  border-bottom: none;
+}
+
+.pipeline-detail-row:hover {
+  background: #f9fafb;
+}
+
+.pipeline-detail-row--running {
+  background: #eff6ff;
+}
+
+.pipeline-detail-row--completed {
+  background: #f0fdf4;
+}
+
+.pipeline-detail-row--locked {
+  opacity: 0.5;
+}
+
+.pipeline-detail-step {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9ca3af;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  width: 44px;
+  flex-shrink: 0;
+}
+
+.pipeline-detail-row--running .pipeline-detail-step {
+  color: #2563eb;
+}
+
+.pipeline-detail-step--done {
+  color: #10b981 !important;
+  font-size: 13px;
+}
+
+.pipeline-detail-label {
+  font-weight: 600;
+  color: #374151;
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.pipeline-detail-desc {
+  flex: 1;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.pipeline-detail-skill {
+  font-size: 11px;
+  font-family: 'SF Mono', 'Monaco', monospace;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.pipeline-detail-btn {
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: #6b7280;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.pipeline-detail-btn:hover:not(:disabled) {
+  background: #111827;
+  border-color: #111827;
+  color: white;
+}
+
+.pipeline-detail-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pipeline-detail-btn--link {
+  background: none;
+  color: #3b82f6;
+  border-color: #bfdbfe;
+}
+
+.pipeline-detail-btn--link:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.pipeline-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #d1d5db;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: pipeline-spin 0.7s linear infinite;
+}
+
+@keyframes pipeline-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========================
+   Utility Skills
+   ======================== */
+
+.utility-section {
+  margin-top: -8px;
+}
+
+.utility-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.btn-utility {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.btn-utility:hover:not(:disabled) {
+  border-color: #d1d5db;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  background: #f9fafb;
+}
+
+.btn-utility:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-utility--running {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.utility-desc {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+/* ========================
+   CLI Copy Button (interactive skills)
+   ======================== */
+
+.btn-cli-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-cli-copy:hover {
+  background: #334155;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+.btn-cli-copy--copied {
+  background: #064e3b;
+  border-color: #065f46;
+  color: #6ee7b7;
+}
+
+.btn-cli-copy--sm {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+/* ========================
+   Pipeline: dependency + interactive
+   ======================== */
+
+.pipeline-detail-produces {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.pipeline-detail-requires {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  color: #9ca3af;
+  background: #f3f4f6;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.pipeline-detail-requires--locked {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.utility-requires {
+  font-size: 10px;
+  color: #9ca3af;
+  background: #f3f4f6;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+/* ========================
+   Path Auto-detect Badge
+   ======================== */
+
+.path-auto-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #059669;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
 }

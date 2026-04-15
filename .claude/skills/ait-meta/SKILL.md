@@ -1,5 +1,5 @@
 ---
-name: generate-app-info
+name: ait-meta
 description: 앱의 .meta-dashboard.json을 PRD와 소스코드 분석으로 자동 생성합니다.
 allowed-tools: Read, Bash, Glob, Write
 ---
@@ -11,8 +11,8 @@ allowed-tools: Read, Bash, Glob, Write
 ## 호출 형식
 
 ```
-/init-dashboard-meta              # 특정 앱 폴더에서 실행
-/init-dashboard-meta              # 레포 루트에서 실행 (앱 선택 필요)
+/ait-meta                         # 특정 앱 폴더에서 실행
+/ait-meta                         # 레포 루트에서 실행 (앱 선택 필요)
 ```
 
 ---
@@ -52,11 +52,11 @@ apps/ 폴더에서 발견된 앱:
 5. `docs/**/*.md` 중 내용에 "문제 정의" 또는 "Problem Statement" 포함된 파일
 
 PRD를 찾으면 STEP 2로 진행.  
-**못 찾으면** → `/idea-to-prd` 스킬을 먼저 실행하도록 안내:
+**못 찾으면** → `/ait-plan` 스킬을 먼저 실행하도록 안내:
 
 ```
 PRD 파일을 찾지 못했습니다.
-먼저 /idea-to-prd 로 PRD를 작성해주세요.
+먼저 /ait-plan 으로 PRD를 작성해주세요.
 PRD가 docs/ 폴더에 저장된 후 다시 이 스킬을 실행하면 됩니다.
 ```
 

@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import ReactMarkdown from 'react-markdown';
 import { useApps } from '@/hooks/useApps';
 import LogStream from '@/components/LogStream';
 import AppAvatar from '@/components/AppAvatar';
-import type { AppConsoleConfig } from '@/types';
+import { PIPELINE_SKILLS } from '@/types';
+import type { AppConsoleConfig, AllowedSkill, PipelineStepStatus } from '@/types';
 
 type ConsoleTextField = Extract<
   keyof AppConsoleConfig,
@@ -76,6 +77,20 @@ async function copyText(text: string) {
   }
 }
 
+
+// ── 파이프라인 단계 상태 판별 ──
+type StepState = 'completed' | 'enabled' | 'locked';
+
+function getStepState(
+  step: (typeof PIPELINE_SKILLS)[number],
+  progress: Record<number, PipelineStepStatus>
+): StepState {
+  if (progress[step.step]) return 'completed';
+  if (step.requiresSteps.length === 0) return 'enabled';
+  const allDepsMet = step.requiresSteps.every((s) => !!progress[s]);
+  return allDepsMet ? 'enabled' : 'locked';
+}
+
 export default function AppDetail() {
   const { appId } = useParams<{ appId: string }>();
   const navigate = useNavigate();
@@ -87,7 +102,25 @@ export default function AppDetail() {
   const [saving, setSaving] = useState(false);
   const [logLines, setLogLines] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
+  const [runningSkill, setRunningSkill] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [pipelineExpanded, setPipelineExpanded] = useState(true);
+  const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
+  const skillEsRef = useRef<EventSource | null>(null);
+
+  // 언마운트 시 실행 중인 스킬 EventSource 정리
+  useEffect(() => {
+    return () => {
+      skillEsRef.current?.close();
+    };
+  }, []);
+
+  async function copyCliCommand(skill: string) {
+    const cmd = `claude -p /${skill}`;
+    await copyText(cmd);
+    setCopiedCmd(skill);
+    setTimeout(() => setCopiedCmd(null), 2000);
+  }
 
   if (!app) {
     return (
@@ -124,13 +157,16 @@ export default function AppDetail() {
       } else if ((edit.field === 'prdPath' || edit.field === 'utPath') && !edit.value.trim()) {
         value = null;
       }
-      await fetch(`/api/apps/${app.folderName}/console`, {
+      const res = await fetch(`/api/apps/${app.folderName}/console`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [edit.field]: value }),
       });
+      if (!res.ok) throw new Error('저장에 실패했습니다.');
       setEdit({ field: null, value: '' });
       await refetch();
+    } catch {
+      // 실패 시 편집 상태 유지 (사용자가 재시도 가능)
     } finally {
       setSaving(false);
     }
@@ -144,22 +180,29 @@ export default function AppDetail() {
     setTimeout(() => setCopied(null), 1500);
   }
 
-  async function runSkill(skill: 'ait-ut' | 'idea-to-prd' | 'icon-generator') {
+  async function runSkill(skill: AllowedSkill) {
     if (running || !app) return;
+    skillEsRef.current?.close();
     setRunning(true);
+    setRunningSkill(skill);
     setLogLines([]);
     const es = new EventSource(`/api/run-skill/stream?skill=${skill}&app=${app.folderName}`);
+    skillEsRef.current = es;
     es.addEventListener('log', (e) => {
-      setLogLines((prev) => [...prev, e.data as string].slice(-200));
+      setLogLines((prev) => [...prev, e.data].slice(-200));
     });
     es.addEventListener('done', () => {
       setRunning(false);
+      setRunningSkill(null);
       es.close();
+      skillEsRef.current = null;
       void refetch();
     });
     es.addEventListener('error', () => {
       setRunning(false);
+      setRunningSkill(null);
       es.close();
+      skillEsRef.current = null;
       setLogLines((prev) => [...prev, '[오류] 스킬 실행 중 오류가 발생했습니다.']);
     });
   }
@@ -191,43 +234,187 @@ export default function AppDetail() {
             <div className="detail-package">{app.packageName}</div>
           </div>
         </div>
+        <div className="detail-header-completion">
+          <span className="completion-label">완성도</span>
+          <span className="completion-value">{app.completion}%</span>
+        </div>
       </div>
 
-      {/* ── 기획 (PRD) ── */}
-      <section className="detail-section">
-        <h2 className="detail-section-title">기획</h2>
-        <div className="doc-path-row">
-          <PathField
-            label="PRD 경로"
-            field="prdPath"
-            value={app.console.prdPath}
-            exists={app.docs.prd.exists}
-            date={app.docs.prd.date}
-            appId={app.folderName}
-            edit={edit}
-            saving={saving}
-            onEdit={startEdit}
-            onCancel={cancelEdit}
-            onSave={() => void saveField()}
-            onChange={(v) => setEdit({ field: 'prdPath', value: v })}
-          />
-          <div className="doc-actions">
-            {!app.docs.prd.exists && (
-              <button
-                className="btn-skill btn-skill-sm"
-                onClick={() => void runSkill('idea-to-prd')}
-                disabled={running}
-              >
-                ▶ idea-to-prd
-              </button>
-            )}
+      {/* ── 출시 파이프라인 ── */}
+      <section className="detail-section pipeline-section">
+        <div className="pipeline-header">
+          <h2 className="detail-section-title">출시 파이프라인</h2>
+          <div className="pipeline-header-actions">
+            <button
+              className={`btn-cli-copy ${copiedCmd === 'ait-launch' ? 'btn-cli-copy--copied' : ''}`}
+              onClick={() => void copyCliCommand('ait-launch')}
+              title="CLI에서 7단계 파이프라인 순차 실행 (클립보드 복사)"
+            >
+              {copiedCmd === 'ait-launch' ? '복사됨' : 'claude -p /ait-launch'}
+            </button>
+            <button
+              className="btn-pipeline-toggle"
+              onClick={() => setPipelineExpanded((v) => !v)}
+            >
+              {pipelineExpanded ? '접기' : '개별 단계'}
+            </button>
           </div>
         </div>
+
+        {/* 미니 스테퍼 (항상 보임) */}
+        <div className="pipeline-mini-stepper">
+          {PIPELINE_SKILLS.map((item, idx) => {
+            const state = getStepState(item, app.console.pipelineProgress);
+            return (
+              <div key={item.skill} className="pipeline-mini-step-wrap">
+                {idx > 0 && (
+                  <div className={`pipeline-mini-connector ${
+                    getStepState(PIPELINE_SKILLS[idx - 1]!, app.console.pipelineProgress) === 'completed'
+                      ? 'pipeline-mini-connector--done'
+                      : ''
+                  }`} />
+                )}
+                <div
+                  className={`pipeline-mini-dot pipeline-mini-dot--${state} ${
+                    runningSkill === item.skill ? 'pipeline-mini-dot--running' : ''
+                  }`}
+                  title={`Step ${item.step}: ${item.label} — ${item.description}${
+                    state === 'completed' ? ' ✓' : state === 'locked' ? ` (필요: ${item.requires})` : ''
+                  }`}
+                >
+                  {state === 'completed' && <span className="pipeline-mini-check">✓</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 개별 단계 (펼쳤을 때) */}
+        {pipelineExpanded && (
+          <div className="pipeline-detail-list">
+            {PIPELINE_SKILLS.map((item) => {
+              const state = getStepState(item, app.console.pipelineProgress);
+              const isLocked = state === 'locked';
+              const isCompleted = state === 'completed';
+              return (
+                <div
+                  key={item.skill}
+                  className={`pipeline-detail-row ${
+                    runningSkill === item.skill ? 'pipeline-detail-row--running' : ''
+                  } ${isCompleted ? 'pipeline-detail-row--completed' : ''} ${
+                    isLocked ? 'pipeline-detail-row--locked' : ''
+                  }`}
+                >
+                  <span className={`pipeline-detail-step ${isCompleted ? 'pipeline-detail-step--done' : ''}`}>
+                    {isCompleted ? '✓' : `STEP ${item.step}`}
+                  </span>
+                  <span className="pipeline-detail-label">{item.label}</span>
+                  <span className="pipeline-detail-desc">
+                    {item.description}
+                    <span className="pipeline-detail-produces">→ {item.produces}</span>
+                    {isLocked && item.requires && (
+                      <span className="pipeline-detail-requires pipeline-detail-requires--locked">
+                        필요: {item.requires}
+                      </span>
+                    )}
+                  </span>
+                  {item.mode === 'interactive' ? (
+                    <button
+                      className="pipeline-detail-btn pipeline-detail-btn--link"
+                      onClick={() => document.getElementById('plan-section')?.scrollIntoView({ behavior: 'smooth' })}
+                      disabled={isLocked}
+                      title={isLocked ? `전제 조건 미충족: ${item.requires}` : '아래 기획 섹션으로 이동'}
+                    >
+                      {isCompleted ? '기획서 보기' : '기획하기'}
+                    </button>
+                  ) : (
+                    <button
+                      className="pipeline-detail-btn"
+                      onClick={() => void runSkill(item.skill as AllowedSkill)}
+                      disabled={running || isLocked}
+                      title={isLocked ? `전제 조건 미충족: ${item.requires}` : item.description}
+                    >
+                      {runningSkill === item.skill ? (
+                        <span className="pipeline-spinner" />
+                      ) : isCompleted ? (
+                        '재실행'
+                      ) : (
+                        '실행'
+                      )}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ── 기획 (PRD) ── */}
+      <section id="plan-section" className="detail-section">
+        <h2 className="detail-section-title">기획</h2>
+        {app.docs.prd.exists ? (
+          /* PRD가 있을 때: 경로 + 뷰어 */
+          <div className="plan-existing">
+            <div className="doc-path-row">
+              <PathField
+                label="PRD 경로"
+                field="prdPath"
+                value={app.docs.prd.path ?? app.console.prdPath}
+                exists={app.docs.prd.exists}
+                date={app.docs.prd.date}
+                autoDetected={app.docs.prd.autoDetected}
+                appId={app.folderName}
+                edit={edit}
+                saving={saving}
+                onEdit={startEdit}
+                onCancel={cancelEdit}
+                onSave={() => void saveField()}
+                onChange={(v) => setEdit({ field: 'prdPath', value: v })}
+              />
+            </div>
+          </div>
+        ) : (
+          /* PRD가 없을 때: 3가지 진입점 */
+          <div className="plan-empty">
+            <p className="plan-empty-desc">기획서(PRD)가 아직 없습니다. 아래 방법 중 하나로 시작하세요.</p>
+            <div className="plan-entries">
+              <PrdDropZone
+                appId={app.folderName}
+                onUploaded={() => void refetch()}
+              />
+              <div className="plan-entry">
+                <div className="plan-entry-icon">&#x1F4BB;</div>
+                <div className="plan-entry-title">CLI에서 기획</div>
+                <p className="plan-entry-desc">
+                  AI와 대화하며 정책 검토부터 PRD 작성까지 진행합니다.
+                </p>
+                <button
+                  className={`btn-cli-copy ${copiedCmd === 'ait-plan' ? 'btn-cli-copy--copied' : ''}`}
+                  onClick={() => void copyCliCommand('ait-plan')}
+                  title="앱 폴더에서 실행"
+                >
+                  {copiedCmd === 'ait-plan' ? '복사됨' : 'claude -p /ait-plan'}
+                </button>
+              </div>
+              <div className="plan-entry plan-entry--coming">
+                <div className="plan-entry-icon">&#x1F4AC;</div>
+                <div className="plan-entry-title">
+                  웹에서 기획
+                  <span className="plan-entry-badge">준비 중</span>
+                </div>
+                <p className="plan-entry-desc">
+                  브라우저에서 AI와 대화하며 PRD를 완성합니다.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── 브랜드 & 코드 설정 | 스토어 등록 자료 (2컬럼) ── */}
       <div className="detail-columns">
-        {/* 브랜드 & 코드 설정 (현 L1) */}
+        {/* 브랜드 & 코드 설정 (Layer 1) */}
         <section className="detail-section">
           <h2 className="detail-section-title">
             브랜드 & 코드 설정
@@ -259,13 +446,13 @@ export default function AppDetail() {
             <div className="meta-row">
               <div className="meta-label">.ait 파일</div>
               <div className="meta-value">
-                <span>{app.completionDetail.layer1 >= 10 ? '✅ 있음' : '❌ 없음'}</span>
+                <span>{app.completionDetail.layer1 >= 10 ? '있음' : '없음'}</span>
               </div>
             </div>
           </div>
         </section>
 
-        {/* 스토어 등록 자료 (현 L2) */}
+        {/* 스토어 등록 자료 (Layer 2) */}
         <section className="detail-section">
           <h2 className="detail-section-title">
             스토어 등록 자료
@@ -287,13 +474,13 @@ export default function AppDetail() {
                   </div>
                 ) : (
                   <div className="meta-display">
-                    <span className="meta-empty">❌ 없음 (600×600)</span>
+                    <span className="meta-empty">없음 (600x600)</span>
                     <button
                       className="btn-skill btn-skill-sm"
-                      onClick={() => void runSkill('icon-generator')}
+                      onClick={() => void runSkill('ait-assets')}
                       disabled={running}
                     >
-                      ▶ icon-generator
+                      /ait-assets
                     </button>
                   </div>
                 )}
@@ -359,7 +546,7 @@ export default function AppDetail() {
                               onClick={() => void handleCopy(field.key)}
                               title="클립보드에 복사"
                             >
-                              {copied === field.key ? '✓' : '복사'}
+                              {copied === field.key ? '복사됨' : '복사'}
                             </button>
                           )}
                           <button className="btn-edit" onClick={() => startEdit(field.key)}>
@@ -388,13 +575,13 @@ export default function AppDetail() {
                   </div>
                 ) : (
                   <div className="meta-display">
-                    <span className="meta-empty">❌ 없음 (1932×828)</span>
+                    <span className="meta-empty">없음 (1932x828)</span>
                     <button
                       className="btn-skill btn-skill-sm"
-                      onClick={() => void runSkill('icon-generator')}
+                      onClick={() => void runSkill('ait-assets')}
                       disabled={running}
                     >
-                      ▶ icon-generator
+                      /ait-assets
                     </button>
                   </div>
                 )}
@@ -417,7 +604,7 @@ export default function AppDetail() {
                     ))}
                   </div>
                 ) : (
-                  <span className="meta-empty">❌ 없음 (세로 636×1048 ≥3장)</span>
+                  <span className="meta-empty">없음 (세로 636x1048, 3장 이상)</span>
                 )}
               </div>
             </div>
@@ -432,9 +619,10 @@ export default function AppDetail() {
           <PathField
             label="UT 경로"
             field="utPath"
-            value={app.console.utPath}
+            value={app.docs.ut.path ?? app.console.utPath}
             exists={app.docs.ut.exists}
             date={app.docs.ut.date}
+            autoDetected={app.docs.ut.autoDetected}
             appId={app.folderName}
             edit={edit}
             saving={saving}
@@ -450,14 +638,14 @@ export default function AppDetail() {
                 onClick={() => void runSkill('ait-ut')}
                 disabled={running}
               >
-                ▶ ait-ut
+                /ait-ut
               </button>
             )}
           </div>
         </div>
       </section>
 
-      <LogStream lines={logLines} running={running} />
+      <LogStream lines={logLines} running={running} skillName={runningSkill} />
     </main>
   );
 }
@@ -470,6 +658,7 @@ function PathField({
   value,
   exists,
   date,
+  autoDetected,
   appId,
   edit,
   saving,
@@ -483,6 +672,7 @@ function PathField({
   value: string | null;
   exists: boolean;
   date?: string;
+  autoDetected?: boolean;
   appId: string;
   edit: EditState;
   saving: boolean;
@@ -523,6 +713,7 @@ function PathField({
           ) : (
             <span className="meta-empty">경로 미설정</span>
           )}
+          {autoDetected && <span className="path-auto-badge">자동 감지</span>}
           {exists && date && <span className="doc-date">{date}</span>}
           <button className="btn-edit" onClick={() => onEdit(field)}>
             편집
@@ -573,7 +764,7 @@ function MarkdownViewer({
             <div className="md-modal-header">
               <span className="md-modal-title">{title}</span>
               <button className="md-modal-close" onClick={() => setModal(false)}>
-                ✕
+                x
               </button>
             </div>
             <div className="md-modal-body md-content">
@@ -583,6 +774,88 @@ function MarkdownViewer({
         </div>
       )}
     </>
+  );
+}
+
+function PrdDropZone({
+  appId,
+  onUploaded,
+}: {
+  appId: string;
+  onUploaded: () => void;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      if (!file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
+        setError('.md 또는 .txt 파일만 업로드할 수 있습니다.');
+        return;
+      }
+      setError(null);
+      setUploading(true);
+      try {
+        const content = await file.text();
+        const res = await fetch(`/api/apps/${appId}/upload-prd`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, content }),
+        });
+        if (!res.ok) {
+          const data = (await res.json()) as { error?: string };
+          throw new Error(data.error ?? 'Upload failed');
+        }
+        onUploaded();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '업로드 실패');
+      } finally {
+        setUploading(false);
+      }
+    },
+    [appId, onUploaded]
+  );
+
+  return (
+    <div
+      className={`plan-entry plan-entry--drop ${dragOver ? 'plan-entry--drag-over' : ''}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const file = e.dataTransfer.files[0];
+        if (file) void handleFile(file);
+      }}
+      onClick={() => inputRef.current?.click()}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".md,.txt"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleFile(file);
+          e.target.value = '';
+        }}
+      />
+      <div className="plan-entry-icon">{uploading ? '' : '\u{1F4C4}'}</div>
+      <div className="plan-entry-title">PRD 업로드</div>
+      <p className="plan-entry-desc">
+        {uploading
+          ? '업로드 중...'
+          : dragOver
+            ? '여기에 놓으세요'
+            : '기획서 파일(.md)을 드래그하거나 클릭하세요'}
+      </p>
+      {error && <p className="plan-entry-error">{error}</p>}
+    </div>
   );
 }
 
@@ -606,7 +879,7 @@ function ReadonlyRow({
             <span>{value}</span>
           )
         ) : (
-          <span className="meta-empty">—</span>
+          <span className="meta-empty">-</span>
         )}
       </div>
     </div>
