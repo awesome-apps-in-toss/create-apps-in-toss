@@ -1,81 +1,119 @@
 # Barreleye
 
-앱인토스 미니앱 개발을 위한 모노레포입니다.
+**토스 미니앱 개발의 모든 것, 한 곳에서.**
 
-## 기술 스택
+여러 미니앱을 모노레포로 관리하고, 각 앱의 출시 준비 상태를 대시보드 UI로 확인하세요.
+공통 설정은 한 번만, 막히는 단계는 AI에게 맡기세요.
 
-- **모노레포**: pnpm workspaces + Turborepo
-- **빌드 도구**: Vite 6
-- **프레임워크**: React 18 + TypeScript 5.6
-- **상태 관리**: TanStack Query v5
-- **라우팅**: React Router v7
-- **앱인토스 SDK**: @apps-in-toss/web-framework ^1.x
-- **디자인 시스템**: @toss/tds-mobile ^2.x
+**[→ 데모 보기](https://awesome-apps-in-toss.github.io/create-apps-in-toss/)**
 
-## 시작하기
+---
 
+## 이게 뭔가요?
+
+토스 미니앱(앱인토스)을 만들다 보면 이런 상황이 생깁니다.
+
+> "PRD는 만들었나? 스토어 등록용 로고는? 앱 이름 영어로 뭐라고 했더라?"
+
+앱이 여러 개가 되면 각 앱의 상태를 파악하는 것 자체가 일이 됩니다.
+Barreleye는 이 문제를 해결하는 **미니앱 전용 개발 허브**입니다.
+
+---
+
+## 주요 기능
+
+### 📊 뭐가 빠졌는지 한눈에
+브랜드 설정, 스토어 에셋, 기획 문서를 3가지 레이어로 나눠 각 앱의 완성도를 시각화합니다. 어느 앱이 출시에 얼마나 가까운지 카드 하나로 파악됩니다.
+
+### ⚡ 새 앱, 명령어 하나로
 ```bash
-# 의존성 설치
-pnpm install
+pnpm new-app my-app
+```
+TypeScript·ESLint·TDS 설정이 자동으로 적용된 미니앱이 생성됩니다. 스캐폴딩부터 개발까지 바로 시작할 수 있습니다.
 
-# 개발 서버 실행
-pnpm dev
+### 📦 공통 설정은 한 번만
+`packages/`에 TypeScript 설정·ESLint 규칙·UI 컴포넌트를 모아두면 모든 앱이 공유합니다. 설정을 고칠 때 파일 하나만 수정하면 됩니다.
 
-# 빌드
-pnpm build
+### 🤖 막히는 단계, AI에게 맡기기
+기획·에셋·구현·검수 등 각 단계를 AI 스킬로 하나씩 채우거나, `/ait-launch`로 7단계 전체를 한 번에 실행할 수 있습니다.
+
+```
+기획 → 에셋 → 스캐폴딩 → TDS → 구현 → 검수 → 빌드
 ```
 
-## 주요 명령어
+---
 
-| 명령어                | 설명                   |
-| --------------------- | ---------------------- |
-| `pnpm dev`            | 모든 앱 개발 서버 실행 |
-| `pnpm build`          | 전체 빌드              |
-| `pnpm lint`           | 전체 린트 검사         |
-| `pnpm typecheck`      | 전체 타입 체크         |
-| `pnpm format`         | 코드 포맷팅            |
-| `pnpm new-app <name>` | 새 미니앱 생성         |
+## 빠른 시작
+
+```bash
+# 1. 클론
+git clone https://github.com/Awesome-Apps-in-Toss/create-apps-in-toss.git
+cd create-apps-in-toss
+
+# 2. 의존성 설치
+pnpm install
+
+# 3. 대시보드 실행
+pnpm dev
+```
+
+브라우저에서 `http://localhost:5173` 열면 대시보드가 뜹니다.
+
+### 새 미니앱 추가
+
+```bash
+pnpm new-app my-app
+pnpm install
+pnpm --filter @barreleye/my-app dev
+```
+
+---
 
 ## 프로젝트 구조
 
 ```
 barreleye/
-├── apps/                    # 미니앱들
-│   └── sample-miniapp/      # 샘플 앱
-├── packages/                # 공유 패키지
-│   ├── tsconfig/            # TypeScript 설정
-│   ├── eslint-config/       # ESLint 설정
-│   └── ui/                  # 공유 UI 컴포넌트
-├── docs/                    # 문서 (Harness)
-├── scripts/                 # 유틸리티 스크립트
-├── AGENTS.md                # AI 에이전트 가이드
-├── pnpm-workspace.yaml
-├── turbo.json
-└── package.json
+├── apps/
+│   ├── dashboard/      # 관리 대시보드 (대시보드 본체)
+│   └── sample/         # 샘플 미니앱
+├── packages/
+│   ├── tsconfig/       # 공유 TypeScript 설정
+│   ├── eslint-config/  # 공유 ESLint 설정
+│   └── ui/             # 공유 UI 컴포넌트
+├── docs/               # 가이드 문서
+└── scripts/            # 유틸리티 스크립트
 ```
 
-## 문서
+---
 
-상세 문서는 `docs/` 디렉토리 참조:
+## 기술 스택
 
-- [Architecture Overview](docs/architecture/overview.md)
-- [Dependency Layers](docs/architecture/dependency-layers.md)
-- [Create App Guide](docs/guides/create-app.md)
-- [Code Style](docs/conventions/code-style.md)
-- [Troubleshooting](docs/troubleshooting/common-errors.md)
+| 영역 | 기술 |
+|------|------|
+| 런타임 | React 18, TypeScript 5.6 |
+| 빌드 | Vite 6, Turborepo |
+| 모노레포 | pnpm workspaces |
+| 상태 관리 | TanStack Query v5 |
+| 라우팅 | React Router v7 |
+| 앱인토스 SDK | `@apps-in-toss/web-framework` ^2.x |
+| 디자인 시스템 | `@toss/tds-mobile` ^2.x |
 
-AI 에이전트용 컨텍스트: [AGENTS.md](AGENTS.md)
+---
 
-## 새 미니앱 생성
+## 주요 명령어
 
-```bash
-pnpm new-app my-new-app
-pnpm install
-pnpm --filter @barreleye/my-new-app dev
-```
+| 명령어 | 설명 |
+|--------|------|
+| `pnpm dev` | 대시보드 개발 서버 실행 |
+| `pnpm build` | 전체 빌드 |
+| `pnpm new-app <name>` | 새 미니앱 생성 |
+| `pnpm lint` | 전체 린트 검사 |
+| `pnpm typecheck` | 전체 타입 체크 |
 
-## 주의사항
+---
 
+## 참고
+
+- 앱인토스 개발자 문서: [developers-apps-in-toss.toss.im](https://developers-apps-in-toss.toss.im)
 - SDK 2.x 필수 (2026년 3월 23일 이후 1.x 업로드 불가)
-- TDS 컴포넌트는 샌드박스 앱에서만 테스트 가능
-- 비게임 미니앱은 TDS 사용 필수
+- 비게임 미니앱은 `@toss/tds-mobile` 컴포넌트 사용 필수

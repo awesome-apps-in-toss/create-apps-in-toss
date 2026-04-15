@@ -99,7 +99,7 @@ export default function Home() {
               토스 미니앱 개발의 모든 것,<br />한 곳에서
             </h1>
             <p className="hero-desc">
-              여러 미니앱을 모노레포로 관리하고, 각 앱의 출시 준비 상태를 GUI로 확인하세요.
+              여러 미니앱을 모노레포로 관리하고, 각 앱의 출시 준비 상태를 UI에서 확인하세요.
               공유 설정·에셋은 한 번만 관리하면 모든 앱에 적용됩니다.
             </p>
             <div className="hero-cta">
