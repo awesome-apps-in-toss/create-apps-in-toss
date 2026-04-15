@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react-swc';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
+  base: process.env.NODE_ENV === 'production' ? '/create-apps-in-toss/' : '/',
   plugins: [react(), tsconfigPaths()],
   server: {
     port: 3000,

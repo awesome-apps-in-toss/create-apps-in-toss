@@ -8,17 +8,20 @@ import NewApp from './pages/NewApp';
 import { AppsProvider } from './hooks/useApps';
 import './App.css';
 
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <AppLayout />,
-    children: [
-      { index: true, element: <Home /> },
-      { path: 'apps/:appId', element: <AppDetail /> },
-      { path: 'new-app', element: <NewApp /> },
-    ],
-  },
-]);
+const router = createBrowserRouter(
+  [
+    {
+      path: '/',
+      element: <AppLayout />,
+      children: [
+        { index: true, element: <Home /> },
+        { path: 'apps/:appId', element: <AppDetail /> },
+        { path: 'new-app', element: <NewApp /> },
+      ],
+    },
+  ],
+  { basename: import.meta.env.BASE_URL }
+);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
