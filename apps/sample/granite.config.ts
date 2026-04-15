@@ -1,9 +1,9 @@
 import { defineConfig } from '@apps-in-toss/web-framework/config';
 
 export default defineConfig({
-  appName: 'sample-2',
+  appName: 'sample',
   brand: {
-    displayName: '샘플2', // 화면에 노출될 앱의 한글 이름으로 바꿔주세요.
+    displayName: '샘플', // 화면에 노출될 앱의 한글 이름으로 바꿔주세요.
     primaryColor: '#3182F6', // 화면에 노출될 앱의 기본 색상으로 바꿔주세요.
     icon: 'https://static.toss.im/icons/png/4x/icon-person-man.png',
   },
