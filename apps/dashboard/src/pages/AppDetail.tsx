@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import ReactMarkdown from 'react-markdown';
+import { Monitor, MessageSquare, FileText, Loader2 } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
 import LogStream from '@/components/LogStream';
 import AppAvatar from '@/components/AppAvatar';
@@ -385,7 +386,7 @@ export default function AppDetail() {
                 isDemo={isDemo}
               />
               <div className="plan-entry">
-                <div className="plan-entry-icon">&#x1F4BB;</div>
+                <div className="plan-entry-icon"><Monitor size={20} strokeWidth={1.75} /></div>
                 <div className="plan-entry-title">CLI에서 기획</div>
                 <p className="plan-entry-desc">
                   AI와 대화하며 정책 검토부터 PRD 작성까지 진행합니다.
@@ -399,7 +400,7 @@ export default function AppDetail() {
                 </button>
               </div>
               <div className="plan-entry plan-entry--coming">
-                <div className="plan-entry-icon">&#x1F4AC;</div>
+                <div className="plan-entry-icon"><MessageSquare size={20} strokeWidth={1.75} /></div>
                 <div className="plan-entry-title">
                   웹에서 기획
                   <span className="plan-entry-badge">준비 중</span>
@@ -857,7 +858,7 @@ function PrdDropZone({
           e.target.value = '';
         }}
       />
-      <div className="plan-entry-icon">{uploading ? '' : '\u{1F4C4}'}</div>
+      <div className="plan-entry-icon">{uploading ? <Loader2 size={20} strokeWidth={1.75} className="spin" /> : <FileText size={20} strokeWidth={1.75} />}</div>
       <div className="plan-entry-title">PRD 업로드</div>
       <p className="plan-entry-desc">
         {uploading

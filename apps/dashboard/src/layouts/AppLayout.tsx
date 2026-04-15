@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router';
+import { Info } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import { useApps } from '@/hooks/useApps';
 
@@ -9,7 +10,7 @@ export default function AppLayout() {
     <div className="layout">
       {isDemo && (
         <div className="demo-banner">
-          <span className="demo-banner-icon">📌</span>
+          <span className="demo-banner-icon"><Info size={16} strokeWidth={2} /></span>
           <span>
             데모 모드입니다. 실제 앱 데이터와 편집 기능은 로컬에서{' '}
             <code>pnpm dev</code> 실행 후 사용 가능합니다.

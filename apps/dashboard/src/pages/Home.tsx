@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { LayoutDashboard, Terminal, Layers, Sparkles } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
 import AppAvatar from '@/components/AppAvatar';
 import type { AppInfo } from '@/types';
@@ -9,28 +11,28 @@ type AppFilter = 'all' | 'brand' | 'store' | 'prd' | 'ut';
 
 const REPO_URL = 'https://github.com/Awesome-Apps-in-Toss/create-apps-in-toss';
 
-const FEATURES = [
+const FEATURES: { Icon: LucideIcon; title: string; desc: string }[] = [
   {
-    icon: '📊',
+    Icon: LayoutDashboard,
     title: '뭐가 빠졌는지 한눈에',
     desc: '브랜드·스토어 에셋·문서를 3가지 레이어로 나눠 완성도를 시각화',
   },
   {
-    icon: '⚡',
+    Icon: Terminal,
     title: '새 앱, 명령어 하나로',
     desc: 'pnpm new-app으로 미니앱 스캐폴딩. tsconfig·ESLint·TDS 설정이 자동 적용',
   },
   {
-    icon: '📦',
+    Icon: Layers,
     title: '공통 설정은 한 번만',
     desc: 'TypeScript·ESLint·UI 컴포넌트를 모노레포 packages/에서 모든 앱이 공유',
   },
   {
-    icon: '🤖',
+    Icon: Sparkles,
     title: '막히는 단계, AI에게 맡기기',
     desc: '기획·에셋·구현·검수 등 각 단계를 AI 스킬로 하나씩 채우거나, /ait-launch로 전체를 한 번에 실행',
   },
-] as const;
+];
 
 /** 앱에서 아직 완료되지 않은 다음 파이프라인 단계 */
 function getNextStep(app: AppInfo) {
@@ -127,7 +129,7 @@ export default function Home() {
         <div className="hero-features">
           {FEATURES.map((f) => (
             <div key={f.title} className="hero-feature">
-              <span className="hero-feature-icon">{f.icon}</span>
+              <span className="hero-feature-icon"><f.Icon size={20} strokeWidth={1.75} /></span>
               <div>
                 <div className="hero-feature-title">{f.title}</div>
                 <div className="hero-feature-desc">{f.desc}</div>
