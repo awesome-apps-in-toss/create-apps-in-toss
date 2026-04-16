@@ -87,11 +87,20 @@ function isEmptyDir(p) {
 }
 
 function toPackageName(raw) {
-  return raw
+  const sanitized = raw
     .toLowerCase()
     .replace(/[^a-z0-9-_]/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 214) || 'my-miniapp';
+    .slice(0, 214);
+  if (!sanitized) {
+    console.log(
+      c.yellow(
+        `  ⚠ "${raw}"은(는) npm 패키지명으로 쓸 수 없어 package.json name을 "my-miniapp"으로 설정합니다. 필요하면 직접 수정하세요.`
+      )
+    );
+    return 'my-miniapp';
+  }
+  return sanitized;
 }
 
 function pruneTemplate(target) {
@@ -216,15 +225,7 @@ export async function run(argv) {
   const sha = await resolveSha(REPO, args.branch);
   console.log(c.gray(`  · ${sha.slice(0, 7)} 다운로드 중...`));
 
-  try {
-    await downloadTemplate(`github:${REPO}#${sha}`, {
-      dir: target,
-      force: true,
-      registry: false,
-      auth: process.env.GITHUB_TOKEN,
-    });
-  } catch (err) {
-    // 부분 다운로드 정리: 스캐폴드 시작 전에 없던 디렉토리면 삭제
+  const cleanupOnFailure = () => {
     if (!targetExistedBefore) {
       try {
         fs.rmSync(target, { recursive: true, force: true });
@@ -232,30 +233,41 @@ export async function run(argv) {
         // best-effort
       }
     }
-    throw err;
-  }
-
-  console.log(c.gray('  · 템플릿 정리 (샘플 앱·스캐폴더·lockfile 제거)...'));
-  pruneTemplate(target);
-
-  const projectName = toPackageName(path.basename(target));
-  rewriteRootPackageJson(target, projectName);
-  writeTemplateManifest(target, { sha, branch: args.branch });
-
-  if (!args.skipGit) {
-    console.log(c.gray('  · git init + upstream remote 등록...'));
-    initGit(target, sha);
-  }
+  };
 
   let installed = false;
-  if (!args.skipInstall) {
-    if (hasCmd('pnpm')) {
-      console.log(c.gray('  · pnpm install 실행...'));
-      installed = run_('pnpm', ['install'], target);
-      if (!installed) console.log(c.yellow('  ⚠ pnpm install 실패 — 수동으로 재시도하세요'));
-    } else {
-      console.log(c.yellow('  ⚠ pnpm이 설치되어 있지 않아 install 스킵 (npm i -g pnpm)'));
+  try {
+    await downloadTemplate(`github:${REPO}#${sha}`, {
+      dir: target,
+      force: true,
+      registry: false,
+      auth: process.env.GITHUB_TOKEN,
+    });
+
+    console.log(c.gray('  · 템플릿 정리 (샘플 앱·스캐폴더·lockfile 제거)...'));
+    pruneTemplate(target);
+
+    const projectName = toPackageName(path.basename(target));
+    rewriteRootPackageJson(target, projectName);
+    writeTemplateManifest(target, { sha, branch: args.branch });
+
+    if (!args.skipGit) {
+      console.log(c.gray('  · git init + upstream remote 등록...'));
+      initGit(target, sha);
     }
+
+    if (!args.skipInstall) {
+      if (hasCmd('pnpm')) {
+        console.log(c.gray('  · pnpm install 실행...'));
+        installed = run_('pnpm', ['install'], target);
+        if (!installed) console.log(c.yellow('  ⚠ pnpm install 실패 — 수동으로 재시도하세요'));
+      } else {
+        console.log(c.yellow('  ⚠ pnpm이 설치되어 있지 않아 install 스킵 (npm i -g pnpm)'));
+      }
+    }
+  } catch (err) {
+    cleanupOnFailure();
+    throw err;
   }
 
   printNext(projectDir, installed);

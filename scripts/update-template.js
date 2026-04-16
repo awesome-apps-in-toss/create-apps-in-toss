@@ -198,7 +198,14 @@ function main() {
   }
 
   console.log(`[update-template] ${remote}/${UPSTREAM_BRANCH} fetch 중...`);
-  sh(`git fetch ${remote} ${UPSTREAM_BRANCH}`, { stdio: 'inherit' });
+  const fetched = spawnSync('git', ['fetch', remote, UPSTREAM_BRANCH], {
+    stdio: 'inherit',
+    shell: false,
+  });
+  if (fetched.status !== 0) {
+    console.error(`[update-template] ❌ git fetch 실패 (${remote}/${UPSTREAM_BRANCH})`);
+    process.exit(1);
+  }
 
   const latest = sh('git rev-parse FETCH_HEAD');
   const { sha: baseline, source } = resolveBaseline(remote);
