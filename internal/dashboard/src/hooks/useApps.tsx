@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type { AppInfo } from '@/types';
 import { MOCK_APPS } from '@/demo/mockData';
@@ -21,7 +21,7 @@ export function AppsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(!IS_STATIC);
   const [error, setError] = useState<string | null>(null);
 
-  async function fetchApps() {
+  const fetchApps = useCallback(async () => {
     if (IS_STATIC) return;
     try {
       const res = await fetch('/api/apps');
@@ -33,7 +33,7 @@ export function AppsProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     if (IS_STATIC) return;
@@ -44,13 +44,14 @@ export function AppsProvider({ children }: { children: ReactNode }) {
     const es = new EventSource('/api/events');
     es.addEventListener('refresh', () => void fetchApps());
     return () => es.close();
-  }, []);
+  }, [fetchApps]);
 
-  return (
-    <AppsContext.Provider value={{ apps, loading, error, isDemo: IS_STATIC, refetch: fetchApps }}>
-      {children}
-    </AppsContext.Provider>
+  const value = useMemo<AppsContextValue>(
+    () => ({ apps, loading, error, isDemo: IS_STATIC, refetch: fetchApps }),
+    [apps, loading, error, fetchApps]
   );
+
+  return <AppsContext.Provider value={value}>{children}</AppsContext.Provider>;
 }
 
 export function useApps() {

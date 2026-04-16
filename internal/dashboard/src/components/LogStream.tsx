@@ -28,7 +28,12 @@ export default function LogStream({ lines, running, skillName }: LogStreamProps)
 
   return (
     <div className="log-stream">
-      <button className="log-stream-header" onClick={() => setCollapsed((c) => !c)}>
+      <button
+        className="log-stream-header"
+        onClick={() => setCollapsed((c) => !c)}
+        aria-expanded={!collapsed}
+        aria-controls="log-stream-body"
+      >
         <span className="log-stream-title">
           {skillName ? `/${skillName}` : '실행 로그'}
         </span>
@@ -41,7 +46,13 @@ export default function LogStream({ lines, running, skillName }: LogStreamProps)
         <span className="log-stream-toggle">{collapsed ? '펼치기' : '접기'}</span>
       </button>
       {!collapsed && (
-        <div className="log-stream-body">
+        <div
+          id="log-stream-body"
+          className="log-stream-body"
+          role="log"
+          aria-live="polite"
+          aria-atomic="false"
+        >
           {lines.map((line, i) => (
             <div
               key={i}
