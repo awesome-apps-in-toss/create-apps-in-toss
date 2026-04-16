@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
-const { execSync } = require('node:child_process');
+const { execSync, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -60,13 +60,12 @@ if (!remote) {
   process.exit(0);
 }
 
-const fetched = silent(() =>
-  execSync(`git fetch --depth=1 ${remote} ${BRANCH}`, {
-    stdio: 'ignore',
-    timeout: NETWORK_TIMEOUT_MS,
-  })
-);
-if (fetched === null) {
+const fetched = spawnSync('git', ['fetch', '--depth=1', remote, BRANCH], {
+  stdio: 'ignore',
+  timeout: NETWORK_TIMEOUT_MS,
+  shell: false,
+});
+if (fetched.status !== 0) {
   writeCooldown();
   process.exit(0);
 }
@@ -83,10 +82,11 @@ if (manifestSha) {
   writeCooldown();
   if (manifestSha === remoteSha) process.exit(0);
   // 사용자가 수동 merge/rebase로 이미 반영한 경우 false-positive 방지
-  const alreadyMerged = silent(() =>
-    execSync(`git merge-base --is-ancestor ${remoteSha} HEAD`, { stdio: 'ignore' })
-  );
-  if (alreadyMerged !== null) process.exit(0);
+  const alreadyMerged = spawnSync('git', ['merge-base', '--is-ancestor', remoteSha, 'HEAD'], {
+    stdio: 'ignore',
+    shell: false,
+  });
+  if (alreadyMerged.status === 0) process.exit(0);
   notify();
   process.exit(0);
 }
@@ -98,13 +98,14 @@ if (headSha === remoteSha) {
   process.exit(0);
 }
 
-const isAncestor = silent(() =>
-  execSync(`git merge-base --is-ancestor ${remoteSha} HEAD`, { stdio: 'ignore' })
-);
+const isAncestor = spawnSync('git', ['merge-base', '--is-ancestor', remoteSha, 'HEAD'], {
+  stdio: 'ignore',
+  shell: false,
+});
 
 writeCooldown();
 
-if (isAncestor !== null) process.exit(0);
+if (isAncestor.status === 0) process.exit(0);
 
 notify();
 
