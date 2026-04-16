@@ -11,6 +11,8 @@
     "format:check": "prettier --check .",
     "clean": "turbo clean && rm -rf node_modules",
     "new-app": "node scripts/create-app.js",
+    "update-template": "node scripts/update-template.js",
+    "postinstall": "node scripts/check-template-version.js",
     "prepare": "husky"
   },
   "devDependencies": {

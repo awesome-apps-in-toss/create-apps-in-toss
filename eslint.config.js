@@ -25,6 +25,7 @@ export default tseslint.config(
       '.turbo/',
       'apps/**/node_modules/',
       'packages/**/node_modules/',
+      'internal/**/node_modules/',
     ],
   }
 );
