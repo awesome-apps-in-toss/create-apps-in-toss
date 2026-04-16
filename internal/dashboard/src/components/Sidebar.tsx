@@ -1,46 +1,47 @@
 import { NavLink, useNavigate } from 'react-router';
 import type { AppInfo } from '@/types';
+import { getFallbackColor, hexToRgba } from '@/lib/palette';
 
 interface SidebarProps {
   apps: AppInfo[];
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-const FALLBACK_COLORS = [
-  { bg: '#dbeafe', color: '#1d4ed8' },
-  { bg: '#ede9fe', color: '#6d28d9' },
-  { bg: '#dcfce7', color: '#15803d' },
-  { bg: '#ffedd5', color: '#c2410c' },
-  { bg: '#fce7f3', color: '#be185d' },
-  { bg: '#ccfbf1', color: '#0f766e' },
-  { bg: '#fef9c3', color: '#854d0e' },
-];
-
-function hexToRgba(hex: string, alpha: number) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
-export default function Sidebar({ apps }: SidebarProps) {
+export default function Sidebar({ apps, mobileOpen, onMobileClose }: SidebarProps) {
   const navigate = useNavigate();
 
+  const handleHeaderClick = () => {
+    void navigate('/');
+    onMobileClose?.();
+  };
+
+  const handleNewAppClick = () => {
+    void navigate('/new-app');
+    onMobileClose?.();
+  };
+
+  const handleNavClick = () => {
+    onMobileClose?.();
+  };
+
   return (
-    <aside className="sidebar">
-      <div
+    <aside className={`sidebar${mobileOpen ? ' sidebar--mobile-open' : ''}`}>
+      <button
+        type="button"
         className="sidebar-header"
-        onClick={() => void navigate('/')}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && void navigate('/')}
+        onClick={handleHeaderClick}
       >
         <img
           src="https://static.toss.im/logos/png/4x/logo-apps-in-toss.png"
           alt="토스 미니앱"
           className="sidebar-logo-img"
+          loading="lazy"
+          decoding="async"
+          height={20}
         />
         <div className="sidebar-subtitle">미니앱 관리 대시보드</div>
-      </div>
+      </button>
 
       <div className="sidebar-section-label">앱 목록</div>
 
@@ -50,7 +51,7 @@ export default function Sidebar({ apps }: SidebarProps) {
           const initials = displayName.slice(0, 2).toUpperCase();
           const iconUrl = app.granite?.icon;
           const primaryColor = app.granite?.primaryColor;
-          const fallback = FALLBACK_COLORS[i % FALLBACK_COLORS.length]!;
+          const fallback = getFallbackColor(i);
 
           const avatarStyle = primaryColor
             ? { background: hexToRgba(primaryColor, 0.12), color: primaryColor }
@@ -61,10 +62,19 @@ export default function Sidebar({ apps }: SidebarProps) {
               key={app.folderName}
               to={`/apps/${app.folderName}`}
               className={({ isActive }) => `sidebar-app-item ${isActive ? 'active' : ''}`}
+              onClick={handleNavClick}
             >
               <span className="sidebar-app-avatar" style={avatarStyle}>
                 {iconUrl ? (
-                  <img src={iconUrl} alt={displayName} className="sidebar-app-avatar-img" />
+                  <img
+                    src={iconUrl}
+                    alt={displayName}
+                    className="sidebar-app-avatar-img"
+                    loading="lazy"
+                    decoding="async"
+                    width={22}
+                    height={22}
+                  />
                 ) : (
                   initials
                 )}
@@ -79,7 +89,7 @@ export default function Sidebar({ apps }: SidebarProps) {
           );
         })}
 
-        <button className="sidebar-new-app-btn" onClick={() => void navigate('/new-app')}>
+        <button className="sidebar-new-app-btn" onClick={handleNewAppClick}>
           <span className="sidebar-new-app-icon">+</span>
           <span>새 앱 만들기</span>
         </button>

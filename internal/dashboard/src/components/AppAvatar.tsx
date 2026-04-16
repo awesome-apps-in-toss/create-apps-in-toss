@@ -1,21 +1,5 @@
 import type { AppInfo } from '@/types';
-
-const FALLBACK_COLORS = [
-  { bg: '#dbeafe', color: '#1d4ed8' },
-  { bg: '#ede9fe', color: '#6d28d9' },
-  { bg: '#dcfce7', color: '#15803d' },
-  { bg: '#ffedd5', color: '#c2410c' },
-  { bg: '#fce7f3', color: '#be185d' },
-  { bg: '#ccfbf1', color: '#0f766e' },
-  { bg: '#fef9c3', color: '#854d0e' },
-];
-
-function hexToRgba(hex: string, alpha: number) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
+import { getFallbackColor, hexToRgba } from '@/lib/palette';
 
 interface AppAvatarProps {
   app: AppInfo;
@@ -29,6 +13,7 @@ export default function AppAvatar({ app, index, size = 'md' }: AppAvatarProps) {
   const displayName = (app.granite?.displayName ?? app.console.nameKo) || app.folderName;
   const initials = displayName.slice(0, 2).toUpperCase();
   const sizeClass = size === 'sm' ? 'app-avatar-sm' : 'app-avatar';
+  const imgSize = size === 'sm' ? 22 : 40;
 
   if (iconUrl) {
     return (
@@ -37,10 +22,18 @@ export default function AppAvatar({ app, index, size = 'md' }: AppAvatarProps) {
         style={
           primaryColor
             ? { background: hexToRgba(primaryColor, 0.12) }
-            : { background: FALLBACK_COLORS[index % FALLBACK_COLORS.length]!.bg }
+            : { background: getFallbackColor(index).bg }
         }
       >
-        <img src={iconUrl} alt={displayName} className="app-avatar-img" />
+        <img
+          src={iconUrl}
+          alt={displayName}
+          className="app-avatar-img"
+          loading="lazy"
+          decoding="async"
+          width={imgSize}
+          height={imgSize}
+        />
       </div>
     );
   }
@@ -56,7 +49,7 @@ export default function AppAvatar({ app, index, size = 'md' }: AppAvatarProps) {
     );
   }
 
-  const fallback = FALLBACK_COLORS[index % FALLBACK_COLORS.length]!;
+  const fallback = getFallbackColor(index);
   return (
     <div className={sizeClass} style={{ background: fallback.bg, color: fallback.color }}>
       {initials}

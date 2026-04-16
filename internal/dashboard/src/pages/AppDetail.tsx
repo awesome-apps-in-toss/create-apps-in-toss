@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import ReactMarkdown from 'react-markdown';
 import { Monitor, MessageSquare, FileText, Loader2 } from 'lucide-react';
@@ -65,6 +65,19 @@ function assetUrl(appId: string, relPath: string) {
   return `/api/apps/${appId}/asset?path=${encodeURIComponent(relPath)}`;
 }
 
+// MarkdownViewer의 fetch 결과 캐시 (간단 FIFO, 최대 30개)
+const MARKDOWN_CACHE_LIMIT = 30;
+const markdownCache = new Map<string, string>();
+function cacheMarkdown(key: string, value: string) {
+  if (markdownCache.has(key)) markdownCache.delete(key);
+  markdownCache.set(key, value);
+  while (markdownCache.size > MARKDOWN_CACHE_LIMIT) {
+    const oldest = markdownCache.keys().next().value;
+    if (oldest === undefined) break;
+    markdownCache.delete(oldest);
+  }
+}
+
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text);
@@ -101,6 +114,7 @@ export default function AppDetail() {
 
   const [edit, setEdit] = useState<EditState>({ field: null, value: '' });
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [logLines, setLogLines] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
   const [runningSkill, setRunningSkill] = useState<string | null>(null);
@@ -108,6 +122,7 @@ export default function AppDetail() {
   const [pipelineExpanded, setPipelineExpanded] = useState(true);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const skillEsRef = useRef<EventSource | null>(null);
+  const planSectionRef = useRef<HTMLElement | null>(null);
 
   // 언마운트 시 실행 중인 스킬 EventSource 정리
   useEffect(() => {
@@ -135,6 +150,7 @@ export default function AppDetail() {
 
   function startEdit(field: ConsoleTextField) {
     const raw = app!.console[field];
+    setSaveError(null);
     setEdit({
       field,
       value: Array.isArray(raw) ? (raw as string[]).join(', ') : ((raw as string | null) ?? ''),
@@ -142,6 +158,7 @@ export default function AppDetail() {
   }
 
   function cancelEdit() {
+    setSaveError(null);
     setEdit({ field: null, value: '' });
   }
 
@@ -164,10 +181,11 @@ export default function AppDetail() {
         body: JSON.stringify({ [edit.field]: value }),
       });
       if (!res.ok) throw new Error('저장에 실패했습니다.');
+      setSaveError(null);
       setEdit({ field: null, value: '' });
       await refetch();
     } catch {
-      // 실패 시 편집 상태 유지 (사용자가 재시도 가능)
+      setSaveError('저장에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setSaving(false);
     }
@@ -322,7 +340,14 @@ export default function AppDetail() {
                   {item.mode === 'interactive' ? (
                     <button
                       className="pipeline-detail-btn pipeline-detail-btn--link"
-                      onClick={() => document.getElementById('plan-section')?.scrollIntoView({ behavior: 'smooth' })}
+                      onClick={() => {
+                        const reduced =
+                          typeof window !== 'undefined' &&
+                          window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+                        planSectionRef.current?.scrollIntoView({
+                          behavior: reduced ? 'auto' : 'smooth',
+                        });
+                      }}
                       disabled={isLocked || isDemo}
                       title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : isLocked ? `전제 조건 미충족: ${item.requires}` : '아래 기획 섹션으로 이동'}
                     >
@@ -352,7 +377,7 @@ export default function AppDetail() {
       </section>
 
       {/* ── 기획 (PRD) ── */}
-      <section id="plan-section" className="detail-section">
+      <section id="plan-section" ref={planSectionRef} className="detail-section">
         <h2 className="detail-section-title">기획</h2>
         {app.docs.prd.exists ? (
           /* PRD가 있을 때: 경로 + 뷰어 */
@@ -368,6 +393,7 @@ export default function AppDetail() {
                 appId={app.folderName}
                 edit={edit}
                 saving={saving}
+                saveError={saveError}
                 onEdit={startEdit}
                 onCancel={cancelEdit}
                 onSave={() => void saveField()}
@@ -440,7 +466,15 @@ export default function AppDetail() {
               value={app.granite?.icon}
               render={(v) => (
                 <span className="granite-icon-row">
-                  <img src={v} alt="icon" className="granite-icon-preview" />
+                  <img
+                    src={v}
+                    alt="icon"
+                    className="granite-icon-preview"
+                    loading="lazy"
+                    decoding="async"
+                    width={40}
+                    height={40}
+                  />
                   <span className="granite-icon-url">{v}</span>
                 </span>
               )}
@@ -471,6 +505,10 @@ export default function AppDetail() {
                       src={assetUrl(app.folderName, app.console.logoPath)}
                       alt="logo"
                       className="asset-preview asset-preview-square"
+                      loading="lazy"
+                      decoding="async"
+                      width={64}
+                      height={64}
                     />
                     <span className="asset-path">{app.console.logoPath}</span>
                   </div>
@@ -534,6 +572,15 @@ export default function AppDetail() {
                         <button className="btn-cancel" onClick={cancelEdit}>
                           취소
                         </button>
+                        {saveError && (
+                          <span
+                            className="meta-error"
+                            role="alert"
+                            style={{ color: 'var(--color-danger)', fontSize: 11 }}
+                          >
+                            {saveError}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <div className="meta-display">
@@ -578,6 +625,10 @@ export default function AppDetail() {
                       src={assetUrl(app.folderName, app.console.thumbnailPath)}
                       alt="thumbnail"
                       className="asset-preview asset-preview-wide"
+                      loading="lazy"
+                      decoding="async"
+                      width={160}
+                      height={69}
                     />
                     <span className="asset-path">{app.console.thumbnailPath}</span>
                   </div>
@@ -607,8 +658,12 @@ export default function AppDetail() {
                       <img
                         key={idx}
                         src={assetUrl(app.folderName, p)}
-                        alt={`screenshot-${idx + 1}`}
+                        alt={`${displayName} 스크린샷 ${idx + 1}`}
                         className="asset-preview asset-preview-screenshot"
+                        loading="lazy"
+                        decoding="async"
+                        width={61}
+                        height={100}
                       />
                     ))}
                   </div>
@@ -635,6 +690,7 @@ export default function AppDetail() {
             appId={app.folderName}
             edit={edit}
             saving={saving}
+            saveError={saveError}
             onEdit={startEdit}
             onCancel={cancelEdit}
             onSave={() => void saveField()}
@@ -672,6 +728,7 @@ function PathField({
   appId,
   edit,
   saving,
+  saveError,
   onEdit,
   onCancel,
   onSave,
@@ -686,6 +743,7 @@ function PathField({
   appId: string;
   edit: EditState;
   saving: boolean;
+  saveError?: string | null;
   onEdit: (f: ConsoleTextField) => void;
   onCancel: () => void;
   onSave: () => void;
@@ -712,6 +770,15 @@ function PathField({
           <button className="btn-cancel" onClick={onCancel}>
             취소
           </button>
+          {saveError && (
+            <span
+              className="meta-error"
+              role="alert"
+              style={{ color: 'var(--color-danger)', fontSize: 11 }}
+            >
+              {saveError}
+            </span>
+          )}
         </div>
       ) : (
         <div className="path-field-body">
@@ -746,13 +813,55 @@ function MarkdownViewer({
 }) {
   const [content, setContent] = useState<string | null>(null);
   const [modal, setModal] = useState(false);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const reactId = useId();
+  const titleId = `md-modal-title-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
   useEffect(() => {
+    const key = `${appId}::${relPath}`;
+    const cached = markdownCache.get(key);
+    if (cached !== undefined) {
+      setContent(cached);
+      return;
+    }
+    let cancelled = false;
     void fetch(`/api/apps/${appId}/asset?path=${encodeURIComponent(relPath)}`)
       .then((r) => r.text())
-      .then(setContent)
-      .catch(() => setContent('파일을 불러올 수 없습니다.'));
+      .then((text) => {
+        if (cancelled) return;
+        cacheMarkdown(key, text);
+        setContent(text);
+      })
+      .catch(() => {
+        if (!cancelled) setContent('파일을 불러올 수 없습니다.');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [appId, relPath]);
+
+  // 모달 열릴 때 ESC 키 처리 + 포커스 관리
+  useEffect(() => {
+    if (!modal) return;
+    previousFocusRef.current =
+      (document.activeElement as HTMLElement | null) ?? null;
+    // 닫기 버튼으로 초기 포커스 이동
+    closeBtnRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      // 닫힐 때 이전 포커스 복원
+      previousFocusRef.current?.focus?.();
+    };
+  }, [modal]);
 
   if (content === null) return <div className="md-loading">불러오는 중...</div>;
 
@@ -769,12 +878,29 @@ function MarkdownViewer({
       </div>
 
       {modal && (
-        <div className="md-modal-overlay" onClick={() => setModal(false)}>
-          <div className="md-modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="md-modal-overlay"
+          role="presentation"
+          onClick={() => setModal(false)}
+        >
+          <div
+            className="md-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="md-modal-header">
-              <span className="md-modal-title">{title}</span>
-              <button className="md-modal-close" onClick={() => setModal(false)}>
-                x
+              <span className="md-modal-title" id={titleId}>
+                {title}
+              </span>
+              <button
+                ref={closeBtnRef}
+                className="md-modal-close"
+                onClick={() => setModal(false)}
+                aria-label="닫기"
+              >
+                ×
               </button>
             </div>
             <div className="md-modal-body md-content">
@@ -834,6 +960,10 @@ function PrdDropZone({
   return (
     <div
       className={`plan-entry plan-entry--drop ${dragOver && !isDemo ? 'plan-entry--drag-over' : ''} ${isDemo ? 'plan-entry--disabled' : ''}`}
+      role="button"
+      tabIndex={isDemo ? -1 : 0}
+      aria-label="PRD 파일 업로드 (드래그앤드롭 또는 클릭)"
+      aria-disabled={isDemo}
       onDragOver={(e) => {
         e.preventDefault();
         setDragOver(true);
@@ -845,7 +975,17 @@ function PrdDropZone({
         const file = e.dataTransfer.files[0];
         if (file) void handleFile(file);
       }}
-      onClick={() => inputRef.current?.click()}
+      onClick={() => {
+        if (isDemo) return;
+        inputRef.current?.click();
+      }}
+      onKeyDown={(e) => {
+        if (isDemo) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          inputRef.current?.click();
+        }
+      }}
     >
       <input
         ref={inputRef}
@@ -858,7 +998,15 @@ function PrdDropZone({
           e.target.value = '';
         }}
       />
-      <div className="plan-entry-icon">{uploading ? <Loader2 size={20} strokeWidth={1.75} className="spin" /> : <FileText size={20} strokeWidth={1.75} />}</div>
+      <div className="plan-entry-icon">
+        {uploading ? (
+          <span role="status" aria-label="업로드 중">
+            <Loader2 size={20} strokeWidth={1.75} className="spin" />
+          </span>
+        ) : (
+          <FileText size={20} strokeWidth={1.75} />
+        )}
+      </div>
       <div className="plan-entry-title">PRD 업로드</div>
       <p className="plan-entry-desc">
         {uploading

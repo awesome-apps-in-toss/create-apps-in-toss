@@ -141,9 +141,11 @@ export default function Home() {
 
       {/* ── 다음 할 일 (로컬 모드) ── */}
       {!isDemo && urgentApp && nextStep && (
-        <div
+        <button
+          type="button"
           className="next-action"
           onClick={() => void navigate(`/apps/${urgentApp.folderName}`)}
+          style={{ font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
         >
           <div className="next-action-left">
             <span className="next-action-eyebrow">출시에 가장 가까운 앱</span>
@@ -166,11 +168,11 @@ export default function Home() {
             <span className="next-action-pct">{urgentApp.completion}%</span>
             <span className="next-action-arrow">→</span>
           </div>
-        </div>
+        </button>
       )}
 
       {/* ── 필터 + 앱 목록 ── */}
-      <div className="filter-row">
+      <div className="filter-row" role="toolbar" aria-label="앱 필터">
         {(
           [
             ['all', '전체'],
@@ -182,7 +184,9 @@ export default function Home() {
         ).map(([f, label]) => (
           <button
             key={f}
+            type="button"
             className={`filter-btn${filter === f ? ' active' : ''}`}
+            aria-pressed={filter === f}
             onClick={() => setFilter(f)}
           >
             {label}
@@ -196,10 +200,12 @@ export default function Home() {
           const description = app.console.subtitle || app.description;
 
           return (
-            <div
+            <button
               key={app.folderName}
+              type="button"
               className="app-card clickable"
               onClick={() => void navigate(`/apps/${app.folderName}`)}
+              style={{ font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
             >
               <div className="app-card-header">
                 <AppAvatar app={app} index={i} />
@@ -224,7 +230,7 @@ export default function Home() {
                   {app.docs.ut.exists && <span className="status-tag status-tag--ut">UT</span>}
                 </div>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
