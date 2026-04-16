@@ -12,7 +12,7 @@ import type {
 import { DEFAULT_CONSOLE_CONFIG } from '../../src/types/index.js';
 
 const router = Router();
-const APPS_DIR = path.resolve(process.cwd(), '../');
+const APPS_DIR = path.resolve(process.cwd(), '../../apps');
 
 // ── 앱 프레임워크 설정 파싱 (granite.config.ts 지원) ────────────
 async function readGranite(appDir: string): Promise<GraniteBrand | null> {

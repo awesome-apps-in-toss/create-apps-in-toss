@@ -5,7 +5,7 @@ import type { AppConsoleConfig } from '../../src/types/index.js';
 import { DEFAULT_CONSOLE_CONFIG } from '../../src/types/index.js';
 
 const router = Router();
-const APPS_DIR = path.resolve(process.cwd(), '../');
+const APPS_DIR = path.resolve(process.cwd(), '../../apps');
 const META_FILE = '.meta-dashboard.json';
 
 // ── 앱 ID 검증 (경로 탈출 방지) ──
