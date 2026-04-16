@@ -10,7 +10,7 @@ import { sseClients } from './sse.js';
 
 const app = express();
 const PORT = 3001;
-const APPS_DIR = path.resolve(process.cwd(), '../');
+const APPS_DIR = path.resolve(process.cwd(), '../../apps');
 
 app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json());

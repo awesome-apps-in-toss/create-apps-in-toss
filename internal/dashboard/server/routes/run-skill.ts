@@ -5,8 +5,8 @@ import path from 'path';
 import { PIPELINE_SKILLS } from '../../src/types/index.js';
 
 const router = Router();
-const APPS_DIR = path.resolve(process.cwd(), '../');
 const REPO_ROOT = path.resolve(process.cwd(), '../../');
+const APPS_DIR = path.join(REPO_ROOT, 'apps');
 
 // ── 앱 ID 검증 (경로 탈출 방지) ──
 const APP_ID_RE = /^[a-z0-9][a-z0-9._-]*$/;
