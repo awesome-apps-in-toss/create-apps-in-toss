@@ -48,23 +48,6 @@ pnpm update-template
 - `internal/create-apps-in-toss/` — 스캐폴더 패키지. scaffold 시 제거되며 upstream 개발자만 관리합니다.
 - `.env*`, `node_modules/`, 빌드 산출물
 
-### 레거시 `apps/dashboard/` 마이그레이션
-
-대시보드가 `apps/`에 있던 시절 포크·클론한 경우, 업데이트 후 두 경로가 공존합니다:
-
-- 새 `internal/dashboard/` — upstream 최신본
-- 기존 `apps/dashboard/` — 로컬에 남아있음 (안전하게 보존)
-
-**`apps/dashboard/`에 본인이 추가한 로컬 변경이 없다면** 수동으로 제거:
-
-```bash
-git diff apps/dashboard internal/dashboard   # 로컬 커스터마이징 비교
-git rm -r apps/dashboard
-git commit -m "chore: remove legacy apps/dashboard"
-```
-
-로컬 커스터마이징이 있다면 `internal/dashboard/`로 옮긴 뒤 제거하세요. `pnpm update-template`은 `apps/dashboard/`를 감지하면 종료 시 안내 메시지를 출력합니다.
-
 upstream이 새 script를 추가했다면 수동으로 반영 (remote 이름은 `upstream` 또는 `origin`):
 
 ```bash

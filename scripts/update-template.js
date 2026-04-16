@@ -177,15 +177,6 @@ function syncPath(baseline, target, p) {
   return { ok: true, count };
 }
 
-function notifyLegacyDashboard() {
-  if (!fs.existsSync('apps/dashboard')) return;
-  console.warn('\n[update-template] ⚠️  레거시 경로 감지: apps/dashboard/');
-  console.warn('   대시보드는 internal/dashboard/ 로 이전되었습니다.');
-  console.warn('   로컬 변경을 확인 후 수동으로 제거하세요:');
-  console.warn('     git diff apps/dashboard internal/dashboard   # 로컬 커스터마이징 비교');
-  console.warn('     git rm -r apps/dashboard                     # 확인 후 제거');
-}
-
 function updateCooldownTimestamp() {
   const cacheDir = path.join('node_modules', '.cache');
   const cacheFile = path.join(cacheDir, 'barreleye-template-check');
@@ -215,7 +206,6 @@ function main() {
   if (baseline === latest) {
     console.log('[update-template] ✅ 이미 최신 상태입니다. (baseline === upstream)');
     updateCooldownTimestamp();
-    notifyLegacyDashboard();
     return;
   }
 
@@ -252,7 +242,6 @@ function main() {
   if (changed === 0) {
     console.log(`[update-template] ✅ 코드 변경 없음. ${MANIFEST_FILE}만 ${latest.slice(0, 7)}로 업데이트.`);
     updateCooldownTimestamp();
-    notifyLegacyDashboard();
     return;
   }
 
@@ -271,8 +260,6 @@ function main() {
   console.log(`\n⚠️  apps/* / package.json / README.md / pnpm-lock.yaml은 동기화 대상이 아닙니다.`);
   console.log('   upstream의 scripts 필드에 새 항목이 있다면 수동으로 반영하세요:');
   console.log(`   git show ${remote}/${UPSTREAM_BRANCH}:package.json`);
-
-  notifyLegacyDashboard();
 }
 
 main();
