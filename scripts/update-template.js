@@ -8,6 +8,7 @@ const UPSTREAM_URL = 'https://github.com/Awesome-Apps-in-Toss/create-apps-in-tos
 const UPSTREAM_URL_FRAGMENT = 'Awesome-Apps-in-Toss/create-apps-in-toss';
 const UPSTREAM_BRANCH = process.env.BARRELEYE_TEMPLATE_BRANCH || 'main';
 const SYNC_IGNORE_FILE = '.barreleye-sync-ignore';
+const MANIFEST_FILE = '.barreleye-template.json';
 
 const SYNC_PATHS = [
   '.claude',
@@ -15,7 +16,7 @@ const SYNC_PATHS = [
   'scripts',
   'packages',
   'docs',
-  'apps/dashboard',
+  'internal/dashboard',
   'pnpm-workspace.yaml',
   'turbo.json',
   'tsconfig.json',
@@ -27,8 +28,12 @@ const SYNC_PATHS = [
   'AGENTS.md',
 ];
 
+const args = process.argv.slice(2);
+const ALLOW_HEAD_FALLBACK = args.includes('--allow-head-fallback');
+
 function sh(cmd, opts = {}) {
-  return execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
+  const out = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts });
+  return typeof out === 'string' ? out.trim() : '';
 }
 
 function tryShell(cmd, opts = {}) {
@@ -37,6 +42,15 @@ function tryShell(cmd, opts = {}) {
   } catch (e) {
     return { ok: false, err: e.stderr?.toString() ?? e.message };
   }
+}
+
+function git(argv) {
+  const r = spawnSync('git', argv, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], shell: false });
+  return {
+    ok: r.status === 0,
+    out: (r.stdout || '').trim(),
+    err: (r.stderr || '').trim() || (r.error?.message ?? ''),
+  };
 }
 
 function loadIgnorePatterns() {
@@ -50,6 +64,20 @@ function loadIgnorePatterns() {
 
 function isIgnored(p, patterns) {
   return patterns.some((pat) => p === pat || p.startsWith(pat.replace(/\/$/, '') + '/'));
+}
+
+function readManifest() {
+  if (!fs.existsSync(MANIFEST_FILE)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(MANIFEST_FILE, 'utf8'));
+  } catch {
+    console.warn(`[update-template] ⚠️  ${MANIFEST_FILE} 파싱 실패 — 무시`);
+    return null;
+  }
+}
+
+function writeManifest(data) {
+  fs.writeFileSync(MANIFEST_FILE, JSON.stringify(data, null, 2) + '\n');
 }
 
 function validateUpstreamUrl(url) {
@@ -99,24 +127,63 @@ function warnAutocrlf() {
   }
 }
 
-function syncPath(ref, p) {
-  // upstream에 없는 파일은 로컬에서 삭제 (A = local에 있고 upstream에 없음)
-  const deletedR = tryShell(`git diff --name-only --diff-filter=A ${ref}..HEAD -- "${p}"`);
+function resolveBaseline(remote) {
+  const manifest = readManifest();
+  if (manifest?.sha) {
+    return { sha: manifest.sha, source: 'manifest', manifest };
+  }
+
+  console.log(`[update-template] ${MANIFEST_FILE} 없음 — baseline 자동 추정`);
+  const mb = git(['merge-base', `${remote}/${UPSTREAM_BRANCH}`, 'HEAD']);
+  if (mb.ok && mb.out) {
+    console.log(`[update-template]  · merge-base ${remote}/${UPSTREAM_BRANCH} HEAD = ${mb.out.slice(0, 7)}`);
+    return { sha: mb.out, source: 'merge-base', manifest: null };
+  }
+
+  if (!ALLOW_HEAD_FALLBACK) {
+    console.error('[update-template] ❌ baseline SHA를 결정할 수 없습니다.');
+    console.error('   manifest(.barreleye-template.json)도 없고 merge-base도 실패했습니다.');
+    console.error('   HEAD를 baseline으로 쓰면 사용자가 추가한 tracked 파일이 삭제될 수 있습니다.');
+    console.error('   의도적으로 진행하려면: pnpm update-template --allow-head-fallback');
+    process.exit(1);
+  }
+
+  const head = git(['rev-parse', 'HEAD']);
+  if (head.ok) {
+    console.warn(`[update-template] ⚠️  HEAD fallback: ${head.out.slice(0, 7)} — 로컬 추가 파일이 삭제될 수 있음`);
+    return { sha: head.out, source: 'head-fallback', manifest: null };
+  }
+
+  throw new Error('baseline SHA를 결정할 수 없습니다.');
+}
+
+function syncPath(baseline, target, p) {
+  const deletedR = git(['diff', '--name-only', '--diff-filter=D', `${baseline}..${target}`, '--', p]);
   if (deletedR.ok && deletedR.out) {
     for (const f of deletedR.out.split('\n').filter(Boolean)) {
-      const rm = tryShell(`git rm -f -- "${f}"`);
+      if (!fs.existsSync(f)) continue;
+      const rm = git(['rm', '-f', '--', f]);
       if (!rm.ok) {
         console.warn(`[update-template]  ⚠ rm 실패: ${f} (${rm.err.split('\n')[0]})`);
       }
     }
   }
 
-  const r = tryShell(`git checkout ${ref} -- "${p}"`);
+  const r = git(['checkout', target, '--', p]);
   if (!r.ok) return { ok: false, err: r.err };
 
-  const diff = tryShell(`git diff --cached --name-only -- "${p}"`);
+  const diff = git(['diff', '--cached', '--name-only', '--', p]);
   const count = diff.ok && diff.out ? diff.out.split('\n').filter(Boolean).length : 0;
   return { ok: true, count };
+}
+
+function notifyLegacyDashboard() {
+  if (!fs.existsSync('apps/dashboard')) return;
+  console.warn('\n[update-template] ⚠️  레거시 경로 감지: apps/dashboard/');
+  console.warn('   대시보드는 internal/dashboard/ 로 이전되었습니다.');
+  console.warn('   로컬 변경을 확인 후 수동으로 제거하세요:');
+  console.warn('     git diff apps/dashboard internal/dashboard   # 로컬 커스터마이징 비교');
+  console.warn('     git rm -r apps/dashboard                     # 확인 후 제거');
 }
 
 function updateCooldownTimestamp() {
@@ -142,16 +209,27 @@ function main() {
   console.log(`[update-template] ${remote}/${UPSTREAM_BRANCH} fetch 중...`);
   sh(`git fetch ${remote} ${UPSTREAM_BRANCH}`, { stdio: 'inherit' });
 
-  // FETCH_HEAD가 가장 신뢰도 높음 (remote-tracking ref 갱신은 git config에 의존)
-  const ref = sh('git rev-parse FETCH_HEAD');
-  let changed = 0;
+  const latest = sh('git rev-parse FETCH_HEAD');
+  const { sha: baseline, source } = resolveBaseline(remote);
 
+  if (baseline === latest) {
+    console.log('[update-template] ✅ 이미 최신 상태입니다. (baseline === upstream)');
+    updateCooldownTimestamp();
+    notifyLegacyDashboard();
+    return;
+  }
+
+  console.log(
+    `[update-template] baseline ${baseline.slice(0, 7)} (${source}) → upstream ${latest.slice(0, 7)}`
+  );
+
+  let changed = 0;
   for (const p of SYNC_PATHS) {
     if (isIgnored(p, ignorePatterns)) {
       console.log(`[update-template]  · skip ${p} (ignored)`);
       continue;
     }
-    const r = syncPath(ref, p);
+    const r = syncPath(baseline, latest, p);
     if (!r.ok) {
       console.warn(`[update-template]  · skip ${p} (${r.err.split('\n')[0]})`);
       continue;
@@ -162,12 +240,19 @@ function main() {
     }
   }
 
-  // staged 상태를 unstage (워킹트리는 유지)
-  tryShell('git reset HEAD --');
+  git(['reset', 'HEAD', '--']);
+
+  writeManifest({
+    repository: UPSTREAM_URL_FRAGMENT,
+    branch: UPSTREAM_BRANCH,
+    sha: latest,
+    updatedAt: new Date().toISOString(),
+  });
 
   if (changed === 0) {
-    console.log('[update-template] ✅ 이미 최신 상태입니다.');
+    console.log(`[update-template] ✅ 코드 변경 없음. ${MANIFEST_FILE}만 ${latest.slice(0, 7)}로 업데이트.`);
     updateCooldownTimestamp();
+    notifyLegacyDashboard();
     return;
   }
 
@@ -182,10 +267,12 @@ function main() {
   console.log('\n[update-template] 🎉 완료. 변경사항은 unstaged 상태로 워킹트리에 있습니다:');
   console.log('  git status');
   console.log('  git diff');
-  console.log('  git add -A && git commit -m "chore: sync template from upstream"');
-  console.log('\n⚠️  package.json / README.md / pnpm-lock.yaml은 동기화 대상이 아닙니다.');
+  console.log(`  git add -A && git commit -m "chore: sync template to ${latest.slice(0, 7)}"`);
+  console.log(`\n⚠️  apps/* / package.json / README.md / pnpm-lock.yaml은 동기화 대상이 아닙니다.`);
   console.log('   upstream의 scripts 필드에 새 항목이 있다면 수동으로 반영하세요:');
   console.log(`   git show ${remote}/${UPSTREAM_BRANCH}:package.json`);
+
+  notifyLegacyDashboard();
 }
 
 main();

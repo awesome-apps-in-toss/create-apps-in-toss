@@ -39,7 +39,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/dashboard/dist
+          path: internal/dashboard/dist
 
   deploy:
     needs: build

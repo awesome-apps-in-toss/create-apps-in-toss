@@ -40,13 +40,15 @@
 
 ```
 barreleye/
-├── apps/
-│   ├── dashboard/          # 로컬 대시보드 (앱 준비 상태 시각화)
-│   └── sample/             # 샘플 미니앱
-├── packages/
-│   ├── tsconfig/           # 공유 TypeScript 설정
-│   ├── eslint-config/      # 공유 ESLint 설정
-│   └── ui/                 # 공유 UI 컴포넌트
+├── apps/                    # 사용자 미니앱 (scaffold 시 비어있음, update-template 불가침)
+│   └── sample/              # 샘플 미니앱 (upstream branch에만 존재, scaffold 시 제거됨)
+├── packages/                # 사용자 공용 패키지
+│   ├── tsconfig/            # 공유 TypeScript 설정
+│   ├── eslint-config/       # 공유 ESLint 설정
+│   └── ui/                  # 공유 UI 컴포넌트
+├── internal/                # 템플릿 관리 영역 (update-template 동기화 대상)
+│   ├── dashboard/           # 관리 대시보드
+│   └── create-apps-in-toss/ # 스캐폴더 패키지 (upstream 전용, scaffold 시 제거됨)
 ├── docs/
 │   ├── launch-flow/        # 앱인토스 7단계 출시 플로우
 │   ├── architecture/       # 아키텍처 (overview, dependency-layers)
@@ -74,12 +76,13 @@ barreleye/
 ## Dependency Flow (엄격)
 
 ```
-packages/tsconfig → packages/eslint-config → packages/ui → apps/*
+packages/tsconfig → packages/eslint-config → packages/ui → apps/* ∪ internal/*
 ```
 
-- `apps/*`는 `packages/*`에 의존 가능
+- `apps/*` / `internal/*`는 `packages/*`에 의존 가능
 - `packages/*`는 서로 의존 가능 (순환 금지)
 - `apps/*`끼리는 의존 금지
+- `internal/*`은 템플릿 관리 영역 — `update-template` 동기화 대상
 
 ---
 
@@ -112,7 +115,7 @@ pnpm new-app X    # 새 앱 생성
 
 ## Dashboard
 
-`apps/dashboard/`는 로컬 웹 UI로 다음 기능을 제공한다:
+`internal/dashboard/`는 로컬 웹 UI로 다음 기능을 제공한다:
 
 - 모든 앱과 완료 상태(3 레이어) 시각화
 - `.meta-dashboard.json` 메타데이터 인라인 편집

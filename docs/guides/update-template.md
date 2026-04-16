@@ -1,6 +1,6 @@
 # 템플릿 업데이트 받기
 
-이 프로젝트는 [Awesome-Apps-in-Toss/create-apps-in-toss](https://github.com/Awesome-Apps-in-Toss/create-apps-in-toss) 원본에서 스킬·스크립트·대시보드·문서가 계속 개선됩니다. 클론한 뒤에도 upstream 변경사항을 받아올 수 있도록 동기화 스크립트가 포함되어 있습니다.
+이 프로젝트는 [Awesome-Apps-in-Toss/create-apps-in-toss](https://github.com/Awesome-Apps-in-Toss/create-apps-in-toss) 원본에서 스킬·스크립트·대시보드·문서가 계속 개선됩니다. `npx create-apps-in-toss`로 스캐폴드했든, 레포를 포크/클론했든 동일한 방식으로 upstream 변경사항을 받아올 수 있습니다.
 
 ## 사용법
 
@@ -8,14 +8,24 @@
 pnpm update-template
 ```
 
-동작:
+## 동작 방식 (SHA baseline)
 
-1. `upstream` remote가 없으면 자동으로 추가 (`origin`이 원본을 가리키면 그대로 사용). URL이 공식 레포와 다르면 중단합니다.
+프로젝트 루트의 **`.barreleye-template.json`** 이 마지막으로 동기화된 upstream SHA를 기록합니다. 이 파일을 기준으로 upstream의 어떤 파일이 추가/수정/삭제되었는지 계산합니다.
+
+1. `upstream` remote가 없으면 자동으로 추가 (`origin`이 원본을 가리키면 그대로 사용). URL이 공식 레포와 다르면 중단.
 2. `core.autocrlf=true` 감지 시 경고 (CRLF 변환으로 불필요한 diff가 생길 수 있음)
-3. `upstream/main`을 fetch (FETCH_HEAD 기준)
-4. 아래 경로를 upstream 버전으로 동기화. **동기화 대상 경로 안에서 upstream에 없는 파일은 로컬에서도 제거됩니다** — upstream이 삭제한 파일뿐 아니라, 사용자가 그 경로 안에 추가한 커스텀 파일(예: `.claude/skills/mine/`, `docs/my-note.md`)도 함께 제거된다는 뜻입니다. 보존이 필요하면 `.barreleye-sync-ignore`에 해당 상위 경로를 등록하거나, 동기화 대상 밖(예: `apps/<your-app>/`)에 두세요.
-5. 변경사항을 unstage 상태로 워킹트리에 남김
-6. `pnpm install` 실행
+3. `upstream/main` fetch (FETCH_HEAD 기준)
+4. **baseline 결정**:
+   - `.barreleye-template.json`의 SHA 사용
+   - 없으면 `git merge-base upstream/main HEAD`로 자동 추정 (기존 clone 사용자 마이그레이션)
+   - 그것도 실패하면 **스크립트 중단** (데이터 손실 방지). 의도적으로 HEAD를 baseline으로 쓰려면 `pnpm update-template --allow-head-fallback` (로컬 tracked 파일이 삭제될 수 있음)
+5. 아래 경로에 대해 `baseline..FETCH_HEAD` diff 적용:
+   - upstream이 **삭제한** 파일 → 로컬에서도 제거
+   - upstream이 **추가/수정한** 파일 → 로컬에 덮어쓰기
+   - baseline 이후 사용자가 추가한 tracked 파일·untracked 파일 → **보존**
+6. `.barreleye-template.json`을 새 SHA로 업데이트
+7. 변경사항을 unstage 상태로 워킹트리에 남김
+8. 변경 파일이 있었을 때만 `pnpm install` 실행
 
 ## 동기화 대상
 
@@ -24,24 +34,60 @@ pnpm update-template
 - `scripts/`
 - `packages/` (공용 tsconfig·eslint·ui)
 - `docs/`
-- `apps/dashboard/`
+- `internal/dashboard/` (관리 대시보드)
 - 루트 설정 파일 (`turbo.json`, `tsconfig.json`, `eslint.config.js`, `pnpm-workspace.yaml`, `vercel.json`, `.gitignore`, `.gitattributes`, `CLAUDE.md`, `AGENTS.md`)
 
 ## 동기화되지 **않는** 파일
 
 사용자 커스터마이징이 쌓일 가능성이 높은 파일은 의도적으로 제외됩니다:
 
+- `apps/*` — **당신이 만든 미니앱은 절대 건드리지 않습니다.** 어떤 하위 경로도 update-template이 수정·삭제하지 않습니다.
 - `package.json` — 루트 dependencies/scripts에 본인 앱용 항목이 있을 수 있어 자동 덮어쓰지 않습니다.
 - `pnpm-lock.yaml` — package.json이 fork마다 달라져서 lockfile도 갈라지는 게 정상입니다.
 - `README.md` — 프로젝트 설명은 fork마다 다릅니다.
-- `apps/*` (단 `apps/dashboard` 제외) — 당신이 만든 미니앱은 절대 건드리지 않습니다.
+- `internal/create-apps-in-toss/` — 스캐폴더 패키지. scaffold 시 제거되며 upstream 개발자만 관리합니다.
 - `.env*`, `node_modules/`, 빌드 산출물
 
-upstream이 새 script를 추가했다면 수동으로 반영:
+### 레거시 `apps/dashboard/` 마이그레이션
+
+대시보드가 `apps/`에 있던 시절 포크·클론한 경우, 업데이트 후 두 경로가 공존합니다:
+
+- 새 `internal/dashboard/` — upstream 최신본
+- 기존 `apps/dashboard/` — 로컬에 남아있음 (안전하게 보존)
+
+**`apps/dashboard/`에 본인이 추가한 로컬 변경이 없다면** 수동으로 제거:
 
 ```bash
-git show upstream/main:package.json
+git diff apps/dashboard internal/dashboard   # 로컬 커스터마이징 비교
+git rm -r apps/dashboard
+git commit -m "chore: remove legacy apps/dashboard"
 ```
+
+로컬 커스터마이징이 있다면 `internal/dashboard/`로 옮긴 뒤 제거하세요. `pnpm update-template`은 `apps/dashboard/`를 감지하면 종료 시 안내 메시지를 출력합니다.
+
+upstream이 새 script를 추가했다면 수동으로 반영 (remote 이름은 `upstream` 또는 `origin`):
+
+```bash
+git show upstream/main:package.json   # 또는 origin/main
+```
+
+## `.barreleye-template.json`
+
+`npx create-apps-in-toss`로 scaffold하면 자동 생성됩니다:
+
+```json
+{
+  "repository": "Awesome-Apps-in-Toss/create-apps-in-toss",
+  "branch": "main",
+  "sha": "a1b2c3d...",
+  "scaffoldedAt": "2026-04-16T12:34:56.000Z",
+  "scaffolder": "create-apps-in-toss@0.1.0"
+}
+```
+
+**git에 커밋하세요** — 팀원들이 같은 baseline에서 업데이트를 받도록.
+
+기존 clone 사용자는 이 파일이 없어도 `pnpm update-template`이 자동으로 `merge-base`를 추정하고, 첫 실행 후 파일을 생성합니다.
 
 ## 동기화 제외 설정 (`.barreleye-sync-ignore`)
 
@@ -59,19 +105,19 @@ docs
 - `BARRELEYE_SKIP_TEMPLATE_CHECK=1` — postinstall 자동 체크 끄기
 - `CI=true` — postinstall 자동 스킵
 
-## 충돌 정책
+## 로컬 수정이 덮어써지는 경우
 
-**동기화 대상 경로는 항상 upstream이 우선**합니다. 해당 경로의 로컬 수정은 덮어써질 수 있으니, 고정이 필요하면 `.barreleye-sync-ignore`에 등록하세요. 템플릿 공용 파일을 수정해야 한다면 원본 레포에 PR을 올리는 것을 권장합니다.
+**동기화 대상 경로 내에서 upstream에도 존재하는 파일**을 수정했다면 덮어써집니다. 고정이 필요하면 `.barreleye-sync-ignore`에 등록하세요. 템플릿 공용 파일을 개선해야 한다면 원본 레포에 PR을 올리는 것을 권장합니다.
 
-실수로 로컬 변경을 잃었다면 먼저 `git reflog`로 이전 상태를 확인하고 안전하게 복구하세요:
+**baseline 이후 로컬에서만 추가한 파일**(upstream에 존재하지 않는 파일)은 보존됩니다. 예: `.claude/skills/my-custom/SKILL.md`는 그대로 남습니다. 단 `--allow-head-fallback` 모드에서는 baseline이 HEAD가 되어 사용자가 추가한 tracked 파일도 삭제 대상이 될 수 있으니 주의하세요.
+
+실수로 로컬 변경을 잃었다면 `git reflog`로 이전 상태를 확인:
 
 ```bash
 git reflog                              # 이전 HEAD 목록 확인
 git switch -c backup-before-sync <해시> # 잃어버린 상태로 새 브랜치 생성
 git restore --source=<해시> -- <경로>   # 특정 파일만 복구
 ```
-
-`git reset --hard`는 최후의 수단입니다.
 
 ## 사전 체크
 
@@ -103,3 +149,5 @@ git status
 git diff
 git add -A && git commit -m "chore: sync template from upstream"
 ```
+
+커밋에는 업데이트된 `.barreleye-template.json` (새 SHA)도 포함됩니다.

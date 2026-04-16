@@ -11,6 +11,7 @@ const BRANCH = process.env.BARRELEYE_TEMPLATE_BRANCH || 'main';
 const NETWORK_TIMEOUT_MS = 3000;
 const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h
 const CACHE_FILE = path.join('node_modules', '.cache', 'barreleye-template-check');
+const MANIFEST_FILE = '.barreleye-template.json';
 
 function sh(cmd, opts = {}) {
   return execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], ...opts }).trim();
@@ -24,7 +25,6 @@ function silent(fn) {
   }
 }
 
-// 쿨다운: 24h 내 체크했으면 skip (rate limit / 네트워크 비용 절약)
 const lastCheck = silent(() => Number(fs.readFileSync(CACHE_FILE, 'utf8')));
 if (lastCheck && Date.now() - lastCheck < COOLDOWN_MS) process.exit(0);
 
@@ -34,6 +34,15 @@ function writeCooldown() {
     fs.writeFileSync(CACHE_FILE, String(Date.now()));
   } catch {
     // ignore
+  }
+}
+
+function readManifestSha() {
+  try {
+    const m = JSON.parse(fs.readFileSync(MANIFEST_FILE, 'utf8'));
+    return typeof m?.sha === 'string' && m.sha.length >= 7 ? m.sha : null;
+  } catch {
+    return null;
   }
 }
 
@@ -51,7 +60,6 @@ if (!remote) {
   process.exit(0);
 }
 
-// shallow fetch로 upstream SHA를 로컬에 확보 (timeout으로 offline/사내망 보호)
 const fetched = silent(() =>
   execSync(`git fetch --depth=1 ${remote} ${BRANCH}`, {
     stdio: 'ignore',
@@ -69,6 +77,21 @@ if (!remoteSha) {
   process.exit(0);
 }
 
+// 1순위: manifest SHA와 upstream SHA 직접 비교 (npx scaffold / update 직후 가장 정확)
+const manifestSha = readManifestSha();
+if (manifestSha) {
+  writeCooldown();
+  if (manifestSha === remoteSha) process.exit(0);
+  // 사용자가 수동 merge/rebase로 이미 반영한 경우 false-positive 방지
+  const alreadyMerged = silent(() =>
+    execSync(`git merge-base --is-ancestor ${remoteSha} HEAD`, { stdio: 'ignore' })
+  );
+  if (alreadyMerged !== null) process.exit(0);
+  notify();
+  process.exit(0);
+}
+
+// 2순위 (manifest 없는 clone 사용자): git ancestry 체크
 const headSha = silent(() => sh('git rev-parse HEAD'));
 if (headSha === remoteSha) {
   writeCooldown();
@@ -81,13 +104,16 @@ const isAncestor = silent(() =>
 
 writeCooldown();
 
-// is-ancestor: 성공(exit 0) = upstream이 HEAD에 포함됨 = 최신, 실패 = 업데이트 있음
 if (isAncestor !== null) process.exit(0);
 
-console.log('');
-console.log('📦 [barreleye] 템플릿에 새 업데이트가 있습니다.');
-console.log('   최신 스킬·스크립트·대시보드를 받으려면:');
-console.log('   $ pnpm update-template');
-console.log('');
-console.log('   (이 알림은 24시간 후 다시 나타납니다. 끄려면 BARRELEYE_SKIP_TEMPLATE_CHECK=1)');
-console.log('');
+notify();
+
+function notify() {
+  console.log('');
+  console.log('📦 [barreleye] 템플릿에 새 업데이트가 있습니다.');
+  console.log('   최신 스킬·스크립트·대시보드를 받으려면:');
+  console.log('   $ pnpm update-template');
+  console.log('');
+  console.log('   (이 알림은 24시간 후 다시 나타납니다. 끄려면 BARRELEYE_SKIP_TEMPLATE_CHECK=1)');
+  console.log('');
+}
