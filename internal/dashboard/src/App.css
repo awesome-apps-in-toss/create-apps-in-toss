@@ -1959,6 +1959,17 @@ body {
   color: #6b7280;
 }
 
+.new-app-error {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .new-app-actions {
   display: flex;
   gap: 10px;

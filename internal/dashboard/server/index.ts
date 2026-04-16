@@ -4,6 +4,7 @@ import path from 'path';
 import { appsRouter } from './routes/apps.js';
 import { metaRouter } from './routes/meta.js';
 import { runSkillRouter } from './routes/run-skill.js';
+import { createAppRouter } from './routes/create-app.js';
 import { createWatcher } from './watcher.js';
 import { sseClients } from './sse.js';
 
@@ -55,6 +56,7 @@ app.get('/api/apps/:id/asset', (req, res) => {
   });
 });
 
+app.use('/api/apps/create', createAppRouter);
 app.use('/api/apps', appsRouter);
 app.use('/api/apps', metaRouter);
 app.use('/api/run-skill', runSkillRouter);
