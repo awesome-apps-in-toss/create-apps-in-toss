@@ -16,6 +16,7 @@
 | 빌드 & 배포 | `docs/launch-flow/07-build-deploy-guide.md` | `/ait-build` |
 | UT 시뮬레이션 | — | `/ait-ut` |
 | 앱 메타 생성 | — | `/ait-meta` |
+| 로드맵 · 설계 원칙 | `docs/roadmap.md` | — |
 | 아키텍처 이해 | `docs/architecture/overview.md` | — |
 | 의존성 관리 | `docs/guides/dependencies.md` | — |
 | 코드 컨벤션 | `docs/conventions/code-style.md` | — |
