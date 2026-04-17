@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Circle, Loader2, XCircle, AlertCircle, Clock, Play, RotateCcw } from 'lucide-react';
 import type { PipelineStep } from '@/hooks/useSkills';
+import type { AppInfo } from '@/types';
+import ArtifactReviewCard from '@/components/ArtifactReviewCard';
 import {
   useRuns,
   useRunStream,
@@ -21,6 +23,10 @@ interface RunTimelineProps {
   onRunComplete?: (run: RunSummary) => void;
   /** ait-plan 처럼 interactive 스킬에서 "기획하기" 클릭 시. 미지정 시 버튼 숨김. */
   onInteractiveStep?: (step: PipelineStep) => void;
+  /** true 면 COMPLETED 단계 아래에 ArtifactReviewCard 를 렌더. app 필요. */
+  showArtifacts?: boolean;
+  /** showArtifacts=true 일 때 artifact 조회 대상 앱 정보. */
+  app?: AppInfo;
 }
 
 /**
@@ -39,6 +45,8 @@ export default function RunTimeline({
   externalRefresh,
   onRunComplete,
   onInteractiveStep,
+  showArtifacts = false,
+  app,
 }: RunTimelineProps) {
   const { runs, loading, error, refetch } = useRuns(appName);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -223,6 +231,12 @@ export default function RunTimeline({
                       });
                     }}
                   />
+                )}
+
+                {showArtifacts && app && latest?.state === 'COMPLETED' && (
+                  <div className="run-timeline-artifact">
+                    <ArtifactReviewCard step={step.step} app={app} expanded={false} />
+                  </div>
                 )}
               </div>
             </li>
