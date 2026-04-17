@@ -2849,6 +2849,84 @@ body {
 }
 
 /* ========================
+   Claude CLI status banner
+   ======================== */
+.claude-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+.claude-status--loading {
+  background: var(--color-bg-subtle, #f7f8fa);
+  color: var(--color-text-secondary, #6b7280);
+}
+.claude-status--ok {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+.claude-status--warn {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+.claude-status--error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+.claude-status-icon {
+  flex-shrink: 0;
+}
+.claude-status-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.claude-status-message {
+  font-weight: 500;
+}
+.claude-status-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+.claude-status-meta-item {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.claude-status-refresh {
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.claude-status-refresh:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.05);
+}
+.claude-status--compact {
+  padding: 6px 10px;
+  margin-bottom: 0;
+}
+.claude-status--compact .claude-status-meta {
+  display: none;
+}
+
+/* ========================
    Run Timeline (오케스트레이션 기반)
    ======================== */
 .run-timeline {

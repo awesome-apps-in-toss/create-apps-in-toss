@@ -7,6 +7,7 @@ import { runSkillRouter } from './routes/run-skill.js';
 import { createAppRouter } from './routes/create-app.js';
 import { skillsRouter } from './routes/skills.js';
 import { orchestrationsRouter } from './routes/orchestrations.js';
+import { diagnosticsRouter } from './routes/diagnostics.js';
 import { createWatcher } from './watcher.js';
 import { sseClients } from './sse.js';
 import { getDefaultRunStore } from './lib/orchestration/run-store.js';
@@ -66,6 +67,7 @@ app.use('/api/apps', metaRouter);
 app.use('/api/run-skill', runSkillRouter);
 app.use('/api/skills', skillsRouter);
 app.use('/api/orchestrations', orchestrationsRouter);
+app.use('/api/diagnostics', diagnosticsRouter);
 
 createWatcher();
 

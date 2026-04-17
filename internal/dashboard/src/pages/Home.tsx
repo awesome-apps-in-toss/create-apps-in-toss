@@ -6,6 +6,7 @@ import { useApps } from '@/hooks/useApps';
 import { useSkills } from '@/hooks/useSkills';
 import type { PipelineStep } from '@/hooks/useSkills';
 import AppAvatar from '@/components/AppAvatar';
+import ClaudeStatus from '@/components/ClaudeStatus';
 import type { AppInfo } from '@/types';
 
 type AppFilter = 'all' | 'brand' | 'store' | 'prd' | 'ut';
@@ -140,6 +141,9 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* ── Claude CLI 상태 ── */}
+      {!isDemo && <ClaudeStatus />}
 
       {/* ── 다음 할 일 (로컬 모드) ── */}
       {!isDemo && urgentApp && nextStep && (
