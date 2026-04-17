@@ -5,7 +5,7 @@ import path from 'path';
 import type { AppConsoleConfig } from '../../src/types/index.js';
 import { DEFAULT_CONSOLE_CONFIG } from '../../src/types/index.js';
 
-const router = Router();
+const router: Router = Router();
 const REPO_ROOT = path.resolve(process.cwd(), '../../');
 const APPS_ROOT = path.join(REPO_ROOT, 'apps');
 const CREATE_APP_SCRIPT = path.join(REPO_ROOT, 'scripts', 'create-app.js');

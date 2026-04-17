@@ -2,6 +2,15 @@
 name: ait-ut
 description: 앱인토스(토스 미니앱) 사용자 페르소나로 UT(사용성 테스트)를 시뮬레이션합니다. 경로를 자동 분석해 메인 플로우를 파악하고 문서화한 뒤 UT 리포트를 생성합니다.
 allowed-tools: Read, Bash, Glob, Write
+mode: automated
+requires: [ait-implement]
+inputs:
+  - { key: appName, type: text, required: true }
+  - { key: persona, type: text, required: false }
+  - { key: sessionMode, type: enum, values: [simulate, session], required: false }
+outputs:
+  - { key: utReport, type: file, path: 'apps/<appName>/docs/user-test/*.md' }
+idempotencyKey: ait-ut
 ---
 
 # 앱인토스 UT 시뮬레이터

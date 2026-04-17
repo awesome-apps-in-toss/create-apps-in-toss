@@ -2,6 +2,15 @@
 name: ait-plan
 description: 토스 미니앱 아이디어를 정책 검토 + 대화형 핑퐁 방식으로 검증하고, 비즈니스 모델 설계 후 PRD 파일로 완성합니다.
 allowed-tools: Read, Write
+mode: interactive
+step: 1
+requires: []
+inputs:
+  - { key: idea, type: text, required: false }
+  - { key: planningDoc, type: file, required: false }
+outputs:
+  - { key: prd, type: file, path: 'docs/prd/*.md' }
+idempotencyKey: ait-plan
 ---
 
 # 아이디어 → 정책 검토 → PRD

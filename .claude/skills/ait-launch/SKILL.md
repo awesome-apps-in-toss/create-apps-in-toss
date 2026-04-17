@@ -2,6 +2,15 @@
 name: ait-launch
 description: 앱인토스 미니앱 전체 출시 플로우를 7단계(기획→리소스→스캐폴딩→TDS→구현→검수→빌드)로 순차 실행
 argument-hint: '[기획서 경로 또는 앱 아이디어]'
+mode: interactive
+requires: []
+inputs:
+  - { key: ideaOrPrdPath, type: text, required: false }
+  - { key: appType, type: enum, values: [game, partner], required: false }
+  - { key: appName, type: text, required: false }
+outputs:
+  - { key: app, type: directory, path: 'apps/<appName>/' }
+idempotencyKey: ait-launch
 ---
 
 # 앱인토스 미니앱 전체 출시 플로우

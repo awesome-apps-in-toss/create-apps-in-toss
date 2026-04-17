@@ -4,7 +4,7 @@ import path from 'path';
 import type { AppConsoleConfig } from '../../src/types/index.js';
 import { DEFAULT_CONSOLE_CONFIG } from '../../src/types/index.js';
 
-const router = Router();
+const router: Router = Router();
 const APPS_DIR = path.resolve(process.cwd(), '../../apps');
 const META_FILE = '.meta-dashboard.json';
 

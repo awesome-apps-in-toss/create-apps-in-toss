@@ -2,6 +2,16 @@
 name: ait-review
 description: 앱인토스 검수 체크리스트 기반 코드 리뷰. light(핵심만)/full(전수검사) 모드 지원
 argument-hint: '<app-name> [light|full] [game|partner]'
+mode: automated
+step: 6
+requires: [ait-implement]
+inputs:
+  - { key: appName, type: text, required: true }
+  - { key: reviewMode, type: enum, values: [light, full], required: false }
+  - { key: appType, type: enum, values: [game, partner], required: false }
+outputs:
+  - { key: reviewReport, type: text, required: true }
+idempotencyKey: ait-review
 ---
 
 # 앱인토스 검수 체크리스트 리뷰
