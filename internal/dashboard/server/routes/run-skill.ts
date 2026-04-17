@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { spawn, execSync } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { PIPELINE_SKILLS } from '../../src/types/index.js';
+import { readSkillMeta } from '../lib/skills-meta.js';
 
 const router: Router = Router();
 const REPO_ROOT = path.resolve(process.cwd(), '../../');
@@ -127,12 +127,16 @@ router.get('/stream', (req, res) => {
   proc.on('close', (code) => {
     sendLog(`[dashboard] 종료 (exit code: ${code ?? 0})`);
 
-    // 파이프라인 스킬 성공 시 진행 상태 기록
+    // 파이프라인 스킬 성공 시 진행 상태 기록 (SKILL.md frontmatter의 step 기반)
     if (code === 0) {
-      const pipelineStep = PIPELINE_SKILLS.find((s) => s.skill === skill);
-      if (pipelineStep) {
-        void recordPipelineProgress(appName, pipelineStep.step).catch(() => {});
-      }
+      void readSkillMeta(skill)
+        .then((meta) => {
+          if (meta?.step != null) {
+            return recordPipelineProgress(appName, meta.step);
+          }
+          return undefined;
+        })
+        .catch(() => {});
     }
 
     sendDone();

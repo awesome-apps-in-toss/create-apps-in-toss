@@ -107,36 +107,30 @@ export interface AppInfo {
 }
 
 // ──────────────────────────────────────────
-// 스킬 분류
-// ──────────────────────────────────────────
-
-// ──────────────────────────────────────────
 // 스킬 실행 모드
 //   interactive: 대화형 — 웹에서 직접 실행 불가, CLI 명령어 복사 제공
 //   automated:   자동 실행 가능 — 웹에서 바로 실행
 // ──────────────────────────────────────────
 export type SkillMode = 'interactive' | 'automated';
 
-/** 7단계 순차 파이프라인 스킬 */
-export const PIPELINE_SKILLS = [
-  { step: 1, label: '기획', skill: 'ait-plan', description: '정책 검토 + PRD 생성', mode: 'interactive' as SkillMode, requires: null, requiresSteps: [] as readonly number[], produces: 'PRD 문서' },
-  { step: 2, label: '에셋', skill: 'ait-assets', description: '이미지/텍스트 리소스 생성', mode: 'automated' as SkillMode, requires: null, requiresSteps: [] as readonly number[], produces: '로고, 썸네일, 스크린샷' },
-  { step: 3, label: '스캐폴딩', skill: 'ait-scaffold', description: '프로젝트 생성 + 설정', mode: 'automated' as SkillMode, requires: 'PRD (Step 1)', requiresSteps: [1] as readonly number[], produces: '프로젝트 구조, granite.config.ts' },
-  { step: 4, label: 'TDS', skill: 'ait-tds-setup', description: 'TDS 패키지 설치 + 검증', mode: 'automated' as SkillMode, requires: '프로젝트 (Step 3)', requiresSteps: [3] as readonly number[], produces: 'TDS 패키지, Provider 설정' },
-  { step: 5, label: '구현', skill: 'ait-implement', description: '기획서 기반 기능 구현', mode: 'automated' as SkillMode, requires: 'PRD + TDS (Step 1, 4)', requiresSteps: [1, 4] as readonly number[], produces: '기능 코드, 라우팅' },
-  { step: 6, label: '검수', skill: 'ait-review', description: '검수 체크리스트 점검', mode: 'automated' as SkillMode, requires: '구현 완료 (Step 5)', requiresSteps: [5] as readonly number[], produces: '검수 리포트' },
-  { step: 7, label: '빌드', skill: 'ait-build', description: '빌드 + 콘솔 업로드 안내', mode: 'automated' as SkillMode, requires: '검수 통과 (Step 6)', requiresSteps: [6] as readonly number[], produces: '.ait 번들' },
-] as const;
+// 파이프라인 단계의 **UI용 형상**(label/produces/requires 등)은 더 이상
+// 이 파일에 하드코딩하지 않는다. 런타임에 GET /api/skills 가 SKILL.md
+// frontmatter를 읽어 내려주며, 프론트는 useSkills() 훅으로 소비한다.
+// 여기서는 실행 허용 스킬의 **식별자(id)**만 타입 수준에서 고정한다.
 
-/** 독립 실행 유틸리티 스킬 */
-export const UTILITY_SKILLS = [
-  { skill: 'ait-meta', label: '메타 생성', description: '.meta-dashboard.json 자동 생성', mode: 'automated' as SkillMode, requiresData: 'PRD 또는 코드' },
-  { skill: 'ait-ut', label: 'UT 시뮬레이션', description: '페르소나 기반 사용성 테스트', mode: 'automated' as SkillMode, requiresData: '구현된 앱' },
-  { skill: 'ait-launch', label: '전체 실행', description: '7단계 파이프라인 순차 실행', mode: 'interactive' as SkillMode, requiresData: null },
-] as const;
+/** 7단계 순차 파이프라인 스킬 id */
+export type PipelineSkill =
+  | 'ait-plan'
+  | 'ait-assets'
+  | 'ait-scaffold'
+  | 'ait-tds-setup'
+  | 'ait-implement'
+  | 'ait-review'
+  | 'ait-build';
 
-export type PipelineSkill = (typeof PIPELINE_SKILLS)[number]['skill'];
-export type UtilitySkill = (typeof UTILITY_SKILLS)[number]['skill'];
+/** 독립 실행 유틸리티 스킬 id */
+export type UtilitySkill = 'ait-meta' | 'ait-ut' | 'ait-launch';
+
 export type AllowedSkill = PipelineSkill | UtilitySkill;
 
 export interface SkillRunRequest {

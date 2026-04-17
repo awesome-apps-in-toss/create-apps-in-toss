@@ -4,6 +4,8 @@ description: 앱인토스 검수 체크리스트 기반 코드 리뷰. light(핵
 argument-hint: '<app-name> [light|full] [game|partner]'
 mode: automated
 step: 6
+label: 검수
+produces: 검수 리포트
 requires: [ait-implement]
 inputs:
   - { key: appName, type: text, required: true }

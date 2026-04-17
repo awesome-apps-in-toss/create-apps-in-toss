@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import AppDetail from './pages/AppDetail';
 import NewApp from './pages/NewApp';
 import { AppsProvider } from './hooks/useApps';
+import { SkillsProvider } from './hooks/useSkills';
 import './App.css';
 
 const router = createBrowserRouter(
@@ -26,7 +27,9 @@ const router = createBrowserRouter(
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppsProvider>
-      <RouterProvider router={router} />
+      <SkillsProvider>
+        <RouterProvider router={router} />
+      </SkillsProvider>
     </AppsProvider>
   </StrictMode>
 );

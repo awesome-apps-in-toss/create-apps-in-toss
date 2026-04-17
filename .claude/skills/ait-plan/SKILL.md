@@ -4,6 +4,8 @@ description: 토스 미니앱 아이디어를 정책 검토 + 대화형 핑퐁 �
 allowed-tools: Read, Write
 mode: interactive
 step: 1
+label: 기획
+produces: PRD 문서
 requires: []
 inputs:
   - { key: idea, type: text, required: false }

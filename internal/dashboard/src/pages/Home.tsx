@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router';
 import { LayoutDashboard, Terminal, Layers, Sparkles } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
+import { useSkills } from '@/hooks/useSkills';
+import type { PipelineStep } from '@/hooks/useSkills';
 import AppAvatar from '@/components/AppAvatar';
 import type { AppInfo } from '@/types';
-import { PIPELINE_SKILLS } from '@/types';
 
 type AppFilter = 'all' | 'brand' | 'store' | 'prd' | 'ut';
 
@@ -35,8 +36,8 @@ const FEATURES: { Icon: LucideIcon; title: string; desc: string }[] = [
 ];
 
 /** 앱에서 아직 완료되지 않은 다음 파이프라인 단계 */
-function getNextStep(app: AppInfo) {
-  return PIPELINE_SKILLS.find((s) => !app.console.pipelineProgress[s.step]) ?? null;
+function getNextStep(app: AppInfo, pipeline: PipelineStep[]): PipelineStep | null {
+  return pipeline.find((s) => !app.console.pipelineProgress[s.step]) ?? null;
 }
 
 /** 완성도가 가장 높고, 아직 할 일이 남은 앱 */
@@ -50,11 +51,12 @@ function getMostUrgentApp(apps: AppInfo[]): AppInfo | null {
 
 export default function Home() {
   const { apps, loading, error, isDemo } = useApps();
+  const { pipeline } = useSkills();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<AppFilter>('all');
 
   const urgentApp = getMostUrgentApp(apps);
-  const nextStep = urgentApp ? getNextStep(urgentApp) : null;
+  const nextStep = urgentApp ? getNextStep(urgentApp, pipeline) : null;
 
   if (loading) {
     return (

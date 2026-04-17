@@ -3,9 +3,10 @@ import { useParams, useNavigate } from 'react-router';
 import ReactMarkdown from 'react-markdown';
 import { Monitor, MessageSquare, FileText, Loader2 } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
+import { useSkills } from '@/hooks/useSkills';
+import type { PipelineStep } from '@/hooks/useSkills';
 import LogStream from '@/components/LogStream';
 import AppAvatar from '@/components/AppAvatar';
-import { PIPELINE_SKILLS } from '@/types';
 import type { AppConsoleConfig, AllowedSkill, PipelineStepStatus } from '@/types';
 
 type ConsoleTextField = Extract<
@@ -96,7 +97,7 @@ async function copyText(text: string) {
 type StepState = 'completed' | 'enabled' | 'locked';
 
 function getStepState(
-  step: (typeof PIPELINE_SKILLS)[number],
+  step: PipelineStep,
   progress: Record<number, PipelineStepStatus>
 ): StepState {
   if (progress[step.step]) return 'completed';
@@ -109,6 +110,7 @@ export default function AppDetail() {
   const { appId } = useParams<{ appId: string }>();
   const navigate = useNavigate();
   const { apps, refetch, isDemo } = useApps();
+  const { pipeline } = useSkills();
   const appIndex = apps.findIndex((a) => a.folderName === appId);
   const app = apps[appIndex];
 
@@ -282,13 +284,13 @@ export default function AppDetail() {
 
         {/* 미니 스테퍼 (항상 보임) */}
         <div className="pipeline-mini-stepper">
-          {PIPELINE_SKILLS.map((item, idx) => {
+          {pipeline.map((item, idx) => {
             const state = getStepState(item, app.console.pipelineProgress);
             return (
               <div key={item.skill} className="pipeline-mini-step-wrap">
                 {idx > 0 && (
                   <div className={`pipeline-mini-connector ${
-                    getStepState(PIPELINE_SKILLS[idx - 1]!, app.console.pipelineProgress) === 'completed'
+                    getStepState(pipeline[idx - 1]!, app.console.pipelineProgress) === 'completed'
                       ? 'pipeline-mini-connector--done'
                       : ''
                   }`} />
@@ -311,7 +313,7 @@ export default function AppDetail() {
         {/* 개별 단계 (펼쳤을 때) */}
         {pipelineExpanded && (
           <div className="pipeline-detail-list">
-            {PIPELINE_SKILLS.map((item) => {
+            {pipeline.map((item) => {
               const state = getStepState(item, app.console.pipelineProgress);
               const isLocked = state === 'locked';
               const isCompleted = state === 'completed';

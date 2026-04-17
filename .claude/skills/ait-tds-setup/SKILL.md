@@ -4,6 +4,8 @@ description: 대상 앱에 @toss/tds-mobile TDS 패키지를 설치하고 컴포
 argument-hint: '<app-name>'
 mode: automated
 step: 4
+label: TDS
+produces: TDS 패키지, Provider 설정
 requires: [ait-scaffold]
 inputs:
   - { key: appName, type: text, required: true }
