@@ -140,6 +140,8 @@ export default function Wizard() {
           appName={app.folderName}
           pipeline={pipeline}
           isDemo={isDemo}
+          app={app}
+          showArtifacts
           onRunComplete={() => {
             void refetch();
             void refetchRuns();
