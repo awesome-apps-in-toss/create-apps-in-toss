@@ -11,7 +11,7 @@ import type {
 } from '../../src/types/index.js';
 import { DEFAULT_CONSOLE_CONFIG } from '../../src/types/index.js';
 
-const router = Router();
+const router: Router = Router();
 const APPS_DIR = path.resolve(process.cwd(), '../../apps');
 
 // ── 앱 프레임워크 설정 파싱 (granite.config.ts 지원) ────────────

@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { PIPELINE_SKILLS } from '../../src/types/index.js';
 
-const router = Router();
+const router: Router = Router();
 const REPO_ROOT = path.resolve(process.cwd(), '../../');
 const APPS_DIR = path.join(REPO_ROOT, 'apps');
 
