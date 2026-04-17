@@ -2,6 +2,17 @@
 name: ait-scaffold
 description: 모노레포에 새 미니앱 프로젝트를 pnpm new-app으로 생성하고 granite.config.ts 설정까지 완료
 argument-hint: '<app-name>'
+mode: automated
+step: 3
+requires: [ait-plan]
+inputs:
+  - { key: appName, type: text, required: true }
+  - { key: displayName, type: text, required: false }
+  - { key: primaryColor, type: text, required: false }
+  - { key: appType, type: enum, values: [game, partner], required: false }
+outputs:
+  - { key: project, type: directory, path: 'apps/<appName>/' }
+idempotencyKey: ait-scaffold
 ---
 
 # 앱인토스 앱 스캐폴딩

@@ -2,6 +2,14 @@
 name: ait-build
 description: typecheck→lint→ait build 순서로 빌드하고 .ait 번들 용량 검증 및 콘솔 업로드 절차 안내
 argument-hint: '<app-name>'
+mode: automated
+step: 7
+requires: [ait-review]
+inputs:
+  - { key: appName, type: text, required: true }
+outputs:
+  - { key: bundle, type: file, path: 'apps/<appName>/dist/*.ait' }
+idempotencyKey: ait-build
 ---
 
 # 앱인토스 빌드 & 배포 준비

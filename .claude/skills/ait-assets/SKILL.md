@@ -2,6 +2,15 @@
 name: ait-assets
 description: 앱인토스 콘솔 등록에 필요한 이미지(로고/썸네일 SVG+PNG)/텍스트 리소스를 점검하고, 이미지 자동 생성 옵션 제공
 argument-hint: '[앱 유형: game|partner] [--generate-images]'
+mode: automated
+step: 2
+requires: []
+inputs:
+  - { key: appType, type: enum, values: [game, partner], required: false }
+  - { key: generateImages, type: boolean, required: false }
+outputs:
+  - { key: images, type: files, path: 'apps/*/assets/*.{svg,png}' }
+idempotencyKey: ait-assets
 ---
 
 # 앱인토스 리소스 준비 점검

@@ -2,6 +2,15 @@
 name: ait-implement
 description: 기획서 기반으로 앱 기능을 구현. TDS 컴포넌트 활용, SDK 연동, 병렬 에이전트 지원
 argument-hint: '<app-name> [기능 범위]'
+mode: automated
+step: 5
+requires: [ait-plan, ait-tds-setup]
+inputs:
+  - { key: appName, type: text, required: true }
+  - { key: scope, type: text, required: false }
+outputs:
+  - { key: code, type: directory, path: 'apps/<appName>/src/' }
+idempotencyKey: ait-implement
 ---
 
 # 앱인토스 기능 구현

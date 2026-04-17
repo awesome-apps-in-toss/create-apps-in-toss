@@ -2,6 +2,14 @@
 name: ait-tds-setup
 description: 대상 앱에 @toss/tds-mobile TDS 패키지를 설치하고 컴포넌트 import/타입체크로 정상 동작 검증
 argument-hint: '<app-name>'
+mode: automated
+step: 4
+requires: [ait-scaffold]
+inputs:
+  - { key: appName, type: text, required: true }
+outputs:
+  - { key: tdsPackages, type: config, path: 'apps/<appName>/package.json' }
+idempotencyKey: ait-tds-setup
 ---
 
 # 앱인토스 TDS 환경 세팅 및 검증

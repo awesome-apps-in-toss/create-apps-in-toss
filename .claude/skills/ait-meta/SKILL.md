@@ -2,6 +2,13 @@
 name: ait-meta
 description: 앱의 .meta-dashboard.json을 PRD와 소스코드 분석으로 자동 생성합니다.
 allowed-tools: Read, Bash, Glob, Write
+mode: automated
+requires: []
+inputs:
+  - { key: appName, type: text, required: false }
+outputs:
+  - { key: metaFile, type: file, path: 'apps/<appName>/.meta-dashboard.json' }
+idempotencyKey: ait-meta
 ---
 
 # .meta-dashboard.json 초기화
