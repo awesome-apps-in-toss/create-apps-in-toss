@@ -5,6 +5,7 @@
 ## Quick Links
 
 - [AGENTS.md](../AGENTS.md) - AI 에이전트 컨텍스트 맵
+- [Roadmap](roadmap.md) - 목표 · 설계 원칙 · 단계별 우선순위
 
 ## Architecture
 
