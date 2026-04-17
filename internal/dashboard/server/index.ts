@@ -9,6 +9,7 @@ import { skillsRouter } from './routes/skills.js';
 import { orchestrationsRouter } from './routes/orchestrations.js';
 import { createWatcher } from './watcher.js';
 import { sseClients } from './sse.js';
+import { getDefaultRunStore } from './lib/orchestration/run-store.js';
 
 const app = express();
 const PORT = 3001;
@@ -67,6 +68,19 @@ app.use('/api/skills', skillsRouter);
 app.use('/api/orchestrations', orchestrationsRouter);
 
 createWatcher();
+
+// 서버 재기동 시 child 프로세스가 사라져 orphan 상태가 된 run 기록을 FAILED로 정리.
+void (async () => {
+  try {
+    const store = await getDefaultRunStore();
+    const cleaned = store.markOrphansFailed();
+    if (cleaned > 0) {
+      console.log(`[run-store] marked ${cleaned} orphan runs as FAILED after restart`);
+    }
+  } catch (err) {
+    console.warn('[run-store] startup cleanup failed', err);
+  }
+})();
 
 app.listen(PORT, HOST, () => {
   if (HOST !== '127.0.0.1' && HOST !== 'localhost') {

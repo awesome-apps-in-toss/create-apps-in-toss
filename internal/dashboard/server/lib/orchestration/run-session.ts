@@ -107,8 +107,19 @@ export class RunSession {
     res.on('close', () => this.clients.delete(res));
   }
 
-  /** 영속화/외부 리스너용 — 모든 이벤트를 forwarding. */
-  addListener(fn: (event: HistoricRunEvent) => void): () => void {
+  /**
+   * 영속화/외부 리스너용. replay: true 옵션이면 기존 히스토리를 먼저 전달한 뒤
+   * 이후 이벤트를 구독. 세션 구성 직후 초기 state 전환을 놓치지 않는 데 필요.
+   */
+  addListener(
+    fn: (event: HistoricRunEvent) => void,
+    opts: { replay?: boolean } = {}
+  ): () => void {
+    if (opts.replay) {
+      for (const e of this.eventHistory) {
+        try { fn(e); } catch { /* ignore listener errors */ }
+      }
+    }
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
   }
