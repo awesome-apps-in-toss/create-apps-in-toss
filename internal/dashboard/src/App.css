@@ -3545,3 +3545,151 @@ body {
 .run-timeline-artifact {
   margin-top: 8px;
 }
+.run-timeline-error-wrap {
+  margin-top: 10px;
+}
+
+/* ========================
+   Run Error Card (실패 복구)
+   ======================== */
+.run-error-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.run-error-card-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.run-error-card-icon {
+  color: #dc2626;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.run-error-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #991b1b;
+}
+.run-error-card-subtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #b91c1c;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.run-error-card-exit {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  background: rgba(220, 38, 38, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.run-error-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.run-error-card-section {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7f1d1d;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.run-error-card-suggestions {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.run-error-card-suggestion {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: #1f2937;
+  line-height: 1.5;
+}
+.run-error-card-suggestion-icon {
+  flex-shrink: 0;
+  color: #b91c1c;
+  margin-top: 2px;
+}
+.run-error-card-suggestion code {
+  background: rgba(0,0,0,0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.run-error-card-suggestion a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+.run-error-card-details {
+  font-size: 12px;
+  color: #4b5563;
+}
+.run-error-card-details summary {
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+}
+.run-error-card-log {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #1f2937;
+  color: #e5e7eb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.run-error-card-retry-error {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #7f1d1d;
+  font-size: 12px;
+}
+.run-error-card-actions {
+  display: flex;
+  gap: 8px;
+}
+.run-error-card-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #dc2626;
+  color: white;
+  border: 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+.run-error-card-retry:hover:not(:disabled) {
+  background: #b91c1c;
+}
+.run-error-card-retry:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

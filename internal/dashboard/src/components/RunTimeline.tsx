@@ -3,6 +3,7 @@ import { CheckCircle2, Circle, Loader2, XCircle, AlertCircle, Clock, Play, Rotat
 import type { PipelineStep } from '@/hooks/useSkills';
 import type { AppInfo } from '@/types';
 import ArtifactReviewCard from '@/components/ArtifactReviewCard';
+import RunErrorCard from '@/components/RunErrorCard';
 import {
   useRuns,
   useRunStream,
@@ -236,6 +237,18 @@ export default function RunTimeline({
                 {showArtifacts && app && latest?.state === 'COMPLETED' && (
                   <div className="run-timeline-artifact">
                     <ArtifactReviewCard step={step.step} app={app} expanded={false} />
+                  </div>
+                )}
+
+                {latest?.state === 'FAILED' && (
+                  <div className="run-timeline-error-wrap">
+                    <RunErrorCard
+                      run={latest}
+                      step={step}
+                      appName={appName}
+                      isDemo={isDemo}
+                      onRetry={() => void refetch()}
+                    />
                   </div>
                 )}
               </div>
