@@ -64,7 +64,7 @@ pnpm install
 pnpm dev
 ```
 
-브라우저에서 `http://localhost:5173` 열면 대시보드가 뜹니다.
+브라우저에서 `http://localhost:3000` 열면 대시보드가 뜹니다.
 
 ### 새 미니앱 추가
 

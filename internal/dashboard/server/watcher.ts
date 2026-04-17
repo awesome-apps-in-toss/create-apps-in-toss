@@ -1,9 +1,8 @@
 import chokidar from 'chokidar';
 import path from 'path';
-import { readdirSync } from 'fs';
 import { broadcast } from './sse.js';
 
-const APPS_DIR = path.resolve(process.cwd(), '../');
+const APPS_DIR = path.resolve(process.cwd(), '../../apps');
 
 function debounce<T extends (...args: string[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout>;
@@ -13,29 +12,23 @@ function debounce<T extends (...args: string[]) => void>(fn: T, ms: number): T {
   }) as T;
 }
 
-function getWatchFiles(): string[] {
-  try {
-    const entries = readdirSync(APPS_DIR, { withFileTypes: true });
-    const files: string[] = [];
-    for (const e of entries) {
-      if (!e.isDirectory() || e.name === 'dashboard') continue;
-      files.push(path.join(APPS_DIR, e.name, '.meta-dashboard.json'));
-      files.push(path.join(APPS_DIR, e.name, '.ait'));
-    }
-    return files;
-  } catch {
-    return [];
-  }
+// chokidar glob 패턴은 POSIX 스타일 슬래시를 요구하므로 Windows에서도 정방향 슬래시로 변환
+function toPosix(p: string): string {
+  return p.split(path.sep).join('/');
 }
 
 export function createWatcher() {
-  const files = getWatchFiles();
-  console.log(`[watcher] ${files.length}개 파일 감지 시작`);
+  const appsDirPosix = toPosix(APPS_DIR);
+  const patterns = [
+    `${appsDirPosix}/*/.meta-dashboard.json`,
+    `${appsDirPosix}/*/.ait`,
+  ];
 
-  const watcher = chokidar.watch(files, {
+  console.log('[watcher] apps/*/.meta-dashboard.json, .ait 동적 감시 시작');
+
+  const watcher = chokidar.watch(patterns, {
     ignoreInitial: true,
     persistent: true,
-    dot: true,
     awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
   });
 

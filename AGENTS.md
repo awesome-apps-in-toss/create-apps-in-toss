@@ -102,7 +102,7 @@ packages/tsconfig → packages/eslint-config → packages/ui → apps/* ∪ inte
 ## Commands
 
 ```bash
-pnpm dev          # 대시보드 개발 서버 (포트 5173 + API 3001)
+pnpm dev          # 대시보드 개발 서버 (포트 3000 + API 3001)
 pnpm dev:apps     # 대시보드 제외 앱 개발 서버
 pnpm build        # 프로덕션 빌드
 pnpm typecheck    # 타입 검사
@@ -122,7 +122,7 @@ pnpm new-app X    # 새 앱 생성
 - 스킬 트리거 (PRD 생성, UT, 에셋 생성, 전체 파이프라인)
 - SSE 기반 실시간 파일 감시
 
-실행: `pnpm dev` (대시보드 포트 5173, API 서버 포트 3001)
+실행: `pnpm dev` (대시보드 포트 3000, API 서버 포트 3001)
 
 ---
 
