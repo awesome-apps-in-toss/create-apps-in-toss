@@ -34,16 +34,20 @@
 | #10 | 127.0.0.1 바인딩 + Claude CLI 권한 옵션 축소 (`--permission-mode acceptEdits`) |
 | #11 | server 코드 typecheck 범위 편입 (드러나지 않던 타입 에러 차단) |
 
-### 🚧 진행 중 (Week 2, 병렬)
+### ✅ 완료 (Week 2)
 
-- **W2-A**: `.claude/skills/ait-*/SKILL.md` frontmatter 표준화 + `GET /api/skills` 동적 스캐너
-  - frontmatter: `mode`, `inputs[]`, `outputs[]`, `requires[]`, `idempotencyKey`
-  - 프론트엔드는 아직 하드코딩된 `PIPELINE_SKILLS` 사용 (다음 PR에서 교체)
-- **W2-B**: `/api/orchestrations` 프로토타입 (ait-plan 한정, 서버 전용)
-  - `POST /api/orchestrations` · `GET …/stream` (SSE) · `POST …/input` · `POST …/cancel`
-  - State machine: DRAFT → VALIDATING_INPUT → READY → RUNNING_STEP → WAITING_USER_INPUT → REVIEW_ARTIFACT → SUCCEEDED/FAILED/CANCELED
-  - Claude CLI `--output-format stream-json --input-format stream-json` 래핑
-  - in-memory `Map<runId, RunSession>` (SQLite는 후속)
+| PR | 요지 |
+|---|---|
+| #12 | `docs/roadmap.md` 추가 — 합의된 방향 단일 출처화 |
+| #13 | `.claude/skills/ait-*/SKILL.md` frontmatter 표준화(`mode`·`step`·`requires`·`inputs`·`outputs`·`idempotencyKey`) + `GET /api/skills` 동적 스캐너 |
+| #14 | `/api/orchestrations` 프로토타입 (ait-plan 한정, 서버 전용). `POST /` · `GET …/stream` (SSE) · `POST …/input` · `POST …/cancel`. RunSession 상태머신 + Claude CLI `stream-json` 래핑. in-memory `Map<runId, RunSession>` |
+
+### 🚧 다음 (Week 3 후보)
+
+- [ ] 프론트엔드가 하드코딩 `PIPELINE_SKILLS`를 버리고 `GET /api/skills` 소비
+- [ ] `/api/orchestrations`를 7개 파이프라인 스킬 전부로 확장 (requires 그래프 기반 순서)
+- [ ] `RunSession` 영속화 — SQLite(`internal/dashboard/data/runs.db`)
+- [ ] 대시보드에 Run Timeline UI (현재 단계·대기중 입력·아티팩트 미리보기)
 
 ---
 

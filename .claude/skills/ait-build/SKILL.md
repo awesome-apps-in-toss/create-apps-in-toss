@@ -4,6 +4,8 @@ description: typecheck→lint→ait build 순서로 빌드하고 .ait 번들 용
 argument-hint: '<app-name>'
 mode: automated
 step: 7
+label: 빌드
+produces: .ait 번들
 requires: [ait-review]
 inputs:
   - { key: appName, type: text, required: true }
