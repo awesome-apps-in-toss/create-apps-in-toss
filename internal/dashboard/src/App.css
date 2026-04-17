@@ -2848,6 +2848,200 @@ body {
   }
 }
 
+/* Wizard 진입 버튼 (AppDetail 헤더) */
+.wizard-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  margin-left: 12px;
+  border-radius: 8px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.wizard-link:hover {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+}
+
+/* ========================
+   Wizard (선형 위저드 모드)
+   ======================== */
+.wizard .wizard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 0 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  flex-wrap: wrap;
+}
+.wizard-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.wizard-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.3;
+}
+.wizard-subtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
+}
+.wizard-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 240px;
+}
+.wizard-progress-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+}
+.wizard-progress-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-bg-subtle, #f3f4f6);
+  overflow: hidden;
+}
+.wizard-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.wizard-progress-pct {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text, #111827);
+  text-align: right;
+}
+.wizard-section {
+  margin-top: 28px;
+}
+.wizard-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  margin: 0 0 12px;
+}
+.wizard-active-step {
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%);
+  border: 1px solid #c7d2fe;
+  margin-bottom: 4px;
+}
+.wizard-active-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.wizard-active-step-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6366f1;
+}
+.wizard-active-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e1b4b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wizard-active-desc {
+  margin: 6px 0 2px;
+  font-size: 14px;
+  color: #312e81;
+}
+.wizard-active-produces {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: #4338ca;
+}
+.wizard-active-requires {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.wizard-idea-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+.wizard-idea-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+.wizard-idea-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #c7d2fe;
+  background: white;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  font-family: inherit;
+}
+.wizard-idea-input:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+.wizard-error {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 13px;
+  margin: 10px 0;
+}
+.wizard-active-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.wizard-cta {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #4f46e5;
+  color: white;
+  border: 0;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.wizard-cta:hover:not(:disabled) {
+  background: #4338ca;
+}
+.wizard-cta:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ========================
    Claude CLI status banner
    ======================== */

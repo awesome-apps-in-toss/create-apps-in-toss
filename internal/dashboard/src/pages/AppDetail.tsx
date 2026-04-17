@@ -259,6 +259,16 @@ export default function AppDetail() {
         <div className="detail-header-completion">
           <span className="completion-label">완성도</span>
           <span className="completion-value">{app.completion}%</span>
+          {!isDemo && (
+            <button
+              type="button"
+              className="wizard-link"
+              onClick={() => void navigate(`/wizard/${app.folderName}`)}
+              title="선형 위저드 모드로 이동"
+            >
+              위저드 모드 →
+            </button>
+          )}
         </div>
       </div>
 
