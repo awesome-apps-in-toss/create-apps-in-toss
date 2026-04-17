@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import path from 'path';
-import { RunSession, runSessions } from '../lib/orchestration/run-session.js';
+import {
+  RunSession,
+  runSessions,
+  type HistoricRunEvent,
+  type RunState,
+} from '../lib/orchestration/run-session.js';
+import { getDefaultRunStore, type PersistedRunRow } from '../lib/orchestration/run-store.js';
 import { readSkillMeta } from '../lib/skills-meta.js';
 
 const router: Router = Router();
@@ -28,7 +34,7 @@ function needsAppName(skill: string): boolean {
   return skill !== 'ait-scaffold' && skill !== 'ait-launch';
 }
 
-function sessionSummary(session: RunSession) {
+function liveSummary(session: RunSession) {
   return {
     runId: session.runId,
     skill: session.skill,
@@ -40,6 +46,52 @@ function sessionSummary(session: RunSession) {
   };
 }
 
+function persistedSummary(row: PersistedRunRow) {
+  return {
+    runId: row.runId,
+    skill: row.skill,
+    appName: row.appName,
+    state: row.state,
+    startedAt: row.startedAt,
+    endedAt: row.endedAt,
+    exitCode: row.exitCode,
+  };
+}
+
+async function attachStore(session: RunSession): Promise<void> {
+  const store = await getDefaultRunStore();
+  store.insertRun({
+    runId: session.runId,
+    skill: session.skill,
+    appName: session.appName ?? null,
+    initialPrompt: session.initialPrompt,
+    idempotencyKey: session.idempotencyKey ?? null,
+    state: session.state,
+    exitCode: session.exitCode ?? null,
+    startedAt: session.startedAt,
+    endedAt: session.endedAt ?? null,
+    cwd: session.cwd,
+  });
+  session.addListener(
+    (event: HistoricRunEvent) => {
+      try {
+        store.appendEvent(session.runId, event);
+        if (event.kind === 'state' || event.kind === 'done') {
+          store.updateState(
+            session.runId,
+            session.state,
+            session.exitCode ?? null,
+            session.endedAt ?? null
+          );
+        }
+      } catch (err) {
+        console.warn('[run-store] persistence failed', err);
+      }
+    },
+    { replay: true }
+  );
+}
+
 // POST /api/orchestrations
 // Body: {
 //   skill: string,            // pipeline skill id (frontmatter에 step 필요)
@@ -49,6 +101,7 @@ function sessionSummary(session: RunSession) {
 //     prompt?: string,        // 일반 프롬프트 오버라이드
 //   },
 //   idempotencyKey?: string,  // 선택 — 같은 키 성공 기록이 있으면 후속 stage에서 스킵
+//   resume?: boolean,         // true 면 같은 (skill,appName,key)의 최근 COMPLETED 기록을 그대로 반환
 // }
 router.post('/', async (req, res) => {
   const body = req.body as {
@@ -56,6 +109,7 @@ router.post('/', async (req, res) => {
     appName?: unknown;
     input?: { idea?: unknown; prompt?: unknown };
     idempotencyKey?: unknown;
+    resume?: unknown;
   };
 
   const skillId =
@@ -98,6 +152,23 @@ router.post('/', async (req, res) => {
       ? body.idempotencyKey.trim()
       : meta.idempotencyKey;
 
+  const resume = body.resume === true;
+  if (resume) {
+    const store = await getDefaultRunStore();
+    const existing = store.findLatestSuccess({
+      skill: skillId,
+      appName: appName ?? null,
+      idempotencyKey: idempotencyKey ?? null,
+    });
+    if (existing) {
+      res.status(200).json({
+        ...persistedSummary(existing),
+        reused: true,
+      });
+      return;
+    }
+  }
+
   const session = new RunSession({
     skill: skillId,
     cwd,
@@ -106,41 +177,62 @@ router.post('/', async (req, res) => {
     ...(idempotencyKey !== undefined && { idempotencyKey }),
   });
   runSessions.set(session.runId, session);
+  await attachStore(session);
 
-  res.status(201).json(sessionSummary(session));
+  res.status(201).json({ ...liveSummary(session), reused: false });
 });
 
 // GET /api/orchestrations
-// Query: ?app=<id>&skill=<id>&state=<state>
-router.get('/', (req, res) => {
+// Query: ?app=<id>&skill=<id>&state=<state>&limit=<n>
+router.get('/', async (req, res) => {
   const appFilter = typeof req.query['app'] === 'string' ? req.query['app'] : null;
   const skillFilter = typeof req.query['skill'] === 'string' ? req.query['skill'] : null;
-  const stateFilter = typeof req.query['state'] === 'string' ? req.query['state'] : null;
+  const stateFilter =
+    typeof req.query['state'] === 'string' ? (req.query['state'] as RunState) : null;
+  const limitRaw = typeof req.query['limit'] === 'string' ? parseInt(req.query['limit'], 10) : NaN;
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 1000) : 200;
 
-  const runs = Array.from(runSessions.values())
-    .filter((s) => (appFilter ? s.appName === appFilter : true))
-    .filter((s) => (skillFilter ? s.skill === skillFilter : true))
-    .filter((s) => (stateFilter ? s.state === stateFilter : true))
-    .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
-    .map(sessionSummary);
+  const store = await getDefaultRunStore();
+  const rows = store.listRuns({
+    appName: appFilter,
+    skill: skillFilter,
+    state: stateFilter,
+    limit,
+  });
 
-  res.json({ runs });
+  res.json({ runs: rows.map(persistedSummary) });
 });
 
 // GET /api/orchestrations/:runId
-router.get('/:runId', (req, res) => {
+router.get('/:runId', async (req, res) => {
   const runId = req.params['runId'];
-  const session = runId ? runSessions.get(runId) : undefined;
-  if (!session) {
+  if (!runId) {
+    res.status(400).json({ error: 'runId required' });
+    return;
+  }
+  const live = runSessions.get(runId);
+  const store = await getDefaultRunStore();
+  const row = store.getRun(runId);
+
+  if (!live && !row) {
     res.status(404).json({ error: 'run not found' });
     return;
   }
-  res.json({
-    ...sessionSummary(session),
-    initialPrompt: session.initialPrompt,
-    idempotencyKey: session.idempotencyKey ?? null,
-    history: session.getHistory(),
-  });
+
+  const history = live ? [...live.getHistory()] : store.listEvents(runId);
+  const base = live
+    ? {
+        ...liveSummary(live),
+        initialPrompt: live.initialPrompt,
+        idempotencyKey: live.idempotencyKey ?? null,
+      }
+    : {
+        ...persistedSummary(row!),
+        initialPrompt: row!.initialPrompt,
+        idempotencyKey: row!.idempotencyKey,
+      };
+
+  res.json({ ...base, history });
 });
 
 // GET /api/orchestrations/:runId/stream → SSE
@@ -148,7 +240,7 @@ router.get('/:runId/stream', (req, res) => {
   const runId = req.params['runId'];
   const session = runId ? runSessions.get(runId) : undefined;
   if (!session) {
-    res.status(404).json({ error: 'run not found' });
+    res.status(404).json({ error: 'run not found or already terminated' });
     return;
   }
 
