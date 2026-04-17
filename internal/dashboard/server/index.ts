@@ -10,6 +10,7 @@ import { sseClients } from './sse.js';
 
 const app = express();
 const PORT = 3001;
+const HOST = process.env['BARRELEYE_HOST'] || '127.0.0.1';
 const APPS_DIR = path.resolve(process.cwd(), '../../apps');
 
 app.use(cors({ origin: 'http://localhost:3000' }));
@@ -63,6 +64,11 @@ app.use('/api/run-skill', runSkillRouter);
 
 createWatcher();
 
-app.listen(PORT, () => {
-  console.log(`[server] http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  if (HOST !== '127.0.0.1' && HOST !== 'localhost') {
+    console.warn(
+      '[server] ⚠ 외부 바인딩됨 — 약관상 개인 사용 경계를 넘을 수 있음. 신뢰된 네트워크에서만 사용.'
+    );
+  }
+  console.log(`[server] http://${HOST}:${PORT}`);
 });

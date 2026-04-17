@@ -96,12 +96,17 @@ router.get('/stream', (req, res) => {
 
   sendLog(`[dashboard] /${skill} 실행 중 (앱: ${appName})`);
   sendLog(`[dashboard] cwd: ${cwd}`);
+  sendLog('[dashboard] permission-mode=acceptEdits (네트워크/Bash는 사용자 확인 필요)');
 
-  const proc = spawn(claudePath, ['--dangerously-skip-permissions', '-p', `/${skill}`], {
-    cwd,
-    env: { ...process.env },
-    shell: false,
-  });
+  const proc = spawn(
+    claudePath,
+    ['--permission-mode', 'acceptEdits', '-p', `/${skill}`],
+    {
+      cwd,
+      env: { ...process.env },
+      shell: false,
+    }
+  );
 
   proc.stdout.on('data', (chunk: Buffer) => {
     chunk
