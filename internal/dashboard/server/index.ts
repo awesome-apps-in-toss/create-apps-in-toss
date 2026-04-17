@@ -6,6 +6,7 @@ import { metaRouter } from './routes/meta.js';
 import { runSkillRouter } from './routes/run-skill.js';
 import { createAppRouter } from './routes/create-app.js';
 import { skillsRouter } from './routes/skills.js';
+import { orchestrationsRouter } from './routes/orchestrations.js';
 import { createWatcher } from './watcher.js';
 import { sseClients } from './sse.js';
 
@@ -63,6 +64,7 @@ app.use('/api/apps', appsRouter);
 app.use('/api/apps', metaRouter);
 app.use('/api/run-skill', runSkillRouter);
 app.use('/api/skills', skillsRouter);
+app.use('/api/orchestrations', orchestrationsRouter);
 
 createWatcher();
 
