@@ -3,6 +3,7 @@ import path from 'path';
 import {
   RunSession,
   runSessions,
+  TERMINAL_STATES,
   type HistoricRunEvent,
   type RunState,
 } from '../lib/orchestration/run-session.js';
@@ -100,16 +101,18 @@ async function attachStore(session: RunSession): Promise<void> {
 //     idea?: string,          // legacy (ait-plan)
 //     prompt?: string,        // 일반 프롬프트 오버라이드
 //   },
-//   idempotencyKey?: string,  // 선택 — 같은 키 성공 기록이 있으면 후속 stage에서 스킵
-//   resume?: boolean,         // true 면 같은 (skill,appName,key)의 최근 COMPLETED 기록을 그대로 반환
+//   idempotencyKey?: string,  // 선택 — 같은 키의 성공/실행중 기록이 있으면 재사용
+//   forceRerun?: boolean,     // true 면 캐시된 COMPLETED 무시하고 새로 spawn
 // }
+//
+// 응답 body에 reused: boolean 와 reason: 'running'|'cached'|null 포함.
 router.post('/', async (req, res) => {
   const body = req.body as {
     skill?: unknown;
     appName?: unknown;
     input?: { idea?: unknown; prompt?: unknown };
     idempotencyKey?: unknown;
-    resume?: unknown;
+    forceRerun?: unknown;
   };
 
   const skillId =
@@ -152,8 +155,20 @@ router.post('/', async (req, res) => {
       ? body.idempotencyKey.trim()
       : meta.idempotencyKey;
 
-  const resume = body.resume === true;
-  if (resume) {
+  // 1) 동일 (skill, appName) 로 이미 실행 중인 세션이 있으면 그걸 반환.
+  //    동시에 같은 스킬이 두 번 돌지 않도록 보호.
+  for (const live of runSessions.values()) {
+    const sameApp = (live.appName ?? null) === (appName ?? null);
+    const sameSkill = live.skill === skillId;
+    if (sameApp && sameSkill && !TERMINAL_STATES.has(live.state)) {
+      res.status(200).json({ ...liveSummary(live), reused: true, reason: 'running' });
+      return;
+    }
+  }
+
+  // 2) forceRerun 이 아니면, 같은 (skill, appName, idempotencyKey) 의 최근 COMPLETED 기록 재사용.
+  const forceRerun = body.forceRerun === true;
+  if (!forceRerun) {
     const store = await getDefaultRunStore();
     const existing = store.findLatestSuccess({
       skill: skillId,
@@ -161,14 +176,12 @@ router.post('/', async (req, res) => {
       idempotencyKey: idempotencyKey ?? null,
     });
     if (existing) {
-      res.status(200).json({
-        ...persistedSummary(existing),
-        reused: true,
-      });
+      res.status(200).json({ ...persistedSummary(existing), reused: true, reason: 'cached' });
       return;
     }
   }
 
+  // 3) 새 세션 spawn.
   const session = new RunSession({
     skill: skillId,
     cwd,
@@ -179,7 +192,7 @@ router.post('/', async (req, res) => {
   runSessions.set(session.runId, session);
   await attachStore(session);
 
-  res.status(201).json({ ...liveSummary(session), reused: false });
+  res.status(201).json({ ...liveSummary(session), reused: false, reason: null });
 });
 
 // GET /api/orchestrations

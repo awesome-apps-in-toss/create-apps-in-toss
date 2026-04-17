@@ -28,7 +28,7 @@ export interface RunEvent {
   at: string;
 }
 
-const TERMINAL_STATES: ReadonlySet<RunState> = new Set([
+export const TERMINAL_STATES: ReadonlySet<RunState> = new Set([
   'COMPLETED',
   'FAILED',
   'CANCELED',
