@@ -7,6 +7,7 @@ import { useSkills } from '@/hooks/useSkills';
 import type { PipelineStep } from '@/hooks/useSkills';
 import LogStream from '@/components/LogStream';
 import AppAvatar from '@/components/AppAvatar';
+import RunTimeline from '@/components/RunTimeline';
 import type { AppConsoleConfig, AllowedSkill, PipelineStepStatus } from '@/types';
 
 type ConsoleTextField = Extract<
@@ -258,6 +259,16 @@ export default function AppDetail() {
         <div className="detail-header-completion">
           <span className="completion-label">완성도</span>
           <span className="completion-value">{app.completion}%</span>
+          {!isDemo && (
+            <button
+              type="button"
+              className="wizard-link"
+              onClick={() => void navigate(`/wizard/${app.folderName}`)}
+              title="선형 위저드 모드로 이동"
+            >
+              위저드 모드 →
+            </button>
+          )}
         </div>
       </div>
 
@@ -310,72 +321,24 @@ export default function AppDetail() {
           })}
         </div>
 
-        {/* 개별 단계 (펼쳤을 때) */}
+        {/* 실행 기록/현재 진행 (오케스트레이션 API 기반) */}
         {pipelineExpanded && (
-          <div className="pipeline-detail-list">
-            {pipeline.map((item) => {
-              const state = getStepState(item, app.console.pipelineProgress);
-              const isLocked = state === 'locked';
-              const isCompleted = state === 'completed';
-              return (
-                <div
-                  key={item.skill}
-                  className={`pipeline-detail-row ${
-                    runningSkill === item.skill ? 'pipeline-detail-row--running' : ''
-                  } ${isCompleted ? 'pipeline-detail-row--completed' : ''} ${
-                    isLocked ? 'pipeline-detail-row--locked' : ''
-                  }`}
-                >
-                  <span className={`pipeline-detail-step ${isCompleted ? 'pipeline-detail-step--done' : ''}`}>
-                    {isCompleted ? '✓' : `STEP ${item.step}`}
-                  </span>
-                  <span className="pipeline-detail-label">{item.label}</span>
-                  <span className="pipeline-detail-desc">
-                    {item.description}
-                    <span className="pipeline-detail-produces">→ {item.produces}</span>
-                    {isLocked && item.requires && (
-                      <span className="pipeline-detail-requires pipeline-detail-requires--locked">
-                        필요: {item.requires}
-                      </span>
-                    )}
-                  </span>
-                  {item.mode === 'interactive' ? (
-                    <button
-                      className="pipeline-detail-btn pipeline-detail-btn--link"
-                      onClick={() => {
-                        const reduced =
-                          typeof window !== 'undefined' &&
-                          window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-                        planSectionRef.current?.scrollIntoView({
-                          behavior: reduced ? 'auto' : 'smooth',
-                        });
-                      }}
-                      disabled={isLocked || isDemo}
-                      title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : isLocked ? `전제 조건 미충족: ${item.requires}` : '아래 기획 섹션으로 이동'}
-                    >
-                      {isCompleted ? '기획서 보기' : '기획하기'}
-                    </button>
-                  ) : (
-                    <button
-                      className="pipeline-detail-btn"
-                      onClick={() => void runSkill(item.skill as AllowedSkill)}
-                      disabled={running || isLocked || isDemo}
-                      title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : isLocked ? `전제 조건 미충족: ${item.requires}` : item.description}
-                    >
-                      {runningSkill === item.skill ? (
-                        <span className="pipeline-spinner" />
-                      ) : isCompleted ? (
-                        '재실행'
-                      ) : (
-                        '실행'
-                      )}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <RunTimeline
+            appName={app.folderName}
+            pipeline={pipeline}
+            isDemo={isDemo}
+            onInteractiveStep={() => {
+              const reduced =
+                typeof window !== 'undefined' &&
+                window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+              planSectionRef.current?.scrollIntoView({
+                behavior: reduced ? 'auto' : 'smooth',
+              });
+            }}
+            onRunComplete={() => void refetch()}
+          />
         )}
+
       </section>
 
       {/* ── 기획 (PRD) ── */}

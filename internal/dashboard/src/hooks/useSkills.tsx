@@ -5,6 +5,21 @@ const IS_STATIC = import.meta.env.PROD;
 
 export type SkillMode = 'interactive' | 'automated';
 
+export interface SkillInputDescriptor {
+  key: string;
+  /** 'text' | 'textarea' | 'file' | 'color' | 'select' ... 문자열 (서버가 그대로 전달) */
+  type: string;
+  required?: boolean;
+  values?: string[];
+}
+
+export interface SkillOutputDescriptor {
+  key: string;
+  type: string;
+  path?: string;
+  required?: boolean;
+}
+
 /** 서버 `GET /api/skills`의 스킬 메타 (SKILL.md frontmatter 파생) */
 export interface SkillMeta {
   id: string;
@@ -15,8 +30,8 @@ export interface SkillMeta {
   label: string | null;
   produces: string | null;
   requires: string[];
-  inputs: unknown[];
-  outputs: unknown[];
+  inputs: SkillInputDescriptor[];
+  outputs: SkillOutputDescriptor[];
   idempotencyKey: string;
 }
 

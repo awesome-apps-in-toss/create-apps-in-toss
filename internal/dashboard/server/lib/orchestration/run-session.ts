@@ -28,7 +28,7 @@ export interface RunEvent {
   at: string;
 }
 
-const TERMINAL_STATES: ReadonlySet<RunState> = new Set([
+export const TERMINAL_STATES: ReadonlySet<RunState> = new Set([
   'COMPLETED',
   'FAILED',
   'CANCELED',
@@ -37,17 +37,29 @@ const TERMINAL_STATES: ReadonlySet<RunState> = new Set([
 const RETENTION_AFTER_TERMINAL_MS = 60 * 1000;
 
 export interface RunSessionInit {
-  skill: 'ait-plan';
+  skill: string;
   appName?: string;
   cwd: string;
   initialPrompt: string;
+  /** 사전 지정된 runId (SQLite 복원용). 없으면 UUID 생성. */
+  runId?: string;
+  /** idempotency 키 — 같은 키의 성공 기록이 있으면 재실행 스킵 가능 (라우트 레이어에서 검사). */
+  idempotencyKey?: string;
+}
+
+/** 이벤트 히스토리 — SSE 후발 연결자용 리플레이 + SQLite 영속화 소스. */
+export interface HistoricRunEvent extends RunEvent {
+  seq: number;
 }
 
 export class RunSession {
   readonly runId: string;
-  readonly skill: 'ait-plan';
+  readonly skill: string;
   readonly appName?: string;
   readonly startedAt: string;
+  readonly cwd: string;
+  readonly initialPrompt: string;
+  readonly idempotencyKey?: string;
   state: RunState;
   endedAt?: string;
   exitCode?: number;
@@ -56,11 +68,17 @@ export class RunSession {
   private clients: Set<Response> = new Set();
   private buffer = '';
   private cleanupTimer?: NodeJS.Timeout;
+  private eventHistory: HistoricRunEvent[] = [];
+  private nextSeq = 0;
+  private listeners: Set<(event: HistoricRunEvent) => void> = new Set();
 
   constructor(init: RunSessionInit) {
-    this.runId = randomUUID();
+    this.runId = init.runId ?? randomUUID();
     this.skill = init.skill;
     if (init.appName !== undefined) this.appName = init.appName;
+    this.cwd = init.cwd;
+    this.initialPrompt = init.initialPrompt;
+    if (init.idempotencyKey !== undefined) this.idempotencyKey = init.idempotencyKey;
     this.startedAt = new Date().toISOString();
     this.state = 'DRAFT';
 
@@ -76,10 +94,43 @@ export class RunSession {
     this.wireChild();
   }
 
-  addClient(res: Response): void {
+  addClient(res: Response, opts: { replay?: boolean } = {}): void {
     this.clients.add(res);
-    this.emitTo(res, { kind: 'state', data: { state: this.state }, at: new Date().toISOString() });
+    const replay = opts.replay ?? true;
+    if (replay && this.eventHistory.length > 0) {
+      for (const event of this.eventHistory) {
+        this.emitTo(res, event);
+      }
+    } else {
+      this.emitTo(res, { seq: -1, kind: 'state', data: { state: this.state }, at: new Date().toISOString() });
+    }
     res.on('close', () => this.clients.delete(res));
+  }
+
+  /**
+   * 영속화/외부 리스너용. replay: true 옵션이면 기존 히스토리를 먼저 전달한 뒤
+   * 이후 이벤트를 구독. 세션 구성 직후 초기 state 전환을 놓치지 않는 데 필요.
+   */
+  addListener(
+    fn: (event: HistoricRunEvent) => void,
+    opts: { replay?: boolean } = {}
+  ): () => void {
+    if (opts.replay) {
+      for (const e of this.eventHistory) {
+        try { fn(e); } catch { /* ignore listener errors */ }
+      }
+    }
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+
+  /** 이미 기록된 이벤트를 순차로 다시 전달. SQLite에서 복원 직후 리플레이에 사용. */
+  replayInto(fn: (event: HistoricRunEvent) => void): void {
+    for (const event of this.eventHistory) fn(event);
+  }
+
+  getHistory(): readonly HistoricRunEvent[] {
+    return this.eventHistory;
   }
 
   sendInput(text: string): { ok: true } | { ok: false; reason: string } {
@@ -128,6 +179,9 @@ export class RunSession {
 
   private transition(next: RunState): void {
     if (this.state === next) return;
+    // 이미 terminal 상태면 다른 terminal 로 덮어쓰지 않음 — cancel() 직후 child close
+    // 이벤트가 도착해 CANCELED 가 FAILED/COMPLETED 로 바뀌는 것을 방지.
+    if (TERMINAL_STATES.has(this.state)) return;
     this.state = next;
     if (TERMINAL_STATES.has(next)) {
       this.endedAt = new Date().toISOString();
@@ -220,12 +274,17 @@ export class RunSession {
   }
 
   private emit(event: RunEvent): void {
+    const historic: HistoricRunEvent = { ...event, seq: this.nextSeq++ };
+    this.eventHistory.push(historic);
+    for (const listener of this.listeners) {
+      try { listener(historic); } catch { /* ignore listener errors */ }
+    }
     for (const client of this.clients) {
-      this.emitTo(client, event);
+      this.emitTo(client, historic);
     }
   }
 
-  private emitTo(client: Response, event: RunEvent): void {
+  private emitTo(client: Response, event: HistoricRunEvent): void {
     try {
       client.write(`event: ${event.kind}\n`);
       client.write(`data: ${JSON.stringify({ ...event })}\n\n`);
