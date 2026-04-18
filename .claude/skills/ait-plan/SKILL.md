@@ -8,7 +8,10 @@ label: 기획
 produces: PRD 문서
 requires: []
 inputs:
-  - { key: idea, type: text, required: false }
+  - { key: idea, type: textarea, required: false }
+  - { key: target, type: text, required: false }
+  - { key: brandColor, type: color, required: false }
+  - { key: references, type: text, required: false }
   - { key: planningDoc, type: file, required: false }
 outputs:
   - { key: prd, type: file, path: 'docs/prd/*.md' }

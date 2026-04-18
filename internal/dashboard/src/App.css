@@ -3132,35 +3132,71 @@ body {
   font-size: 12px;
   color: #6b7280;
 }
-.wizard-idea-form {
+.wizard-inputs {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   margin: 14px 0 10px;
 }
-.wizard-idea-label {
+
+/* ========================
+   SkillInputForm
+   ======================== */
+.skill-input-form {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.skill-input-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.skill-input-label {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 13px;
   font-weight: 500;
   color: #374151;
 }
-.wizard-idea-input {
+.skill-input-required {
+  color: #dc2626;
+  font-weight: 700;
+}
+.skill-input-control {
   width: 100%;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-radius: 10px;
   border: 1px solid #c7d2fe;
   background: white;
   font-size: 14px;
   line-height: 1.5;
-  resize: vertical;
   font-family: inherit;
+  resize: vertical;
 }
-.wizard-idea-input:focus {
+.skill-input-control:focus {
   outline: none;
   border-color: #4f46e5;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+.skill-input-control:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.skill-input-color-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.skill-input-color {
+  width: 44px;
+  height: 36px;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid #c7d2fe;
+  background: white;
+  cursor: pointer;
 }
 .wizard-error {
   padding: 8px 12px;
