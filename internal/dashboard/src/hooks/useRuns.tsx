@@ -261,11 +261,15 @@ export async function cancelRun(runId: string): Promise<void> {
   await fetch(`/api/orchestrations/${runId}/cancel`, { method: 'POST' });
 }
 
-/** POST /api/orchestrations/:runId/input */
+/** POST /api/orchestrations/:runId/input — non-2xx 는 throw 해서 호출부가 UX 피드백 띄울 수 있도록. */
 export async function sendRunInput(runId: string, text: string): Promise<void> {
-  await fetch(`/api/orchestrations/${runId}/input`, {
+  const res = await fetch(`/api/orchestrations/${runId}/input`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
   });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({ error: 'unknown' }))) as { error?: string };
+    throw new Error(err.error ?? `Failed to send input: ${res.status}`);
+  }
 }

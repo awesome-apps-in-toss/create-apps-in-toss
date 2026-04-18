@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Lightbulb, Users, Palette, Link as LinkIcon, FileText } from 'lucide-react';
 import { useSkills } from '@/hooks/useSkills';
 import type { SkillInputDescriptor } from '@/hooks/useSkills';
@@ -53,6 +53,22 @@ export default function SkillInputForm({
     const prompt = buildPrompt(next, inputs);
     onChange?.({ values: next, prompt, missingRequired });
   }
+
+  // controlled 모드(value prop 제공) 에서는 사용자가 아무 필드도 건드리지 않으면
+  // setValue 가 호출되지 않아 부모의 missingRequired 가 초기값 그대로 남는다.
+  // → 필수 입력이 비어있어도 "시작" 버튼이 enable 되는 우회가 가능.
+  // inputs 선언이 들어올 때(스킬 전환 포함) 현재 values 로 한번 재계산해 부모에 통지.
+  useEffect(() => {
+    if (!meta || inputs.length === 0) return;
+    const missingRequired = inputs.some(
+      (inp) => inp.required && !(values[inp.key] ?? '').trim()
+    );
+    const prompt = buildPrompt(values, inputs);
+    onChange?.({ values, prompt, missingRequired });
+    // values/onChange 는 고의로 deps 에서 제외: 편집 흐름은 setValue 가 담당하고,
+    // 이 effect 는 inputs 선언이 바뀌는 순간(mount 혹은 다른 skill 로 전환) 만 재통지한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skillId, meta, inputs.length]);
 
   if (loading || !meta) return null;
   if (inputs.length === 0) return null;
