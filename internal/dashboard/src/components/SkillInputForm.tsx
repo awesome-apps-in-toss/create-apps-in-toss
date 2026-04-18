@@ -84,6 +84,8 @@ function SkillInputField({
   disabled: boolean;
 }) {
   const { label, placeholder, icon } = describeInput(input);
+  const inputId = `skill-input-${input.key}`;
+  const hintId = `${inputId}-hint`;
   const isTextArea = input.type === 'textarea' || input.key === 'idea' || input.key === 'description';
   const isSelect = input.type === 'select' && input.values && input.values.length > 0;
   const isColor = input.type === 'color' || /color/i.test(input.key);
@@ -96,20 +98,29 @@ function SkillInputField({
         {label}
         {input.required && <span className="skill-input-required">*</span>}
       </span>
+      <span id={hintId} className="skill-input-hint">
+        {placeholder}
+      </span>
       {isFile ? (
         <input
+          id={inputId}
           type="text"
           className="skill-input-control"
           placeholder={placeholder}
           value={value}
           disabled={disabled}
+          aria-required={input.required}
+          aria-describedby={hintId}
           onChange={(e) => onChange(e.target.value)}
         />
       ) : isSelect ? (
         <select
+          id={inputId}
           className="skill-input-control"
           value={value}
           disabled={disabled}
+          aria-required={input.required}
+          aria-describedby={hintId}
           onChange={(e) => onChange(e.target.value)}
         >
           <option value="">{placeholder}</option>
@@ -122,10 +133,13 @@ function SkillInputField({
       ) : isColor ? (
         <div className="skill-input-color-wrap">
           <input
+            id={inputId}
             type="color"
             className="skill-input-color"
             value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#3b82f6'}
             disabled={disabled}
+            aria-required={input.required}
+            aria-describedby={hintId}
             onChange={(e) => onChange(e.target.value)}
           />
           <input
@@ -134,25 +148,34 @@ function SkillInputField({
             value={value}
             placeholder="#RRGGBB"
             disabled={disabled}
+            aria-label={`${label} hex value`}
+            aria-required={input.required}
+            aria-describedby={hintId}
             onChange={(e) => onChange(e.target.value)}
           />
         </div>
       ) : isTextArea ? (
         <textarea
+          id={inputId}
           rows={3}
           className="skill-input-control"
           placeholder={placeholder}
           value={value}
           disabled={disabled}
+          aria-required={input.required}
+          aria-describedby={hintId}
           onChange={(e) => onChange(e.target.value)}
         />
       ) : (
         <input
+          id={inputId}
           type="text"
           className="skill-input-control"
           placeholder={placeholder}
           value={value}
           disabled={disabled}
+          aria-required={input.required}
+          aria-describedby={hintId}
           onChange={(e) => onChange(e.target.value)}
         />
       )}

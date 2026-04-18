@@ -103,7 +103,7 @@ export default function Wizard() {
       <header className="wizard-header">
         <div className="wizard-header-left">
           <AppAvatar app={app} index={appIndex} size="md" />
-          <div>
+          <div className="wizard-header-copy">
             <h1 className="wizard-title">{displayName}</h1>
             <p className="wizard-subtitle">
               {nextStep
@@ -112,7 +112,15 @@ export default function Wizard() {
             </p>
           </div>
         </div>
-        <div className="wizard-progress">
+        <div
+          className="wizard-progress"
+          role="progressbar"
+          aria-label="Wizard progress"
+          aria-valuemin={0}
+          aria-valuemax={pipeline.length}
+          aria-valuenow={completedCount}
+          aria-valuetext={`${completedCount} of ${pipeline.length} steps completed`}
+        >
           <div className="wizard-progress-label">
             {completedCount} / {pipeline.length} 단계
           </div>

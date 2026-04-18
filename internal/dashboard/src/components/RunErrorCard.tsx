@@ -1,6 +1,6 @@
-import { AlertTriangle, RefreshCw, Terminal, LogIn, Wifi } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { startRun, fetchRunDetail } from '@/hooks/useRuns';
+import { AlertTriangle, LogIn, RefreshCw, Terminal, Wifi } from 'lucide-react';
+import { useState } from 'react';
+import { fetchRunDetail, startRun } from '@/hooks/useRuns';
 import type { RunSummary } from '@/hooks/useRuns';
 import type { PipelineStep } from '@/hooks/useSkills';
 
@@ -9,16 +9,14 @@ interface RunErrorCardProps {
   step: PipelineStep;
   appName: string;
   isDemo: boolean;
-  /** 마지막 stderr/log 줄 — 오류 진단에 도움이 되는 힌트. */
+  /** 마지막 stderr/log 줄. 진단에 도움이 되는 힌트 */
   hintLines?: string[];
   onRetry?: () => void;
 }
 
 /**
- * 실패한 run 에 대한 비개발자 친화 에러 카드.
- *   - exitCode / 최근 로그에서 공통 원인을 식별해 한국어 문구로 안내.
- *   - "다시 시도" = POST /api/orchestrations (forceRerun:true) 재호출.
- *   - 심각도별 권장 조치 (CLI 설치·로그인·네트워크 등) 링크 안내.
+ * 실패한 실행을 사용자 친화적인 오류 카드로 보여준다.
+ * 로그 힌트가 없으면 상세를 펼쳤을 때만 history API를 조회한다.
  */
 export default function RunErrorCard({
   run,
@@ -30,34 +28,48 @@ export default function RunErrorCard({
 }: RunErrorCardProps) {
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
-  // hintLines 가 주어지지 않으면 history API 에서 최근 로그 이벤트를 끌어와 진단 분기에 쓴다.
-  // FAILED run 은 live stream 으로 잡을 수 없으므로 history 조회가 필요.
   const [fetchedHints, setFetchedHints] = useState<string[] | null>(null);
-
-  useEffect(() => {
-    if (hintLines !== undefined) return;
-    if (isDemo) return;
-    let cancelled = false;
-    (async () => {
-      const detail = await fetchRunDetail(run.runId);
-      if (cancelled || !detail) return;
-      const lines: string[] = [];
-      for (const ev of detail.history) {
-        if (ev.kind !== 'log' && ev.kind !== 'error') continue;
-        const d = ev.data as { line?: string; stream?: string; message?: string } | null;
-        if (!d) continue;
-        if (typeof d.line === 'string') lines.push(d.line);
-        else if (typeof d.message === 'string') lines.push(d.message);
-      }
-      setFetchedHints(lines.slice(-60));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [run.runId, hintLines, isDemo]);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsLoaded, setDetailsLoaded] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
 
   const effectiveHints = hintLines ?? fetchedHints ?? [];
   const diag = diagnoseFromHints(run.exitCode, effectiveHints);
+  const canShowDetails = hintLines !== undefined ? effectiveHints.length > 0 : !isDemo;
+
+  async function loadHints() {
+    if (hintLines !== undefined || isDemo || detailsLoading || detailsLoaded) return;
+
+    setDetailsLoading(true);
+    setDetailsError(null);
+    try {
+      const detail = await fetchRunDetail(run.runId);
+      if (!detail) {
+        setDetailsError('로그를 불러오지 못했어요.');
+        return;
+      }
+
+      const lines: string[] = [];
+      for (const ev of detail.history) {
+        if (ev.kind !== 'log' && ev.kind !== 'error') continue;
+        const data = ev.data as { line?: string; message?: string } | null;
+        if (!data) continue;
+
+        if (typeof data.line === 'string') lines.push(data.line);
+        else if (typeof data.message === 'string') lines.push(data.message);
+      }
+
+      setFetchedHints(lines.slice(-60));
+      setDetailsLoaded(true);
+    } finally {
+      setDetailsLoading(false);
+    }
+  }
+
+  function handleDetailsToggle(open: boolean) {
+    if (!open) return;
+    void loadHints();
+  }
 
   async function handleRetry() {
     if (isDemo) return;
@@ -70,8 +82,8 @@ export default function RunErrorCard({
         forceRerun: true,
       });
       onRetry?.();
-    } catch (e) {
-      setRetryError(e instanceof Error ? e.message : 'Failed to retry');
+    } catch (error) {
+      setRetryError(error instanceof Error ? error.message : 'Failed to retry');
     } finally {
       setRetrying(false);
     }
@@ -82,9 +94,7 @@ export default function RunErrorCard({
       <div className="run-error-card-head">
         <AlertTriangle size={18} strokeWidth={2} className="run-error-card-icon" />
         <div>
-          <h3 className="run-error-card-title">
-            {step.label} 단계에서 문제가 생겼습니다
-          </h3>
+          <h3 className="run-error-card-title">{step.label} 단계에서 문제가 발생했습니다</h3>
           <p className="run-error-card-subtitle">
             {diag.summary}
             {run.exitCode !== null && (
@@ -97,20 +107,32 @@ export default function RunErrorCard({
       <div className="run-error-card-body">
         <h4 className="run-error-card-section">이렇게 해보세요</h4>
         <ul className="run-error-card-suggestions">
-          {diag.suggestions.map((s, i) => (
-            <li key={i} className="run-error-card-suggestion">
-              <span className="run-error-card-suggestion-icon">{s.icon}</span>
-              <span>{s.text}</span>
+          {diag.suggestions.map((suggestion, index) => (
+            <li key={index} className="run-error-card-suggestion">
+              <span className="run-error-card-suggestion-icon">{suggestion.icon}</span>
+              <span>{suggestion.text}</span>
             </li>
           ))}
         </ul>
 
-        {effectiveHints.length > 0 && (
-          <details className="run-error-card-details">
-            <summary>개발자용 로그 ({effectiveHints.length}줄)</summary>
-            <pre className="run-error-card-log">
-              {effectiveHints.slice(-20).join('\n')}
-            </pre>
+        {canShowDetails && (
+          <details
+            className="run-error-card-details"
+            onToggle={(event) => handleDetailsToggle(event.currentTarget.open)}
+          >
+            <summary>
+              개발자용 로그
+              {effectiveHints.length > 0 ? ` (${effectiveHints.length}줄)` : ''}
+            </summary>
+            {detailsLoading ? (
+              <div className="run-error-card-log">로그를 불러오는 중...</div>
+            ) : detailsError ? (
+              <div className="run-error-card-log">{detailsError}</div>
+            ) : effectiveHints.length > 0 ? (
+              <pre className="run-error-card-log">{effectiveHints.slice(-20).join('\n')}</pre>
+            ) : detailsLoaded ? (
+              <div className="run-error-card-log">표시할 로그가 없어요.</div>
+            ) : null}
           </details>
         )}
       </div>
@@ -125,7 +147,7 @@ export default function RunErrorCard({
           disabled={isDemo || retrying}
         >
           <RefreshCw size={14} strokeWidth={1.75} />
-          {retrying ? '다시 시도 중…' : '다시 시도'}
+          {retrying ? '다시 시도 중...' : '다시 시도'}
         </button>
       </div>
     </div>
@@ -142,9 +164,6 @@ interface Diagnosis {
   suggestions: Suggestion[];
 }
 
-/**
- * 종료 코드와 stderr/stdout 힌트에서 가장 그럴듯한 원인을 한국어로 요약.
- */
 function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis {
   const tail = hints.join('\n').toLowerCase();
 
@@ -166,13 +185,13 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
 
   if (/enoent|command not found|spawn.*claude/.test(tail)) {
     return {
-      summary: 'Claude CLI 를 실행할 수 없습니다.',
+      summary: 'Claude CLI를 실행할 수 없습니다.',
       suggestions: [
         {
           icon: <Terminal size={14} strokeWidth={1.75} />,
           text: (
             <>
-              Claude Code CLI 가 설치되어 있는지 확인하세요. 설치 가이드는{' '}
+              Claude Code CLI가 설치되어 있는지 확인하세요. 설치 가이드는{' '}
               <a
                 href="https://docs.claude.com/claude-code"
                 target="_blank"
@@ -186,7 +205,11 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
         },
         {
           icon: <RefreshCw size={14} strokeWidth={1.75} />,
-          text: <>설치 후 이 페이지를 새로고침하고 <strong>다시 시도</strong>를 눌러주세요.</>,
+          text: (
+            <>
+              설치 후 이 페이지를 새로고침하고 <strong>다시 시도</strong>를 눌러주세요.
+            </>
+          ),
         },
       ],
     };
@@ -200,7 +223,7 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
           icon: <LogIn size={14} strokeWidth={1.75} />,
           text: (
             <>
-              터미널에서 <code>claude /login</code> 을 실행해 로그인한 뒤 다시 시도해주세요.
+              터미널에서 <code>claude /login</code>을 실행해 로그인한 뒤 다시 시도해주세요.
             </>
           ),
         },
@@ -214,7 +237,11 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
       suggestions: [
         {
           icon: <Wifi size={14} strokeWidth={1.75} />,
-          text: <>인터넷 연결을 확인하고 <strong>다시 시도</strong>를 눌러주세요.</>,
+          text: (
+            <>
+              인터넷 연결을 확인하고 <strong>다시 시도</strong>를 눌러주세요.
+            </>
+          ),
         },
       ],
     };
@@ -226,7 +253,11 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
       suggestions: [
         {
           icon: <Terminal size={14} strokeWidth={1.75} />,
-          text: <>앱 폴더의 쓰기 권한을 확인해 주세요. 필요 시 에디터를 관리자로 실행합니다.</>,
+          text: (
+            <>
+              앱 폴더의 쓰기 권한을 확인해주세요. 필요 시 에디터를 관리자 권한으로 실행합니다.
+            </>
+          ),
         },
       ],
     };
@@ -238,7 +269,11 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
       suggestions: [
         {
           icon: <RefreshCw size={14} strokeWidth={1.75} />,
-          text: <>문제가 없었다면 <strong>다시 시도</strong>를 눌러 재실행할 수 있습니다.</>,
+          text: (
+            <>
+              문제가 없었다면 <strong>다시 시도</strong>를 눌러 재실행할 수 있습니다.
+            </>
+          ),
         },
       ],
     };
@@ -249,14 +284,18 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
     suggestions: [
       {
         icon: <RefreshCw size={14} strokeWidth={1.75} />,
-        text: <>일시적인 문제일 수 있습니다. <strong>다시 시도</strong>를 눌러보세요.</>,
+        text: (
+          <>
+            일시적인 문제일 수 있습니다. <strong>다시 시도</strong>를 눌러보세요.
+          </>
+        ),
       },
       {
         icon: <Terminal size={14} strokeWidth={1.75} />,
         text: (
           <>
-            계속 실패하면 아래 개발자용 로그를 확인하거나{' '}
-            <code>pnpm dev</code> 콘솔 출력을 확인해 주세요.
+            계속 실패하면 아래 개발자용 로그를 확인하거나 <code>pnpm dev</code> 콘솔 출력을
+            확인해주세요.
           </>
         ),
       },

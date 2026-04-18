@@ -1,16 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, Circle, Loader2, XCircle, AlertCircle, Clock, Play, RotateCcw } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Circle,
+  Clock,
+  Loader2,
+  Play,
+  RotateCcw,
+  XCircle,
+} from 'lucide-react';
 import type { PipelineStep } from '@/hooks/useSkills';
 import type { AppInfo } from '@/types';
 import ArtifactReviewCard from '@/components/ArtifactReviewCard';
 import RunErrorCard from '@/components/RunErrorCard';
 import {
-  useRuns,
-  useRunStream,
-  startRun,
   cancelRun,
   sendRunInput,
+  startRun,
   TERMINAL_RUN_STATES,
+  useRuns,
+  useRunStream,
   type RunState,
   type RunSummary,
 } from '@/hooks/useRuns';
@@ -19,27 +28,13 @@ interface RunTimelineProps {
   appName: string;
   pipeline: PipelineStep[];
   isDemo?: boolean;
-  /** 외부에서 refresh 를 강제하고 싶을 때 (앱 메타 재로딩 등). */
   externalRefresh?: number;
-  /** run 완료 시 외부에 알림 (meta 재로딩 트리거 등). */
   onRunComplete?: (run: RunSummary) => void;
-  /** ait-plan 처럼 interactive 스킬에서 "기획하기" 클릭 시. 미지정 시 버튼 숨김. */
   onInteractiveStep?: (step: PipelineStep) => void;
-  /** true 면 COMPLETED 단계 아래에 ArtifactReviewCard 를 렌더. app 필요. */
   showArtifacts?: boolean;
-  /** showArtifacts=true 일 때 artifact 조회 대상 앱 정보. */
   app?: AppInfo;
 }
 
-/**
- * 오케스트레이션 API 기반 Run Timeline.
- *   - 7단계를 세로로 나열하고, 각 단계마다 가장 최근 run 의 상태/시간/아티팩트를 노출.
- *   - "실행" 버튼은 POST /api/orchestrations (skill, appName) 로 spawn.
- *   - 실행 중 스킬은 SSE 로 라이브 로그·상태 변화를 인라인 표시.
- *
- * 기존 pipeline-mini-stepper / pipeline-detail-list 와 병행 렌더 가능. Wizard 에서는
- * 전용으로 사용.
- */
 export default function RunTimeline({
   appName,
   pipeline,
@@ -63,7 +58,6 @@ export default function RunTimeline({
     }
   }, [externalRefresh, refetch]);
 
-  /** skillId → 가장 최근 run. */
   const latestBySkill = useMemo(() => {
     const map = new Map<string, RunSummary>();
     for (const run of runs) {
@@ -107,7 +101,10 @@ export default function RunTimeline({
   if (isDemo) {
     return (
       <div className="run-timeline run-timeline--demo">
-        <p>데모 모드에서는 스킬 실행 타임라인이 비활성화됩니다. 로컬에서 <code>pnpm dev</code>로 실행해 보세요.</p>
+        <p>
+          데모 환경에서는 실제 실행을 시작할 수 없습니다. 로컬에서 <code>pnpm dev</code>로 대시보드를
+          띄운 뒤 다시 시도하세요.
+        </p>
       </div>
     );
   }
@@ -115,19 +112,23 @@ export default function RunTimeline({
   return (
     <div className="run-timeline">
       {error && <div className="run-timeline-error">{error}</div>}
-      {startError && <div className="run-timeline-error">실행 요청 실패: {startError}</div>}
-      {loading && runs.length === 0 && <div className="run-timeline-loading">실행 기록 불러오는 중…</div>}
+      {startError && <div className="run-timeline-error">실행 시작 실패: {startError}</div>}
+      {loading && runs.length === 0 && (
+        <div className="run-timeline-loading">실행 이력을 불러오는 중입니다.</div>
+      )}
 
       <ol className="run-timeline-list">
         {pipeline.map((step) => {
           const latest = latestBySkill.get(step.skill) ?? null;
-          const disabled = step.requiresSteps.length > 0 && !step.requiresSteps.every((s) => {
-            const depRun = [...latestBySkill.values()].find((r) => {
-              const depStep = pipeline.find((p) => p.skill === r.skill);
-              return depStep?.step === s && r.state === 'COMPLETED';
+          const disabled =
+            step.requiresSteps.length > 0 &&
+            !step.requiresSteps.every((requiredStep) => {
+              const depRun = [...latestBySkill.values()].find((run) => {
+                const depStep = pipeline.find((candidate) => candidate.skill === run.skill);
+                return depStep?.step === requiredStep && run.state === 'COMPLETED';
+              });
+              return Boolean(depRun);
             });
-            return !!depRun;
-          });
           const running = latest && !TERMINAL_RUN_STATES.has(latest.state);
           const busy = startingSkill === step.skill;
 
@@ -147,7 +148,7 @@ export default function RunTimeline({
                 </div>
                 <div className="run-timeline-desc">
                   {step.description}
-                  <span className="run-timeline-produces"> → {step.produces}</span>
+                  <span className="run-timeline-produces"> 산출물: {step.produces}</span>
                 </div>
 
                 {latest && (
@@ -156,7 +157,7 @@ export default function RunTimeline({
                     <span>{formatTime(latest.startedAt)}</span>
                     {latest.endedAt && (
                       <>
-                        <span className="run-timeline-meta-sep">→</span>
+                        <span className="run-timeline-meta-sep">-</span>
                         <span>{formatTime(latest.endedAt)}</span>
                       </>
                     )}
@@ -175,27 +176,27 @@ export default function RunTimeline({
                       disabled={!onInteractiveStep || disabled}
                       title={
                         disabled
-                          ? `선행 단계 필요: ${step.requires}`
-                          : 'AI와 대화로 진행합니다'
+                          ? `선행 단계 완료 필요: ${step.requires}`
+                          : 'AI와 대화하며 수동 입력이 필요한 단계를 진행합니다.'
                       }
                     >
-                      {latest?.state === 'COMPLETED' ? '기획서 보기' : '기획하기'}
+                      {latest?.state === 'COMPLETED' ? '다시 열기' : '입력 시작'}
                     </button>
                   ) : running ? (
                     <>
                       <button
                         type="button"
                         className="run-timeline-action run-timeline-action--view"
-                        onClick={() => setActiveRunId(latest!.runId)}
+                        onClick={() => setActiveRunId(latest.runId)}
                       >
-                        진행 중 · 로그 보기
+                        라이브 로그 보기
                       </button>
                       <button
                         type="button"
                         className="run-timeline-action run-timeline-action--danger"
-                        onClick={() => void handleCancel(latest!.runId)}
+                        onClick={() => void handleCancel(latest.runId)}
                       >
-                        중단
+                        취소
                       </button>
                     </>
                   ) : latest && latest.state === 'COMPLETED' ? (
@@ -204,7 +205,7 @@ export default function RunTimeline({
                       className="run-timeline-action run-timeline-action--secondary"
                       onClick={() => void handleRerun(step.skill)}
                       disabled={busy || disabled}
-                      title={disabled ? `선행 단계 필요: ${step.requires}` : undefined}
+                      title={disabled ? `선행 단계 완료 필요: ${step.requires}` : undefined}
                     >
                       <RotateCcw size={14} strokeWidth={1.75} />
                       재실행
@@ -215,10 +216,10 @@ export default function RunTimeline({
                       className="run-timeline-action run-timeline-action--primary"
                       onClick={() => void handleStart(step.skill)}
                       disabled={busy || disabled}
-                      title={disabled ? `선행 단계 필요: ${step.requires}` : step.description}
+                      title={disabled ? `선행 단계 완료 필요: ${step.requires}` : step.description}
                     >
                       <Play size={14} strokeWidth={1.75} />
-                      {busy ? '시작 중…' : latest?.state === 'FAILED' ? '다시 시도' : '실행'}
+                      {busy ? '시작 중...' : latest?.state === 'FAILED' ? '다시 실행' : '실행'}
                     </button>
                   )}
                 </div>
@@ -237,7 +238,6 @@ export default function RunTimeline({
 
                 {showArtifacts && app && latest?.state === 'COMPLETED' && (
                   <div className="run-timeline-artifact">
-                    {/* PRD(Step 1) 은 리뷰의 핵심 산출물이라 Wizard 에서도 펼친 상태로 노출. */}
                     <ArtifactReviewCard step={step.step} app={app} expanded={step.step === 1} />
                   </div>
                 )}
@@ -281,14 +281,14 @@ function RunStateIcon({ state }: { state: RunState | null }) {
 
 function RunStateBadge({ state }: { state: RunState }) {
   const text: Record<RunState, string> = {
-    DRAFT: '대기',
-    VALIDATING_INPUT: '입력 검증',
+    DRAFT: '초안',
+    VALIDATING_INPUT: '입력 검증 중',
     READY: '준비됨',
     RUNNING: '실행 중',
     WAITING_USER_INPUT: '입력 대기',
     COMPLETED: '완료',
     FAILED: '실패',
-    CANCELED: '중단됨',
+    CANCELED: '취소됨',
   };
   const cls: Record<RunState, string> = {
     DRAFT: 'neutral',
@@ -326,15 +326,44 @@ function RunLivePanel({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const { state, logs, artifacts, error } = useRunStream(runId);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const { state, logs, artifacts, questions, error } = useRunStream(runId);
+  const logBodyRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const shouldStickToBottomRef = useRef(true);
   const doneFiredRef = useRef(false);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const inputLabelId = useId();
+  const inputHintId = useId();
+  const inputErrorId = useId();
+  const questionId = useId();
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = logBodyRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      shouldStickToBottomRef.current = distanceFromBottom < 48;
+    };
+
+    handleScroll();
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const container = logBodyRef.current;
+    if (!container || !shouldStickToBottomRef.current) return;
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: 'auto',
+    });
   }, [logs]);
 
   useEffect(() => {
@@ -345,6 +374,12 @@ function RunLivePanel({
   }, [state, onDone]);
 
   const waitingInput = state === 'WAITING_USER_INPUT';
+  const latestQuestion = questions.at(-1) ?? null;
+
+  useEffect(() => {
+    if (!waitingInput) return;
+    inputRef.current?.focus({ preventScroll: true });
+  }, [waitingInput, latestQuestion]);
 
   async function handleSend() {
     const text = inputText.trim();
@@ -361,44 +396,73 @@ function RunLivePanel({
     }
   }
 
+  const describedBy = [
+    latestQuestion ? questionId : null,
+    inputHintId,
+    sendError ? inputErrorId : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div className="run-live-panel">
       <div className="run-live-panel-head">
         <span className="run-live-panel-title">
-          실시간 로그 {state && <RunStateBadge state={state} />}
+          라이브 실행 {state && <RunStateBadge state={state} />}
         </span>
-        <button type="button" className="run-live-panel-close" onClick={onClose} aria-label="닫기">
-          ×
+        <button type="button" className="run-live-panel-close" onClick={onClose} aria-label="패널 닫기">
+          닫기
         </button>
       </div>
-      {error && <div className="run-live-panel-error">연결 끊김: {error}</div>}
+      {error && <div className="run-live-panel-error">연결 오류: {error}</div>}
       {artifacts.length > 0 && (
         <div className="run-live-panel-artifacts">
-          {artifacts.map((a, i) => (
-            <span key={i} className="run-live-panel-artifact">
-              📄 {a.path ?? '(no path)'}
+          {artifacts.map((artifact, index) => (
+            <span key={`${artifact.path ?? 'artifact'}-${index}`} className="run-live-panel-artifact">
+              생성 파일: {artifact.path ?? '(경로 없음)'}
             </span>
           ))}
         </div>
       )}
-      <div className="run-live-panel-body" role="log" aria-live="polite">
+      <div
+        ref={logBodyRef}
+        className="run-live-panel-body"
+        role="log"
+        aria-live="polite"
+        aria-label="실행 로그"
+      >
         {logs.length === 0 ? (
-          <div className="run-live-panel-empty">출력 대기 중…</div>
+          <div className="run-live-panel-empty">아직 출력된 로그가 없습니다.</div>
         ) : (
-          logs.map((line, i) => (
-            <div key={i} className="run-live-panel-line">
+          logs.map((line, index) => (
+            <div key={`${index}-${line.slice(0, 24)}`} className="run-live-panel-line">
               {line}
             </div>
           ))
         )}
-        <div ref={bottomRef} />
       </div>
       {waitingInput && (
-        <div className="run-live-panel-input">
-          <div className="run-live-panel-input-hint">
-            Claude 가 답변을 기다리고 있습니다. 아래에 답변을 적어 보내주세요.
+        <div
+          className="run-live-panel-input"
+          role="group"
+          aria-labelledby={inputLabelId}
+          aria-describedby={describedBy || undefined}
+        >
+          <div id={inputLabelId} className="run-live-panel-input-hint">
+            Claude 응답 입력
+          </div>
+          {latestQuestion && (
+            <div id={questionId} className="run-live-panel-input-hint" role="status" aria-live="assertive">
+              <strong>Claude 질문</strong>
+              <div>{latestQuestion.prompt}</div>
+            </div>
+          )}
+          <div id={inputHintId} className="run-live-panel-input-hint">
+            Claude가 추가 정보를 요청했습니다. 질문에 답하고 <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> +{' '}
+            <kbd>Enter</kbd>로 전송할 수 있습니다.
           </div>
           <textarea
+            ref={inputRef}
             className="run-live-panel-input-ta"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
@@ -408,11 +472,17 @@ function RunLivePanel({
                 void handleSend();
               }
             }}
-            placeholder="답변을 입력하세요 (Ctrl/⌘ + Enter 로 전송)"
+            aria-labelledby={inputLabelId}
+            aria-describedby={describedBy || undefined}
+            placeholder="답변을 입력하세요. (Ctrl/Cmd + Enter 전송)"
             rows={3}
             disabled={sending}
           />
-          {sendError && <div className="run-live-panel-input-error">{sendError}</div>}
+          {sendError && (
+            <div id={inputErrorId} className="run-live-panel-input-error" role="alert">
+              {sendError}
+            </div>
+          )}
           <div className="run-live-panel-input-actions">
             <button
               type="button"
@@ -420,7 +490,7 @@ function RunLivePanel({
               onClick={() => void handleSend()}
               disabled={sending || inputText.trim().length === 0}
             >
-              {sending ? '전송 중…' : '보내기'}
+              {sending ? '전송 중...' : '전송'}
             </button>
           </div>
         </div>

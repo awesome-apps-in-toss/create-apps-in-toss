@@ -40,6 +40,11 @@ export interface RunDetail extends RunSummary {
   }>;
 }
 
+export interface RunQuestion {
+  prompt: string;
+  raw: unknown;
+}
+
 export interface StartRunBody {
   skill: string;
   appName?: string;
@@ -54,9 +59,9 @@ export interface StartRunResponse extends RunSummary {
 }
 
 /**
- * 앱 스킬 실행 기록 조회 훅. GitHub Pages (IS_STATIC) 빌드에서는 빈 배열.
+ * 현재 앱의 실행 목록을 조회한다. GitHub Pages (IS_STATIC) 환경에서는 비활성화된다.
  *
- * NOTE: SSE/WS 통합은 후속 스테이지에서. 현재는 명시적 refetch() 호출 시 fresh.
+ * NOTE: SSE/WS 실시간 목록 갱신은 아직 별도 구현이 없어 필요할 때 refetch()로 새로고침한다.
  */
 export function useRuns(appName: string | null): {
   runs: RunSummary[];
@@ -103,23 +108,21 @@ export function useRuns(appName: string | null): {
 }
 
 /**
- * 특정 runId의 SSE 스트림을 구독. 서버가 live 세션을 갖고 있을 때만 유효.
- * 종료(COMPLETED/FAILED/CANCELED) 후에는 자동 close.
- *
- * 로그 라인·상태·아티팩트를 별도 배열로 축적한다.
+ * runId의 SSE 스트림을 구독한다. live 로그/질문/산출물 표시와 상태 반영에 사용한다.
+ * 터미널 상태(COMPLETED/FAILED/CANCELED) 또는 연결 오류 시 스트림을 닫는다.
  */
 export function useRunStream(runId: string | null): {
   state: RunState | null;
   logs: string[];
   artifacts: Array<{ path?: string; preview?: string }>;
-  questions: unknown[];
+  questions: RunQuestion[];
   error: string | null;
   connected: boolean;
 } {
   const [state, setState] = useState<RunState | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [artifacts, setArtifacts] = useState<Array<{ path?: string; preview?: string }>>([]);
-  const [questions, setQuestions] = useState<unknown[]>([]);
+  const [questions, setQuestions] = useState<RunQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
 
@@ -164,7 +167,9 @@ export function useRunStream(runId: string | null): {
     });
     es.addEventListener('question', (e) => {
       const payload = parseData((e as MessageEvent).data) as { data?: unknown };
-      if (payload?.data !== undefined) setQuestions((prev) => [...prev, payload.data]);
+      if (payload?.data !== undefined) {
+        setQuestions((prev) => [...prev, toRunQuestion(payload.data)]);
+      }
     });
     es.addEventListener('error', () => {
       setError('stream disconnected');
@@ -185,7 +190,47 @@ export function useRunStream(runId: string | null): {
   return { state, logs, artifacts, questions, error, connected };
 }
 
-/** GET /api/orchestrations/:runId 헬퍼. history 포함 상세 조회. */
+function toRunQuestion(data: unknown): RunQuestion {
+  return {
+    prompt: extractQuestionPrompt(data),
+    raw: data,
+  };
+}
+
+function extractQuestionPrompt(data: unknown): string {
+  const prompt = collectQuestionText(data)
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join('\n\n');
+
+  return prompt || 'Claude가 추가 입력을 요청했습니다. 필요한 정보를 입력해 계속 진행하세요.';
+}
+
+function collectQuestionText(data: unknown): string[] {
+  if (typeof data === 'string') return [data];
+  if (Array.isArray(data)) return data.flatMap((item) => collectQuestionText(item));
+  if (!data || typeof data !== 'object') return [];
+
+  const record = data as Record<string, unknown>;
+  const preferredKeys = [
+    'prompt',
+    'question',
+    'message',
+    'text',
+    'content',
+    'body',
+    'detail',
+    'details',
+    'description',
+  ];
+
+  const preferredValues = preferredKeys.flatMap((key) => collectQuestionText(record[key]));
+  if (preferredValues.length > 0) return preferredValues;
+
+  return Object.values(record).flatMap((value) => collectQuestionText(value));
+}
+
+/** GET /api/orchestrations/:runId 상세. history 포함 조회. */
 export async function fetchRunDetail(runId: string): Promise<RunDetail | null> {
   if (IS_STATIC) return null;
   try {
@@ -197,7 +242,7 @@ export async function fetchRunDetail(runId: string): Promise<RunDetail | null> {
   }
 }
 
-/** POST /api/orchestrations 헬퍼. */
+/** POST /api/orchestrations 시작. */
 export async function startRun(body: StartRunBody): Promise<StartRunResponse> {
   const res = await fetch('/api/orchestrations', {
     method: 'POST',
@@ -211,12 +256,12 @@ export async function startRun(body: StartRunBody): Promise<StartRunResponse> {
   return (await res.json()) as StartRunResponse;
 }
 
-/** POST /api/orchestrations/:runId/cancel 헬퍼. */
+/** POST /api/orchestrations/:runId/cancel */
 export async function cancelRun(runId: string): Promise<void> {
   await fetch(`/api/orchestrations/${runId}/cancel`, { method: 'POST' });
 }
 
-/** POST /api/orchestrations/:runId/input 헬퍼. */
+/** POST /api/orchestrations/:runId/input */
 export async function sendRunInput(runId: string, text: string): Promise<void> {
   await fetch(`/api/orchestrations/${runId}/input`, {
     method: 'POST',
