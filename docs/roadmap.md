@@ -42,12 +42,20 @@
 | #13 | `.claude/skills/ait-*/SKILL.md` frontmatter 표준화(`mode`·`step`·`requires`·`inputs`·`outputs`·`idempotencyKey`) + `GET /api/skills` 동적 스캐너 |
 | #14 | `/api/orchestrations` 프로토타입 (ait-plan 한정, 서버 전용). `POST /` · `GET …/stream` (SSE) · `POST …/input` · `POST …/cancel`. RunSession 상태머신 + Claude CLI `stream-json` 래핑. in-memory `Map<runId, RunSession>` |
 
-### 🚧 다음 (Week 3 후보)
+### ✅ 완료 (Week 3)
 
-- [ ] 프론트엔드가 하드코딩 `PIPELINE_SKILLS`를 버리고 `GET /api/skills` 소비
-- [ ] `/api/orchestrations`를 7개 파이프라인 스킬 전부로 확장 (requires 그래프 기반 순서)
-- [ ] `RunSession` 영속화 — SQLite(`internal/dashboard/data/runs.db`)
-- [ ] 대시보드에 Run Timeline UI (현재 단계·대기중 입력·아티팩트 미리보기)
+| 항목 | 요지 |
+|---|---|
+| 프론트 `GET /api/skills` 소비 | 하드코딩 `PIPELINE_SKILLS` 제거, `SkillsProvider` + `useSkills()` 훅으로 파이프라인 형상을 동적 구성 |
+| 7-skill 오케스트레이션 | `POST /api/orchestrations { skill, appName, input, forceRerun }` — `readSkillMeta` 로 검증, scaffold/launch 는 REPO_ROOT 나머지는 `apps/<appName>` 실행 |
+| SQLite 영속화 | `better-sqlite3` + `runs`·`events` 테이블, WAL 모드. 서버 재기동 시 고아 run 을 FAILED 로 마킹 |
+| idempotency | 동일 (skill,appName) 이 RUNNING 이면 그걸 반환, (skill,appName,idempotencyKey) 의 최근 COMPLETED 가 있으면 캐시 재사용 — `forceRerun:true` 로 우회 |
+| Run Timeline UI | `<RunTimeline>` 이 7단계 세로 카드 + 최근 run 상태/시간/exit 표시. 실행 시 인라인 SSE 라이브 로그 패널 |
+| Claude CLI 진단 | `GET /api/diagnostics/claude` + `<ClaudeStatus>` 배너 — 설치/로그인/버전 요약 |
+| 에러 복구 카드 | exitCode·stderr 힌트 기반 한국어 진단 + 원샷 다시 시도 |
+| 입력 폼 템플릿 | `SKILL.md` frontmatter `inputs` 선언을 기반으로 `<SkillInputForm>` 이 동적 렌더 (text/textarea/color/select/file) |
+| 선형 위저드 | `/wizard/:appId` — 다음 단계 hero + 전체 타임라인 + 산출물 리뷰 카드 |
+| 아티팩트 리뷰 카드 | `<ArtifactReviewCard>` step 번호에 따라 PRD/에셋/granite.config/TDS 등 분기 렌더 |
 
 ---
 
@@ -55,18 +63,20 @@
 
 **목적**: 오케스트레이션 엔진 + 비개발자 대응 **최소 위저드**를 세운다.
 
-### Week 3–4: 오케스트레이션 확장
-- [ ] 7개 파이프라인 스킬 전부를 `/api/orchestrations`로 실행 가능하게 확장
-- [ ] `RunSession` 영속화 (SQLite, `internal/dashboard/data/runs.db`)
-- [ ] 재실행/이어하기 (idempotencyKey 기반 중복 스킵)
-- [ ] 대시보드에 **Run Timeline** UI (현재 단계, 대기중 입력, 아티팩트 미리보기)
-- [ ] Claude CLI 버전/로그인 상태 진단 화면
+### Week 3–4: 오케스트레이션 확장 ✅
+- [x] 7개 파이프라인 스킬 전부를 `/api/orchestrations`로 실행 가능하게 확장
+- [x] `RunSession` 영속화 (SQLite, `internal/dashboard/data/runs.db`)
+- [x] 재실행/이어하기 (idempotencyKey 기반 중복 스킵)
+- [x] 대시보드에 **Run Timeline** UI (현재 단계, 대기중 입력, 아티팩트 미리보기)
+- [x] Claude CLI 버전/로그인 상태 진단 화면
 
-### Month 2: 비개발자 위저드 모드
-- [ ] `/dashboard/wizard` 라우트 — 선형 step-by-step UI
-- [ ] 단계 경계에서 **아티팩트 리뷰 카드** (PRD diff, 로고 썸네일 프리뷰, granite.config.ts 요약)
-- [ ] 에러 복구 가이드 (한국어 일반인용 문구, “다시 시도” 버튼 원샷)
-- [ ] 입력 폼 템플릿화 (아이디어/브랜드 컬러/타깃 유저 → 구조화 JSON)
+### Month 2: 비개발자 위저드 모드 🚧 (초기 MVP)
+- [x] `/wizard/:appId` 라우트 — 선형 step-by-step UI
+- [x] 단계 경계에서 **아티팩트 리뷰 카드** (PRD, 로고 썸네일 프리뷰, granite.config.ts 요약)
+- [x] 에러 복구 가이드 (한국어 일반인용 문구, "다시 시도" 버튼 원샷)
+- [x] 입력 폼 템플릿화 (아이디어/브랜드 컬러/타깃 유저 → 구조화 JSON, frontmatter 기반 동적 렌더)
+- [ ] PRD diff viewer (v2 변경 시 이전 버전과 비교)
+- [ ] 단계별 산출물 드래그-드롭 교체 (아이콘/스크린샷 등)
 
 ### Month 3: 배포 패키징
 - [ ] `create-apps-in-toss` 1.0 — 처음 로그인 경험 (Claude CLI 미설치 감지, 안내, dry-run 스캐폴드)
