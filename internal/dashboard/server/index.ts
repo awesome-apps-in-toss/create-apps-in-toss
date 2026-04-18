@@ -72,7 +72,8 @@ app.use('/api/diagnostics', diagnosticsRouter);
 createWatcher();
 
 // 서버 재기동 시 child 프로세스가 사라져 orphan 상태가 된 run 기록을 FAILED로 정리.
-void (async () => {
+// listen 전에 await 해서 첫 요청이 받아들여지는 시점에는 정리 완료 상태 보장.
+async function bootstrap() {
   try {
     const store = await getDefaultRunStore();
     const cleaned = store.markOrphansFailed();
@@ -82,13 +83,15 @@ void (async () => {
   } catch (err) {
     console.warn('[run-store] startup cleanup failed', err);
   }
-})();
 
-app.listen(PORT, HOST, () => {
-  if (HOST !== '127.0.0.1' && HOST !== 'localhost') {
-    console.warn(
-      '[server] ⚠ 외부 바인딩됨 — 약관상 개인 사용 경계를 넘을 수 있음. 신뢰된 네트워크에서만 사용.'
-    );
-  }
-  console.log(`[server] http://${HOST}:${PORT}`);
-});
+  app.listen(PORT, HOST, () => {
+    if (HOST !== '127.0.0.1' && HOST !== 'localhost') {
+      console.warn(
+        '[server] ⚠ 외부 바인딩됨 — 약관상 개인 사용 경계를 넘을 수 있음. 신뢰된 네트워크에서만 사용.'
+      );
+    }
+    console.log(`[server] http://${HOST}:${PORT}`);
+  });
+}
+
+void bootstrap();

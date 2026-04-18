@@ -14,6 +14,24 @@ const router: Router = Router();
 const REPO_ROOT = path.resolve(process.cwd(), '../../');
 const APPS_DIR = path.join(REPO_ROOT, 'apps');
 
+// (skill, appName) 단위로 POST /api/orchestrations 호출을 순차화.
+// "이미 실행 중" 체크와 새 세션 spawn 사이에 await 가 있어서
+// 동시 호출 시 같은 스킬이 두 번 spawn 되는 race 를 차단한다.
+const startLocks = new Map<string, Promise<unknown>>();
+async function withStartLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = startLocks.get(key);
+  if (prev) {
+    try { await prev; } catch { /* 이전 호출 실패해도 계속 진행 */ }
+  }
+  const promise = (async () => fn())();
+  startLocks.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    if (startLocks.get(key) === promise) startLocks.delete(key);
+  }
+}
+
 // 앱 ID 검증 (경로 탈출 방지)
 const APP_ID_RE = /^[a-z0-9][a-z0-9._-]*$/;
 function validateAppId(id: string | undefined): id is string {
@@ -155,44 +173,53 @@ router.post('/', async (req, res) => {
       ? body.idempotencyKey.trim()
       : meta.idempotencyKey;
 
-  // 1) 동일 (skill, appName) 로 이미 실행 중인 세션이 있으면 그걸 반환.
-  //    동시에 같은 스킬이 두 번 돌지 않도록 보호.
-  for (const live of runSessions.values()) {
-    const sameApp = (live.appName ?? null) === (appName ?? null);
-    const sameSkill = live.skill === skillId;
-    if (sameApp && sameSkill && !TERMINAL_STATES.has(live.state)) {
-      res.status(200).json({ ...liveSummary(live), reused: true, reason: 'running' });
-      return;
-    }
-  }
-
-  // 2) forceRerun 이 아니면, 같은 (skill, appName, idempotencyKey) 의 최근 COMPLETED 기록 재사용.
   const forceRerun = body.forceRerun === true;
-  if (!forceRerun) {
-    const store = await getDefaultRunStore();
-    const existing = store.findLatestSuccess({
-      skill: skillId,
-      appName: appName ?? null,
-      idempotencyKey: idempotencyKey ?? null,
-    });
-    if (existing) {
-      res.status(200).json({ ...persistedSummary(existing), reused: true, reason: 'cached' });
-      return;
+  const lockKey = `${skillId}::${appName ?? ''}`;
+
+  // 1~3 단계를 (skill, appName) 단위 락으로 감싸 중복 spawn 방지.
+  const outcome = await withStartLock(lockKey, async () => {
+    // 1) 동일 (skill, appName) 로 이미 실행 중인 세션이 있으면 그걸 반환.
+    for (const live of runSessions.values()) {
+      const sameApp = (live.appName ?? null) === (appName ?? null);
+      const sameSkill = live.skill === skillId;
+      if (sameApp && sameSkill && !TERMINAL_STATES.has(live.state)) {
+        return { kind: 'running' as const, session: live };
+      }
     }
-  }
 
-  // 3) 새 세션 spawn.
-  const session = new RunSession({
-    skill: skillId,
-    cwd,
-    initialPrompt,
-    ...(appName !== undefined && { appName }),
-    ...(idempotencyKey !== undefined && { idempotencyKey }),
+    // 2) forceRerun 이 아니면, 같은 (skill, appName, idempotencyKey) 의 최근 COMPLETED 기록 재사용.
+    if (!forceRerun) {
+      const store = await getDefaultRunStore();
+      const existing = store.findLatestSuccess({
+        skill: skillId,
+        appName: appName ?? null,
+        idempotencyKey: idempotencyKey ?? null,
+      });
+      if (existing) return { kind: 'cached' as const, row: existing };
+    }
+
+    // 3) 새 세션 spawn.
+    const session = new RunSession({
+      skill: skillId,
+      cwd,
+      initialPrompt,
+      ...(appName !== undefined && { appName }),
+      ...(idempotencyKey !== undefined && { idempotencyKey }),
+    });
+    runSessions.set(session.runId, session);
+    await attachStore(session);
+    return { kind: 'spawned' as const, session };
   });
-  runSessions.set(session.runId, session);
-  await attachStore(session);
 
-  res.status(201).json({ ...liveSummary(session), reused: false, reason: null });
+  if (outcome.kind === 'running') {
+    res.status(200).json({ ...liveSummary(outcome.session), reused: true, reason: 'running' });
+    return;
+  }
+  if (outcome.kind === 'cached') {
+    res.status(200).json({ ...persistedSummary(outcome.row), reused: true, reason: 'cached' });
+    return;
+  }
+  res.status(201).json({ ...liveSummary(outcome.session), reused: false, reason: null });
 });
 
 // GET /api/orchestrations
