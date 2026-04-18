@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, Rocket, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Rocket } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
 import { useSkills } from '@/hooks/useSkills';
 import { useRuns, startRun, TERMINAL_RUN_STATES } from '@/hooks/useRuns';
 import AppAvatar from '@/components/AppAvatar';
 import ClaudeStatus from '@/components/ClaudeStatus';
 import RunTimeline from '@/components/RunTimeline';
+import SkillInputForm from '@/components/SkillInputForm';
+import type { SkillInputState } from '@/components/SkillInputForm';
 import type { PipelineStep } from '@/hooks/useSkills';
 import type { RunSummary } from '@/hooks/useRuns';
 
@@ -168,21 +170,36 @@ function ActiveStepCard({
   isDemo: boolean;
   onStarted: () => void;
 }) {
-  const [idea, setIdea] = useState('');
+  const { raw } = useSkills();
+  const meta = raw.find((s) => s.id === step.skill);
+  const [inputState, setInputState] = useState<SkillInputState>({
+    values: {},
+    prompt: '',
+    missingRequired: false,
+  });
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const needsIdea = step.skill === 'ait-plan';
+  const hasInputs = (meta?.inputs ?? []).length > 0;
+  // ait-plan 은 아이디어가 없어도 CLI가 대화로 받을 수 있지만, 위저드 UX 상 5자 이상 권장.
+  const ideaValue = inputState.values['idea'] ?? '';
+  const ideaTooShort = step.skill === 'ait-plan' && ideaValue.trim().length < 5;
 
   async function handleStart() {
     if (isDemo) return;
     setStarting(true);
     setError(null);
     try {
+      const idea = ideaValue.trim();
       await startRun({
         skill: step.skill,
         appName,
-        input: needsIdea && idea.trim() ? { idea: idea.trim() } : undefined,
+        input: hasInputs
+          ? {
+              ...(idea ? { idea } : {}),
+              ...(inputState.prompt ? { prompt: inputState.prompt } : {}),
+            }
+          : undefined,
         forceRerun: false,
       });
       onStarted();
@@ -209,19 +226,12 @@ function ActiveStepCard({
         <p className="wizard-active-requires">선행 단계: {step.requires}</p>
       )}
 
-      {needsIdea && (
-        <div className="wizard-idea-form">
-          <label htmlFor="wizard-idea-input" className="wizard-idea-label">
-            <Lightbulb size={14} strokeWidth={1.75} />
-            어떤 미니앱을 만들고 싶은가요?
-          </label>
-          <textarea
-            id="wizard-idea-input"
-            className="wizard-idea-input"
-            rows={4}
-            placeholder="예: 친구들과 여행 일정을 공유하고, 각자 가고 싶은 장소에 투표할 수 있는 미니앱"
-            value={idea}
-            onChange={(e) => setIdea(e.target.value)}
+      {hasInputs && (
+        <div className="wizard-inputs">
+          <SkillInputForm
+            skillId={step.skill}
+            value={inputState}
+            onChange={setInputState}
             disabled={isDemo || starting}
           />
         </div>
@@ -235,14 +245,16 @@ function ActiveStepCard({
           className="wizard-cta"
           onClick={() => void handleStart()}
           disabled={
-            isDemo || starting || (needsIdea && idea.trim().length < 5)
+            isDemo || starting || inputState.missingRequired || ideaTooShort
           }
           title={
             isDemo
               ? '로컬에서 pnpm dev 실행 시 사용 가능'
-              : needsIdea && idea.trim().length < 5
-                ? '아이디어를 조금 더 자세히 적어주세요'
-                : undefined
+              : ideaTooShort
+                ? '아이디어를 5자 이상 적어주세요'
+                : inputState.missingRequired
+                  ? '필수 입력이 비어있습니다'
+                  : undefined
           }
         >
           {starting ? '시작 중…' : '이 단계 시작'}
