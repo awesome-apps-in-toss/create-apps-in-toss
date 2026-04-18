@@ -179,6 +179,9 @@ export class RunSession {
 
   private transition(next: RunState): void {
     if (this.state === next) return;
+    // 이미 terminal 상태면 다른 terminal 로 덮어쓰지 않음 — cancel() 직후 child close
+    // 이벤트가 도착해 CANCELED 가 FAILED/COMPLETED 로 바뀌는 것을 방지.
+    if (TERMINAL_STATES.has(this.state)) return;
     this.state = next;
     if (TERMINAL_STATES.has(next)) {
       this.endedAt = new Date().toISOString();

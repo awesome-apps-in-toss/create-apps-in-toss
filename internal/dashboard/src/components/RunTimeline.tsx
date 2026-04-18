@@ -9,6 +9,7 @@ import {
   useRunStream,
   startRun,
   cancelRun,
+  sendRunInput,
   TERMINAL_RUN_STATES,
   type RunState,
   type RunSummary,
@@ -236,7 +237,8 @@ export default function RunTimeline({
 
                 {showArtifacts && app && latest?.state === 'COMPLETED' && (
                   <div className="run-timeline-artifact">
-                    <ArtifactReviewCard step={step.step} app={app} expanded={false} />
+                    {/* PRD(Step 1) 은 리뷰의 핵심 산출물이라 Wizard 에서도 펼친 상태로 노출. */}
+                    <ArtifactReviewCard step={step.step} app={app} expanded={step.step === 1} />
                   </div>
                 )}
 
@@ -327,6 +329,9 @@ function RunLivePanel({
   const { state, logs, artifacts, error } = useRunStream(runId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const doneFiredRef = useRef(false);
+  const [inputText, setInputText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -338,6 +343,23 @@ function RunLivePanel({
       onDone();
     }
   }, [state, onDone]);
+
+  const waitingInput = state === 'WAITING_USER_INPUT';
+
+  async function handleSend() {
+    const text = inputText.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      await sendRunInput(runId, text);
+      setInputText('');
+    } catch (e) {
+      setSendError(e instanceof Error ? e.message : 'Failed to send');
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <div className="run-live-panel">
@@ -371,6 +393,38 @@ function RunLivePanel({
         )}
         <div ref={bottomRef} />
       </div>
+      {waitingInput && (
+        <div className="run-live-panel-input">
+          <div className="run-live-panel-input-hint">
+            Claude 가 답변을 기다리고 있습니다. 아래에 답변을 적어 보내주세요.
+          </div>
+          <textarea
+            className="run-live-panel-input-ta"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
+            placeholder="답변을 입력하세요 (Ctrl/⌘ + Enter 로 전송)"
+            rows={3}
+            disabled={sending}
+          />
+          {sendError && <div className="run-live-panel-input-error">{sendError}</div>}
+          <div className="run-live-panel-input-actions">
+            <button
+              type="button"
+              className="run-live-panel-send"
+              onClick={() => void handleSend()}
+              disabled={sending || inputText.trim().length === 0}
+            >
+              {sending ? '전송 중…' : '보내기'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

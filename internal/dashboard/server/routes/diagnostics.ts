@@ -52,9 +52,12 @@ async function probeLogin(): Promise<'yes' | 'no' | 'unknown'> {
   // Claude CLI 는 ~/.claude 하위에 세션/자격 증명 관련 파일을 둔다.
   // 구체 파일명은 버전마다 달라질 수 있어 '존재 여부'만으로 추정한다.
   const home = os.homedir();
+  // Claude Code 는 실제로 `~/.claude/.credentials.json` (leading dot) 에 OAuth token 을 저장한다.
+  // 과거/다른 변형 파일명도 함께 체크해 하위 호환.
   const candidates = [
-    path.join(home, '.claude', 'auth.json'),
+    path.join(home, '.claude', '.credentials.json'),
     path.join(home, '.claude', 'credentials.json'),
+    path.join(home, '.claude', 'auth.json'),
     path.join(home, '.claude', 'session.json'),
     path.join(home, '.claude', 'oauth.json'),
   ];

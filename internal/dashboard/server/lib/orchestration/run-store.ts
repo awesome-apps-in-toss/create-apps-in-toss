@@ -72,11 +72,13 @@ export class RunStore {
     this.listEventsStmt = this.db.prepare(`
       SELECT seq, kind, data, at FROM events WHERE runId = ? ORDER BY seq ASC
     `);
+    // 괄호를 명시해 "@appName IS NULL" 과 "OR appName = @appName" 의 관계를 분명히 함.
+    // SQL 상 AND 가 OR 보다 우선하므로 같은 의미지만, 독해 실수 방지.
     this.latestSuccessStmt = this.db.prepare(`
       SELECT * FROM runs
       WHERE skill = @skill
-        AND (@appName IS NULL AND appName IS NULL OR appName = @appName)
-        AND (@idempotencyKey IS NULL AND idempotencyKey IS NULL OR idempotencyKey = @idempotencyKey)
+        AND ((@appName IS NULL AND appName IS NULL) OR appName = @appName)
+        AND ((@idempotencyKey IS NULL AND idempotencyKey IS NULL) OR idempotencyKey = @idempotencyKey)
         AND state = 'COMPLETED'
       ORDER BY startedAt DESC
       LIMIT 1

@@ -1,6 +1,6 @@
 import { AlertTriangle, RefreshCw, Terminal, LogIn, Wifi } from 'lucide-react';
-import { useState } from 'react';
-import { startRun } from '@/hooks/useRuns';
+import { useEffect, useState } from 'react';
+import { startRun, fetchRunDetail } from '@/hooks/useRuns';
 import type { RunSummary } from '@/hooks/useRuns';
 import type { PipelineStep } from '@/hooks/useSkills';
 
@@ -25,13 +25,39 @@ export default function RunErrorCard({
   step,
   appName,
   isDemo,
-  hintLines = [],
+  hintLines,
   onRetry,
 }: RunErrorCardProps) {
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
+  // hintLines 가 주어지지 않으면 history API 에서 최근 로그 이벤트를 끌어와 진단 분기에 쓴다.
+  // FAILED run 은 live stream 으로 잡을 수 없으므로 history 조회가 필요.
+  const [fetchedHints, setFetchedHints] = useState<string[] | null>(null);
 
-  const diag = diagnoseFromHints(run.exitCode, hintLines);
+  useEffect(() => {
+    if (hintLines !== undefined) return;
+    if (isDemo) return;
+    let cancelled = false;
+    (async () => {
+      const detail = await fetchRunDetail(run.runId);
+      if (cancelled || !detail) return;
+      const lines: string[] = [];
+      for (const ev of detail.history) {
+        if (ev.kind !== 'log' && ev.kind !== 'error') continue;
+        const d = ev.data as { line?: string; stream?: string; message?: string } | null;
+        if (!d) continue;
+        if (typeof d.line === 'string') lines.push(d.line);
+        else if (typeof d.message === 'string') lines.push(d.message);
+      }
+      setFetchedHints(lines.slice(-60));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [run.runId, hintLines, isDemo]);
+
+  const effectiveHints = hintLines ?? fetchedHints ?? [];
+  const diag = diagnoseFromHints(run.exitCode, effectiveHints);
 
   async function handleRetry() {
     if (isDemo) return;
@@ -79,11 +105,11 @@ export default function RunErrorCard({
           ))}
         </ul>
 
-        {hintLines.length > 0 && (
+        {effectiveHints.length > 0 && (
           <details className="run-error-card-details">
-            <summary>개발자용 로그 ({hintLines.length}줄)</summary>
+            <summary>개발자용 로그 ({effectiveHints.length}줄)</summary>
             <pre className="run-error-card-log">
-              {hintLines.slice(-20).join('\n')}
+              {effectiveHints.slice(-20).join('\n')}
             </pre>
           </details>
         )}
@@ -166,7 +192,7 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
     };
   }
 
-  if (/not logged in|unauthori|401|403|please login|claude[ \/]login/.test(tail)) {
+  if (/not logged in|unauthori|401|403|please login|claude[ /]login/.test(tail)) {
     return {
       summary: 'Claude CLI 로그인이 필요합니다.',
       suggestions: [

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, Rocket } from 'lucide-react';
+import { ArrowLeft, Rocket, Loader2 } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
 import { useSkills } from '@/hooks/useSkills';
 import { useRuns, startRun, TERMINAL_RUN_STATES } from '@/hooks/useRuns';
@@ -130,6 +130,7 @@ export default function Wizard() {
           step={nextStep}
           appName={app.folderName}
           isDemo={isDemo}
+          latestRun={latestBySkill.get(nextStep.skill) ?? null}
           onStarted={() => {
             void refetchRuns();
           }}
@@ -163,11 +164,13 @@ function ActiveStepCard({
   step,
   appName,
   isDemo,
+  latestRun,
   onStarted,
 }: {
   step: PipelineStep;
   appName: string;
   isDemo: boolean;
+  latestRun: RunSummary | null;
   onStarted: () => void;
 }) {
   const { raw } = useSkills();
@@ -185,6 +188,11 @@ function ActiveStepCard({
   const ideaValue = inputState.values['idea'] ?? '';
   const ideaTooShort = step.skill === 'ait-plan' && ideaValue.trim().length < 5;
 
+  // 이 step 이 이미 실행 중이면 "진행 중" 안내로 전환하고 전체 타임라인으로 스크롤하도록 유도.
+  const running = latestRun && !TERMINAL_RUN_STATES.has(latestRun.state);
+  // FAILED/CANCELED 일 땐 재시도로 프레이밍.
+  const retryable = latestRun && (latestRun.state === 'FAILED' || latestRun.state === 'CANCELED');
+
   async function handleStart() {
     if (isDemo) return;
     setStarting(true);
@@ -200,7 +208,8 @@ function ActiveStepCard({
               ...(inputState.prompt ? { prompt: inputState.prompt } : {}),
             }
           : undefined,
-        forceRerun: false,
+        // 이미 실패/취소된 run 이 있으면 강제로 새 실행을 띄운다. (캐시 hit 방지)
+        forceRerun: retryable ?? false,
       });
       onStarted();
     } catch (e) {
@@ -210,12 +219,17 @@ function ActiveStepCard({
     }
   }
 
+  function scrollToTimeline() {
+    document.querySelector('.run-timeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   return (
     <section id="wizard-active-step" className="wizard-active-step">
       <div className="wizard-active-head">
         <div className="wizard-active-step-label">Step {step.step}</div>
         <h2 className="wizard-active-title">
-          <Rocket size={18} strokeWidth={1.75} /> {step.label}
+          {running ? <Loader2 size={18} strokeWidth={1.75} className="spin" /> : <Rocket size={18} strokeWidth={1.75} />}
+          {step.label}
         </h2>
       </div>
       <p className="wizard-active-desc">{step.description}</p>
@@ -226,40 +240,55 @@ function ActiveStepCard({
         <p className="wizard-active-requires">선행 단계: {step.requires}</p>
       )}
 
-      {hasInputs && (
-        <div className="wizard-inputs">
-          <SkillInputForm
-            skillId={step.skill}
-            value={inputState}
-            onChange={setInputState}
-            disabled={isDemo || starting}
-          />
+      {running ? (
+        <div className="wizard-active-running">
+          <p className="wizard-active-running-text">
+            이미 이 단계가 진행 중입니다. 아래 타임라인에서 실시간 로그와 답변 입력을 확인할 수 있어요.
+          </p>
+          <div className="wizard-active-actions">
+            <button type="button" className="wizard-cta wizard-cta--secondary" onClick={scrollToTimeline}>
+              진행 상황 보기
+            </button>
+          </div>
         </div>
+      ) : (
+        <>
+          {hasInputs && (
+            <div className="wizard-inputs">
+              <SkillInputForm
+                skillId={step.skill}
+                value={inputState}
+                onChange={setInputState}
+                disabled={isDemo || starting}
+              />
+            </div>
+          )}
+
+          {error && <div className="wizard-error">{error}</div>}
+
+          <div className="wizard-active-actions">
+            <button
+              type="button"
+              className="wizard-cta"
+              onClick={() => void handleStart()}
+              disabled={
+                isDemo || starting || inputState.missingRequired || ideaTooShort
+              }
+              title={
+                isDemo
+                  ? '로컬에서 pnpm dev 실행 시 사용 가능'
+                  : ideaTooShort
+                    ? '아이디어를 5자 이상 적어주세요'
+                    : inputState.missingRequired
+                      ? '필수 입력이 비어있습니다'
+                      : undefined
+              }
+            >
+              {starting ? '시작 중…' : retryable ? '다시 시도' : '이 단계 시작'}
+            </button>
+          </div>
+        </>
       )}
-
-      {error && <div className="wizard-error">{error}</div>}
-
-      <div className="wizard-active-actions">
-        <button
-          type="button"
-          className="wizard-cta"
-          onClick={() => void handleStart()}
-          disabled={
-            isDemo || starting || inputState.missingRequired || ideaTooShort
-          }
-          title={
-            isDemo
-              ? '로컬에서 pnpm dev 실행 시 사용 가능'
-              : ideaTooShort
-                ? '아이디어를 5자 이상 적어주세요'
-                : inputState.missingRequired
-                  ? '필수 입력이 비어있습니다'
-                  : undefined
-          }
-        >
-          {starting ? '시작 중…' : '이 단계 시작'}
-        </button>
-      </div>
     </section>
   );
 }

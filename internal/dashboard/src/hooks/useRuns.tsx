@@ -185,6 +185,18 @@ export function useRunStream(runId: string | null): {
   return { state, logs, artifacts, questions, error, connected };
 }
 
+/** GET /api/orchestrations/:runId 헬퍼. history 포함 상세 조회. */
+export async function fetchRunDetail(runId: string): Promise<RunDetail | null> {
+  if (IS_STATIC) return null;
+  try {
+    const res = await fetch(`/api/orchestrations/${runId}`);
+    if (!res.ok) return null;
+    return (await res.json()) as RunDetail;
+  } catch {
+    return null;
+  }
+}
+
 /** POST /api/orchestrations 헬퍼. */
 export async function startRun(body: StartRunBody): Promise<StartRunResponse> {
   const res = await fetch('/api/orchestrations', {

@@ -3229,6 +3229,75 @@ body {
   opacity: 0.4;
   cursor: not-allowed;
 }
+.wizard-cta--secondary {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+.wizard-cta--secondary:hover:not(:disabled) {
+  background: #e0e7ff;
+}
+.wizard-active-running {
+  margin-top: 8px;
+}
+.wizard-active-running-text {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
+  line-height: 1.5;
+  margin: 0 0 8px;
+}
+
+/* RunLivePanel — WAITING_USER_INPUT 입력창 */
+.run-live-panel-input {
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  padding: 10px 12px;
+  background: #fafbff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.run-live-panel-input-hint {
+  font-size: 12px;
+  color: #4f46e5;
+  font-weight: 500;
+}
+.run-live-panel-input-ta {
+  width: 100%;
+  min-height: 56px;
+  resize: vertical;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  background: #fff;
+  box-sizing: border-box;
+}
+.run-live-panel-input-ta:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
+}
+.run-live-panel-input-error {
+  font-size: 12px;
+  color: #dc2626;
+}
+.run-live-panel-input-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.run-live-panel-send {
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: #4f46e5;
+  color: #fff;
+  border: 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+.run-live-panel-send:hover:not(:disabled) { background: #4338ca; }
+.run-live-panel-send:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ========================
    Claude CLI status banner
