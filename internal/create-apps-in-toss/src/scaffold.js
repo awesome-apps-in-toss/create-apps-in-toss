@@ -48,9 +48,13 @@ ${c.bold('옵션')}
   --skip-git            git init 스킵
   -h, --help            도움말
 
+${c.bold('서브커맨드')}
+  adopt   기존 레포를 템플릿에 연결 (npx create-apps-in-toss adopt --help)
+
 ${c.bold('예시')}
   npx create-apps-in-toss my-miniapp
   npx create-apps-in-toss my-miniapp --skip-install
+  npx create-apps-in-toss adopt
 
 ${c.bold('환경변수')}
   GITHUB_TOKEN   GitHub API rate limit 5000/hr로 확장 (선택)
