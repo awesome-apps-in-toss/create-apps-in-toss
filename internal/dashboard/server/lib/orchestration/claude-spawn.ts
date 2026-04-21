@@ -13,20 +13,18 @@ export function findClaudeExecutable(): string {
 }
 
 export interface SpawnClaudeOptions {
-  skill: string;
   cwd: string;
-  initialPrompt: string;
 }
 
 /**
- * Spawn Claude CLI with stream-json I/O and acceptEdits permission mode.
+ * Claude CLI 를 양방향 stream-json 모드로 spawn.
  *
  * 약관/보안: --dangerously-skip-permissions 절대 사용 금지.
- * --permission-mode acceptEdits 고정 → 파일 편집은 자동 허용, Bash/네트워크는 여전히 확인.
+ * --permission-mode acceptEdits 로 편집만 자동 허용 (Bash/네트워크는 여전히 확인).
  *
- * NOTE: stream-json input schema는 claude CLI 버전마다 다를 수 있음.
- * 현재 가정: `{ "type": "user", "message": { "role": "user", "content": [{ "type": "text", "text": "..." }] } }`
- * 필요 시 사용자 입력은 sendUserInput() 헬퍼로 직렬화한다.
+ * --input-format stream-json 을 쓰면 `-p "prompt"` 인자는 **무시되고** 모든 입력은 stdin 으로 들어온다.
+ * 따라서 초기 프롬프트도 `encodeUserInput()` 으로 stdin 에 써야 한다.
+ * (이 함수는 spawn 만 담당하며 실제 initial 메시지 주입은 RunSession 이 처리.)
  */
 export function spawnClaudeForSkill(opts: SpawnClaudeOptions): ChildProcessWithoutNullStreams {
   const claudePath = findClaudeExecutable();
@@ -38,8 +36,6 @@ export function spawnClaudeForSkill(opts: SpawnClaudeOptions): ChildProcessWitho
     '--input-format',
     'stream-json',
     '--verbose',
-    '-p',
-    `/${opts.skill} ${opts.initialPrompt}`.trim(),
   ];
   return spawn(claudePath, args, {
     cwd: opts.cwd,
@@ -58,4 +54,10 @@ export function encodeUserInput(text: string): string {
     },
   };
   return JSON.stringify(payload) + '\n';
+}
+
+/** 스킬을 실행하기 위한 최초 user 메시지 (`/<skill> <initialPrompt>`). */
+export function buildInitialPrompt(skill: string, initialPrompt: string): string {
+  const trimmed = initialPrompt.trim();
+  return trimmed ? `/${skill} ${trimmed}` : `/${skill}`;
 }

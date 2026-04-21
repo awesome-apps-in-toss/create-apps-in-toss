@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { ChildProcessWithoutNullStreams } from 'child_process';
 import type { Response } from 'express';
-import { spawnClaudeForSkill, encodeUserInput } from './claude-spawn.js';
+import { spawnClaudeForSkill, encodeUserInput, buildInitialPrompt } from './claude-spawn.js';
 import { parseStreamLine } from './stream-parser.js';
 
 export type RunState =
@@ -41,6 +41,9 @@ export interface RunSessionInit {
   appName?: string;
   cwd: string;
   initialPrompt: string;
+  /** 'interactive' 면 초기 프롬프트 주입 뒤에도 stdin 을 열어둬 사용자 응답을 계속 받는다.
+   *  'automated' 면 초기 프롬프트 직후 stdin 을 닫아 CLI 가 한 턴 끝나면 스스로 종료하게 한다. */
+  mode: 'interactive' | 'automated';
   /** 사전 지정된 runId (SQLite 복원용). 없으면 UUID 생성. */
   runId?: string;
   /** idempotency 키 — 같은 키의 성공 기록이 있으면 재실행 스킵 가능 (라우트 레이어에서 검사). */
@@ -60,6 +63,7 @@ export class RunSession {
   readonly cwd: string;
   readonly initialPrompt: string;
   readonly idempotencyKey?: string;
+  readonly mode: 'interactive' | 'automated';
   state: RunState;
   endedAt?: string;
   exitCode?: number;
@@ -79,26 +83,46 @@ export class RunSession {
     this.cwd = init.cwd;
     this.initialPrompt = init.initialPrompt;
     if (init.idempotencyKey !== undefined) this.idempotencyKey = init.idempotencyKey;
+    this.mode = init.mode;
     this.startedAt = new Date().toISOString();
     this.state = 'DRAFT';
 
     this.transition('VALIDATING_INPUT');
     this.transition('READY');
 
-    this.child = spawnClaudeForSkill({
-      skill: init.skill,
-      cwd: init.cwd,
-      initialPrompt: init.initialPrompt,
-    });
+    this.child = spawnClaudeForSkill({ cwd: init.cwd });
     this.transition('RUNNING');
     this.wireChild();
+
+    // 초기 프롬프트 주입. stream-json 모드에서는 -p 인자가 무시되므로 반드시 stdin 으로 넣어야 한다.
+    try {
+      this.child.stdin.write(encodeUserInput(buildInitialPrompt(init.skill, init.initialPrompt)));
+    } catch (err) {
+      this.emit({
+        kind: 'error',
+        data: { message: err instanceof Error ? err.message : String(err) },
+        at: new Date().toISOString(),
+      });
+    }
+
+    // 자동화 스킬은 한 턴으로 끝나도록 stdin 을 닫아둔다.
+    // (사용자 응답을 받지 않는 스킬이므로 CLI 가 end_turn 이후 스스로 exit.)
+    if (init.mode === 'automated') {
+      try {
+        this.child.stdin.end();
+      } catch {
+        // ignore
+      }
+    }
   }
 
-  addClient(res: Response, opts: { replay?: boolean } = {}): void {
+  addClient(res: Response, opts: { replay?: boolean; fromSeq?: number } = {}): void {
     this.clients.add(res);
     const replay = opts.replay ?? true;
+    const fromSeq = opts.fromSeq ?? 0;
     if (replay && this.eventHistory.length > 0) {
       for (const event of this.eventHistory) {
+        if (event.seq < fromSeq) continue;
         this.emitTo(res, event);
       }
     } else {
@@ -247,29 +271,37 @@ export class RunSession {
   private dispatchStdoutLine(line: string): void {
     const trimmed = line.trimEnd();
     if (!trimmed) return;
-    const parsed = parseStreamLine(trimmed);
+    const events = parseStreamLine(trimmed);
+    if (events.length === 0) return;
     const at = new Date().toISOString();
-    switch (parsed.kind) {
-      case 'artifact':
-        this.emit({ kind: 'artifact', data: parsed.artifact ?? {}, at });
-        break;
-      case 'done':
-        // 실제 close는 child 'close' 이벤트에서 처리. 여기서는 로그로만 남김.
-        this.emit({ kind: 'log', data: { stream: 'stdout', line: '[stream-json: result]' }, at });
-        break;
-      case 'question':
-        this.transition('WAITING_USER_INPUT');
-        this.emit({ kind: 'question', data: parsed.raw, at });
-        break;
-      case 'log':
-      case 'unknown':
-      default:
-        this.emit({
-          kind: 'log',
-          data: { stream: 'stdout', line: parsed.message ?? trimmed },
-          at,
-        });
-        break;
+    for (const parsed of events) {
+      switch (parsed.kind) {
+        case 'artifact':
+          this.emit({ kind: 'artifact', data: parsed.artifact ?? {}, at });
+          break;
+        case 'turn_end':
+          // 한 턴이 끝났을 뿐이며 세션은 계속 살아있다 (stdin 열림).
+          // automated 모드는 한 턴 뒤 stdin 이 이미 닫혀 CLI 가 스스로 exit → COMPLETED 로 간다.
+          // 따라서 잠깐 WAITING 을 깜빡이지 않도록 automated 에서는 전이하지 않는다.
+          if (this.mode === 'interactive' && !TERMINAL_STATES.has(this.state)) {
+            this.transition('WAITING_USER_INPUT');
+          }
+          break;
+        case 'question':
+          this.transition('WAITING_USER_INPUT');
+          this.emit({ kind: 'question', data: parsed.question ?? parsed.raw, at });
+          break;
+        case 'log':
+        default:
+          if (parsed.message) {
+            this.emit({
+              kind: 'log',
+              data: { stream: 'stdout', line: parsed.message },
+              at,
+            });
+          }
+          break;
+      }
     }
   }
 

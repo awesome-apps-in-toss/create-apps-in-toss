@@ -6,7 +6,7 @@ import { useSkills } from '@/hooks/useSkills';
 import { useRuns, startRun, TERMINAL_RUN_STATES } from '@/hooks/useRuns';
 import AppAvatar from '@/components/AppAvatar';
 import ClaudeStatus from '@/components/ClaudeStatus';
-import RunTimeline from '@/components/RunTimeline';
+import RunTimeline, { RunLivePanel } from '@/components/RunTimeline';
 import SkillInputForm from '@/components/SkillInputForm';
 import type { SkillInputState } from '@/components/SkillInputForm';
 import type { PipelineStep } from '@/hooks/useSkills';
@@ -135,11 +135,16 @@ export default function Wizard() {
 
       {nextStep && (
         <ActiveStepCard
+          key={nextStep.skill}
           step={nextStep}
           appName={app.folderName}
           isDemo={isDemo}
           latestRun={latestBySkill.get(nextStep.skill) ?? null}
           onStarted={() => {
+            void refetchRuns();
+          }}
+          onRunComplete={() => {
+            void refetch();
             void refetchRuns();
           }}
         />
@@ -153,12 +158,14 @@ export default function Wizard() {
           isDemo={isDemo}
           app={app}
           showArtifacts
+          suppressLivePanel
           onRunComplete={() => {
             void refetch();
             void refetchRuns();
           }}
           onInteractiveStep={() => {
-            // wizard 내에서는 ActiveStepCard 로 이동시키고 interactive 는 별도 수집 폼으로 흡수.
+            // wizard 내에서는 ActiveStepCard 에 embedded RunLivePanel 이 이미 붙어 있다.
+            // 타임라인에서 시작 버튼 눌러도 카드로 스크롤해서 대화를 이어가게 함.
             const card = document.getElementById('wizard-active-step');
             card?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }}
@@ -174,12 +181,14 @@ function ActiveStepCard({
   isDemo,
   latestRun,
   onStarted,
+  onRunComplete,
 }: {
   step: PipelineStep;
   appName: string;
   isDemo: boolean;
   latestRun: RunSummary | null;
   onStarted: () => void;
+  onRunComplete: () => void;
 }) {
   const { raw } = useSkills();
   const meta = raw.find((s) => s.id === step.skill);
@@ -227,10 +236,6 @@ function ActiveStepCard({
     }
   }
 
-  function scrollToTimeline() {
-    document.querySelector('.run-timeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
   return (
     <section id="wizard-active-step" className="wizard-active-step">
       <div className="wizard-active-head">
@@ -248,16 +253,16 @@ function ActiveStepCard({
         <p className="wizard-active-requires">선행 단계: {step.requires}</p>
       )}
 
-      {running ? (
+      {running && latestRun ? (
         <div className="wizard-active-running">
-          <p className="wizard-active-running-text">
-            이미 이 단계가 진행 중입니다. 아래 타임라인에서 실시간 로그와 답변 입력을 확인할 수 있어요.
-          </p>
-          <div className="wizard-active-actions">
-            <button type="button" className="wizard-cta wizard-cta--secondary" onClick={scrollToTimeline}>
-              진행 상황 보기
-            </button>
-          </div>
+          <RunLivePanel
+            runId={latestRun.runId}
+            embedded
+            onClose={() => {
+              /* embedded 에서는 닫기 버튼 자체가 없음. */
+            }}
+            onDone={onRunComplete}
+          />
         </div>
       ) : (
         <>

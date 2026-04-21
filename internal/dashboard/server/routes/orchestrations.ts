@@ -203,6 +203,7 @@ router.post('/', async (req, res) => {
       skill: skillId,
       cwd,
       initialPrompt,
+      mode: meta.mode,
       ...(appName !== undefined && { appName }),
       ...(idempotencyKey !== undefined && { idempotencyKey }),
     });
@@ -276,21 +277,73 @@ router.get('/:runId', async (req, res) => {
 });
 
 // GET /api/orchestrations/:runId/stream → SSE
-router.get('/:runId/stream', (req, res) => {
+// Query:
+//   replay=false  → live 세션의 과거 이벤트 replay 건너뛰기 (기본 true)
+//   fromSeq=N     → seq >= N 인 이벤트만 송출 (재접속 시 이미 받은 이벤트 스킵용)
+router.get('/:runId/stream', async (req, res) => {
   const runId = req.params['runId'];
-  const session = runId ? runSessions.get(runId) : undefined;
-  if (!session) {
-    res.status(404).json({ error: 'run not found or already terminated' });
+  if (!runId) {
+    res.status(400).json({ error: 'runId required' });
     return;
   }
+  const live = runSessions.get(runId);
+  const fromSeqRaw = typeof req.query['fromSeq'] === 'string' ? parseInt(req.query['fromSeq'], 10) : NaN;
+  const fromSeq = Number.isFinite(fromSeqRaw) && fromSeqRaw >= 0 ? fromSeqRaw : 0;
+  const replay = req.query['replay'] !== 'false';
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  const replay = req.query['replay'] !== 'false';
-  session.addClient(res, { replay });
+  if (live) {
+    live.addClient(res, { replay, fromSeq });
+    return;
+  }
+
+  // 라이브 세션이 없으면 SQLite 이력에서 replay 하고 스트림을 닫는다.
+  const store = await getDefaultRunStore();
+  const row = store.getRun(runId);
+  if (!row) {
+    res.write(`event: error\ndata: ${JSON.stringify({ error: 'run not found' })}\n\n`);
+    res.end();
+    return;
+  }
+  // replay=false 쿼리를 존중. 복원 경로에서도 과거 이벤트를 다시 쏘지 않고 최종 state/done 만 보낸다.
+  if (replay) {
+    const events = store.listEvents(runId);
+    for (const event of events) {
+      if (event.seq < fromSeq) continue;
+      try {
+        res.write(`event: ${event.kind}\n`);
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      } catch {
+        break;
+      }
+    }
+  }
+  // 영속 이력 뒤에는 현재 저장된 상태를 한 번 더 알려준다 (클라이언트 state 정합).
+  try {
+    res.write(
+      `event: state\ndata: ${JSON.stringify({
+        seq: -1,
+        kind: 'state',
+        data: { state: row.state },
+        at: row.endedAt ?? row.startedAt,
+      })}\n\n`
+    );
+    res.write(
+      `event: done\ndata: ${JSON.stringify({
+        seq: -1,
+        kind: 'done',
+        data: { exitCode: row.exitCode, finalState: row.state, restoredFromStore: true },
+        at: row.endedAt ?? row.startedAt,
+      })}\n\n`
+    );
+  } catch {
+    // ignore
+  }
+  res.end();
 });
 
 // POST /api/orchestrations/:runId/input
