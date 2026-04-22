@@ -4,3 +4,4 @@ dist
 .env.local
 .claude/settings.local.json
 .turbo
+/logs/

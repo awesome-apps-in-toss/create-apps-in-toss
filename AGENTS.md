@@ -61,7 +61,7 @@ barreleye/
 ├── .claude/
 │   ├── agents/
 │   │   └── graphic-designer.md
-│   └── skills/             # Claude 스킬 (11개)
+│   └── skills/             # Claude 스킬 (ait-* 코어 11개 + impeccable 디자인 17개)
 │       ├── ait-plan/           # 아이디어→정책검토→PRD
 │       ├── ait-meta/           # .meta-dashboard.json 자동 생성
 │       ├── ait-preflight/      # 사전 환경 체크 (MCP·도구·env)
@@ -72,7 +72,10 @@ barreleye/
 │       ├── ait-review/         # 검수 체크리스트
 │       ├── ait-build/          # 빌드 & 배포
 │       ├── ait-launch/         # 전체 플로우 오케스트레이터
-│       └── ait-ut/             # UT 시뮬레이션
+│       ├── ait-ut/             # UT 시뮬레이션
+│       └── {adapt,animate,...,typeset}  # impeccable 디자인 스킬 17개 (심볼릭 링크 → .agents/skills/)
+├── .agents/skills/         # impeccable 스킬 원본 (npx skills 관리; skills-lock.json으로 버전 pinning)
+├── skills-lock.json        # impeccable 스킬 버전 매니페스트
 └── scripts/                # 유틸리티 스크립트 (create-app.js, preflight.js)
 ```
 
@@ -139,6 +142,38 @@ pnpm preflight    # Claude 스킬·에이전트 동작 환경 사전 체크 (MCP
 
 설정 파일: `.mcp.json` (프로젝트 루트)
 DALL-E는 MCP 미사용, bash + curl로 OpenAI Images API 직접 호출 (그래픽 디자이너 에이전트 Section 4 참고)
+
+### impeccable 디자인 스킬 관리 정책
+
+- **원본**: `.agents/skills/<name>/` (pbakaus/impeccable 소스 vendored)
+- **Claude Code 인식 경로**: `.claude/skills/<name>` (상대 심볼릭 링크 → `.agents/skills/<name>`)
+- **버전 pinning**: `skills-lock.json` (npx skills 도구 관리)
+- **업데이트 시**: `npx skills update` 후 생기는 diff를 정상 PR로 올림 — `.agents/` 변경은 레포 상태의 일부로 간주
+
+### Windows 사용자 setup (심볼릭 링크)
+
+`.claude/skills/<name>`가 `.agents/skills/<name>`을 가리키는 **상대 심볼릭 링크**로 구성돼 있어, Windows에서는 다음 설정이 필요합니다.
+
+**clone 전** (권장):
+
+```bash
+git config --global core.symlinks true
+git clone https://github.com/Awesome-Apps-in-Toss/create-apps-in-toss.git
+```
+
+**이미 clone한 경우**:
+
+```bash
+git config core.symlinks true
+git reset --hard HEAD   # 심볼릭 링크 재생성
+```
+
+**전제조건**: Windows 10/11에서 심볼릭 링크 생성은 아래 중 하나가 필요합니다.
+
+- 개발자 모드 활성화 (Settings → Update & Security → For developers)
+- 또는 관리자 권한으로 git 실행
+
+설정이 안 된 상태로 clone하면 `.claude/skills/<name>`가 일반 파일(링크 경로 문자열 내용)로 체크아웃되어 Claude Code가 스킬을 인식하지 못합니다. `ls -la .claude/skills/`로 `lrwxr-xr-x` 권한이 안 보이면 위 설정을 확인하세요.
 
 ---
 
