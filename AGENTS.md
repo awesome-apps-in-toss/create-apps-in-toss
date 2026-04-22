@@ -10,8 +10,10 @@
 | 아이디어 → PRD | `docs/launch-flow/01-planning-guide.md` | `/ait-plan` |
 | 사전 환경 점검 | — | `/ait-preflight` |
 | 리소스 준비 | `docs/launch-flow/02-resource-checklist.md` | `/ait-assets` |
-| 스캐폴딩 | `docs/launch-flow/03-scaffold-guide.md` | `/ait-scaffold` |
-| TDS 세팅 | `docs/launch-flow/04-tds-setup-guide.md` | `/ait-tds-setup` |
+| 프로젝트 틀 만들기 (+추가 기능 선택) | `docs/launch-flow/03-scaffold-guide.md` | `/ait-scaffold` |
+| 화면 이동 설정 (React Router) | — | `/ait-add-routing` |
+| 서버 데이터 연결 (TanStack Query) | — | `/ait-add-query` |
+| 토스 스타일 UI (TDS) | `docs/launch-flow/04-tds-setup-guide.md` | `/ait-tds-setup` |
 | 구현 | `docs/launch-flow/05-implementation-guide.md` | `/ait-implement` |
 | 검수 | `docs/launch-flow/06-review-checklist.md` | `/ait-review` |
 | 빌드 & 배포 | `docs/launch-flow/07-build-deploy-guide.md` | `/ait-build` |
@@ -61,13 +63,15 @@ barreleye/
 ├── .claude/
 │   ├── agents/
 │   │   └── graphic-designer.md
-│   └── skills/             # Claude 스킬 (ait-* 코어 11개 + impeccable 디자인 17개)
+│   └── skills/             # Claude 스킬 (ait-* 코어 13개 + impeccable 디자인 17개)
 │       ├── ait-plan/           # 아이디어→정책검토→PRD
 │       ├── ait-meta/           # .meta-dashboard.json 자동 생성
 │       ├── ait-preflight/      # 사전 환경 체크 (MCP·도구·env)
 │       ├── ait-assets/         # 이미지/텍스트 리소스 생성
-│       ├── ait-scaffold/       # 스캐폴딩
-│       ├── ait-tds-setup/      # TDS 환경 세팅
+│       ├── ait-scaffold/       # 최소 스캐폴딩 + 추가 기능 제안
+│       ├── ait-add-routing/    # 화면 이동 설정 (React Router)
+│       ├── ait-add-query/      # 서버 데이터 연결 (TanStack Query)
+│       ├── ait-tds-setup/      # 토스 스타일 UI (TDS)
 │       ├── ait-implement/      # 기능 구현
 │       ├── ait-review/         # 검수 체크리스트
 │       ├── ait-build/          # 빌드 & 배포

@@ -16,6 +16,13 @@ if (!appName) {
 
 const appDir = join(rootDir, 'apps', appName);
 
+/**
+ * 최소 스캐폴딩. 여기서는 "앱이 일단 켜지는 최소 구성"만 만든다.
+ *   - React + Vite + TypeScript
+ *   - @apps-in-toss/web-framework (granite.config.ts 필수)
+ * 추가 라이브러리(@toss/tds-mobile, @tanstack/react-query, react-router-dom 등)는
+ * 각자 /ait-add-* 스킬에서 필요한 앱에만 붙인다.
+ */
 const files = {
   'package.json': JSON.stringify(
     {
@@ -32,11 +39,8 @@ const files = {
       },
       dependencies: {
         '@apps-in-toss/web-framework': '^2.0.5',
-        '@tanstack/react-query': '^5.62.0',
-        '@toss/tds-mobile': '^2.0.0',
         react: '^18.3.1',
         'react-dom': '^18.3.1',
-        'react-router-dom': '^7.1.0',
       },
       devDependencies: {
         '@barreleye/eslint-config': 'workspace:*',
@@ -130,8 +134,6 @@ export default reactConfig;
 
   'src/main.tsx': `import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import { QueryProvider } from '@/providers/QueryProvider';
 import App from './App';
 import './index.css';
 
@@ -140,64 +142,25 @@ if (!rootElement) throw new Error('Root element not found');
 
 createRoot(rootElement).render(
   <StrictMode>
-    <QueryProvider>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </QueryProvider>
+    <App />
   </StrictMode>
 );
 `,
 
-  'src/App.tsx': `import { Routes, Route, Link } from 'react-router-dom';
-import { HomePage } from '@/pages/HomePage';
-
-function App() {
+  'src/App.tsx': `export default function App() {
   return (
-    <div className="app">
-      <nav className="nav">
-        <Link to="/">홈</Link>
-      </nav>
-      <main className="main">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-        </Routes>
-      </main>
-    </div>
+    <main className="app">
+      <section className="card">
+        <h1>${appName}</h1>
+        <p>새 미니앱입니다. 아래 스킬로 필요한 기능을 하나씩 추가해보세요.</p>
+        <ul className="tips">
+          <li><code>/ait-add-routing</code> — 여러 화면을 오갈 수 있게 해줘요</li>
+          <li><code>/ait-add-query</code> — 서버에서 데이터를 받아와 보여줘요</li>
+          <li><code>/ait-tds-setup</code> — 토스 스타일 UI 컴포넌트를 추가해줘요</li>
+        </ul>
+      </section>
+    </main>
   );
-}
-
-export default App;
-`,
-
-  'src/pages/HomePage.tsx': `export function HomePage() {
-  return (
-    <section className="card">
-      <h1>${appName}</h1>
-      <p>새 미니앱입니다.</p>
-    </section>
-  );
-}
-`,
-
-  'src/providers/QueryProvider.tsx': `import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60,
-      retry: 1,
-    },
-  },
-});
-
-interface QueryProviderProps {
-  children: ReactNode;
-}
-
-export function QueryProvider({ children }: QueryProviderProps) {
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 `,
 
@@ -217,23 +180,6 @@ body {
 .app {
   min-height: 100vh;
   padding: 16px;
-}
-
-.nav {
-  display: flex;
-  gap: 16px;
-  padding: 12px 0;
-  margin-bottom: 16px;
-  border-bottom: 1px solid #e5e8eb;
-}
-
-.nav a {
-  color: #3182f6;
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.main {
   max-width: 480px;
   margin: 0 auto;
 }
@@ -254,6 +200,23 @@ body {
 .card p {
   color: #4e5968;
   font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.tips {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #4e5968;
+}
+
+.tips code {
+  background: #f2f4f6;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
 }
 `,
 };
@@ -261,8 +224,7 @@ body {
 async function createApp() {
   console.log(`Creating new app: ${appName}`);
 
-  await mkdir(join(appDir, 'src/pages'), { recursive: true });
-  await mkdir(join(appDir, 'src/providers'), { recursive: true });
+  await mkdir(join(appDir, 'src'), { recursive: true });
 
   for (const [filename, content] of Object.entries(files)) {
     const filePath = join(appDir, filename);
@@ -274,6 +236,10 @@ async function createApp() {
   console.log(`\nDone! Run the following commands:`);
   console.log(`  pnpm install`);
   console.log(`  pnpm --filter @barreleye/${appName} dev`);
+  console.log(`\n추가 기능은 아래 스킬로 붙이세요:`);
+  console.log(`  /ait-add-routing       — 화면 이동 설정 (React Router)`);
+  console.log(`  /ait-add-query         — 서버 데이터 연결 (TanStack Query)`);
+  console.log(`  /ait-tds-setup         — 토스 스타일 UI (TDS)`);
 }
 
 createApp().catch(console.error);

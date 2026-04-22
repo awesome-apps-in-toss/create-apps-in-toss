@@ -355,11 +355,17 @@ export default function AppDetail() {
         {app.docs.prd.exists ? (
           /* PRD가 있을 때: 경로 + 뷰어 */
           <div className="plan-existing">
-            {app.console.prdSource === 'uploaded' && !app.console.prdReviewedAt && !isDemo && (
+            {app.console.prdSource !== 'generated' && !app.console.prdReviewedAt && !isDemo && (
               <PlanReviewBanner
                 appId={app.folderName}
+                prdSource={app.console.prdSource}
                 onMarkedReviewed={() => void refetch()}
-                onOpenWizard={() => void navigate(`/wizard/${app.folderName}`)}
+                onReviewByPlan={() => {
+                  const prdPath = app.docs.prd.path ?? app.console.prdPath ?? '';
+                  void navigate(
+                    `/wizard/${app.folderName}?skill=ait-plan&mode=review&prd=${encodeURIComponent(prdPath)}`,
+                  );
+                }}
               />
             )}
             <div className="doc-path-row">
@@ -1005,12 +1011,14 @@ function PrdDropZone({
 
 function PlanReviewBanner({
   appId,
+  prdSource,
   onMarkedReviewed,
-  onOpenWizard,
+  onReviewByPlan,
 }: {
   appId: string;
+  prdSource: AppConsoleConfig['prdSource'];
   onMarkedReviewed: () => void;
-  onOpenWizard: () => void;
+  onReviewByPlan: () => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1022,7 +1030,11 @@ function PlanReviewBanner({
       const res = await fetch(`/api/apps/${appId}/console`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prdReviewedAt: new Date().toISOString() }),
+        body: JSON.stringify({
+          prdReviewedAt: new Date().toISOString(),
+          // 수동 "검토 완료" 는 source 도 확정시켜 배너가 다시 뜨지 않도록.
+          prdSource: 'generated',
+        }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       onMarkedReviewed();
@@ -1033,24 +1045,29 @@ function PlanReviewBanner({
     }
   }
 
+  const headline =
+    prdSource === 'uploaded'
+      ? '외부에서 가져온 기획서예요'
+      : '직접 작성한 기획서를 아직 검토받지 않았어요';
+
   return (
     <div className="plan-review-banner" role="status">
       <div className="plan-review-banner-head">
         <ShieldCheck size={16} strokeWidth={1.75} />
-        <span className="plan-review-banner-title">외부에서 가져온 기획서예요</span>
+        <span className="plan-review-banner-title">{headline}</span>
       </div>
       <p className="plan-review-banner-desc">
-        앱인토스 정책 · 플랫폼 적합성을 위저드에서 먼저 검토해보세요.
-        이미 검토했다면 "검토 완료" 로 배지만 제거할 수 있어요.
+        <strong>/ait-plan</strong> 이 이 기획서를 읽고 앱인토스 정책 · BM · 리스크를 짚어드릴 수 있어요.
+        이미 검토를 마쳤으면 "검토 완료" 로 배지만 제거할 수 있습니다.
       </p>
       <div className="plan-review-banner-actions">
         <button
           type="button"
           className="plan-review-banner-btn plan-review-banner-btn--primary"
-          onClick={onOpenWizard}
+          onClick={onReviewByPlan}
           disabled={saving}
         >
-          정책 검토 받기 →
+          /ait-plan 에게 검토 맡기기 →
         </button>
         <button
           type="button"

@@ -2495,6 +2495,25 @@ button.plan-entry {
   width: fit-content;
 }
 
+.wizard-review-notice {
+  margin-top: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-md);
+}
+
+.wizard-review-notice code {
+  font-size: 11px;
+  background: var(--color-surface);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+}
+
 .plan-entry-icon {
   font-size: 28px;
   line-height: 1;

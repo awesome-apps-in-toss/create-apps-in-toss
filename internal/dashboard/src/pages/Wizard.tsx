@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useSearchParams } from 'react-router';
 import { ArrowLeft, Rocket, Loader2, Sparkles } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
 import { useSkills } from '@/hooks/useSkills';
@@ -63,12 +63,20 @@ function computeInitialInputs(skillId: string, app: AppInfo): Record<string, str
 export default function Wizard() {
   const { appId } = useParams<{ appId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { apps, refetch, loading, isDemo } = useApps();
   const { pipeline } = useSkills();
   const { runs, refetch: refetchRuns } = useRuns(appId ?? null);
 
   const app = apps.find((a) => a.folderName === appId);
   const appIndex = apps.findIndex((a) => a.folderName === appId);
+
+  // "?skill=ait-plan&mode=review" 처럼 특정 단계로 강제 진입할 수 있게 한다.
+  //   - AppDetail 의 "기획 검토받기" 배너가 ait-plan 을 review 모드로 바로 열 때 사용.
+  //   - mode=review 는 ait-plan 에 "기존 기획서를 정책 검토해달라" 는 프롬프트를 주입한다.
+  const forcedSkill = searchParams.get('skill');
+  const forcedMode = searchParams.get('mode');
+  const forcedPrdPath = searchParams.get('prd');
 
   const latestBySkill = useMemo(() => {
     const map = new Map<string, RunSummary>();
@@ -80,6 +88,11 @@ export default function Wizard() {
   }, [runs]);
 
   const nextStep = useMemo<PipelineStep | null>(() => {
+    // URL 에서 skill 이 지정되면 그 단계를 무조건 현재 단계로.
+    if (forcedSkill) {
+      const match = pipeline.find((s) => s.skill === forcedSkill);
+      if (match) return match;
+    }
     for (const step of pipeline) {
       const latest = latestBySkill.get(step.skill);
       if (!latest || (latest.state !== 'COMPLETED' && !TERMINAL_RUN_STATES.has(latest.state))) {
@@ -88,7 +101,7 @@ export default function Wizard() {
       if (latest.state !== 'COMPLETED') return step;
     }
     return null;
-  }, [pipeline, latestBySkill]);
+  }, [pipeline, latestBySkill, forcedSkill]);
 
   const completedCount = useMemo(() => {
     let n = 0;
@@ -182,10 +195,26 @@ export default function Wizard() {
           app={app}
           isDemo={isDemo}
           latestRun={latestBySkill.get(nextStep.skill) ?? null}
+          reviewMode={forcedMode === 'review' && nextStep.skill === 'ait-plan'}
+          forcedPrdPath={forcedPrdPath}
           onStarted={() => {
             void refetchRuns();
           }}
           onRunComplete={() => {
+            // ait-plan 이 완료됐고 PRD 가 있었다면 자동으로 "정책 검토 완료" 로 기록.
+            // 이렇게 해야 배너가 반복해서 뜨지 않고 UX 가 매끄러워진다.
+            if (nextStep.skill === 'ait-plan' && app.console.prdPath) {
+              void fetch(`/api/apps/${app.folderName}/console`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  prdReviewedAt: new Date().toISOString(),
+                  prdSource: 'generated',
+                }),
+              }).catch(() => {
+                /* best-effort: 실패해도 UI 는 돌려받고 사용자가 "검토 완료" 버튼 다시 누를 수 있음. */
+              });
+            }
             void refetch();
             void refetchRuns();
           }}
@@ -222,6 +251,8 @@ function ActiveStepCard({
   app,
   isDemo,
   latestRun,
+  reviewMode,
+  forcedPrdPath,
   onStarted,
   onRunComplete,
 }: {
@@ -229,16 +260,30 @@ function ActiveStepCard({
   app: AppInfo;
   isDemo: boolean;
   latestRun: RunSummary | null;
+  /** ait-plan 을 "기존 PRD 검토" 전용 모드로 열 때 true */
+  reviewMode?: boolean;
+  /** URL 로 전달된 검토 대상 PRD 경로 (review 모드에서 사용) */
+  forcedPrdPath?: string | null;
   onStarted: () => void;
   onRunComplete: () => void;
 }) {
   const appName = app.folderName;
   const { raw } = useSkills();
   const meta = raw.find((s) => s.id === step.skill);
-  const initialValues = useMemo(
-    () => computeInitialInputs(step.skill, app),
-    [step.skill, app],
-  );
+  const initialValues = useMemo(() => {
+    const base = computeInitialInputs(step.skill, app);
+    // review 모드에서는 planningDoc 을 강제로 우선시하고, idea 필드에는 검토 요청 문구를 박아둔다.
+    // /ait-plan 은 planningDoc 이 있으면 파일을 읽고 Phase 0 (정책 검토) 부터 진행하도록 설계돼 있음.
+    if (reviewMode && step.skill === 'ait-plan') {
+      const prd = forcedPrdPath ?? app.console.prdPath ?? base['planningDoc'] ?? '';
+      return {
+        ...base,
+        ...(prd ? { planningDoc: prd } : {}),
+        idea: '이 기획서를 앱인토스 정책 · BM · 리스크 관점에서 검토해줘.',
+      };
+    }
+    return base;
+  }, [step.skill, app, reviewMode, forcedPrdPath]);
   const [inputState, setInputState] = useState<SkillInputState>({
     values: initialValues,
     prompt: '',
@@ -259,8 +304,12 @@ function ActiveStepCard({
 
   const hasInputs = (meta?.inputs ?? []).length > 0;
   // ait-plan 은 아이디어가 없어도 CLI가 대화로 받을 수 있지만, 위저드 UX 상 5자 이상 권장.
+  // 단, 기획서(planningDoc) 가 이미 채워져 있으면 그 파일로부터 정책 검토 / 내용 보강을 하면 되므로
+  // 아이디어 입력은 선택사항으로 완화한다.
   const ideaValue = inputState.values['idea'] ?? '';
-  const ideaTooShort = step.skill === 'ait-plan' && ideaValue.trim().length < 5;
+  const planningDocValue = (inputState.values['planningDoc'] ?? '').trim();
+  const ideaTooShort =
+    step.skill === 'ait-plan' && !planningDocValue && ideaValue.trim().length < 5;
 
   // 이 step 이 이미 실행 중이면 "진행 중" 안내로 전환하고 전체 타임라인으로 스크롤하도록 유도.
   const running = latestRun && !TERMINAL_RUN_STATES.has(latestRun.state);
@@ -303,6 +352,13 @@ function ActiveStepCard({
         </h2>
       </div>
       <p className="wizard-active-desc">{step.description}</p>
+      {reviewMode && (
+        <div className="wizard-review-notice" role="note">
+          기존 기획서 <code>{forcedPrdPath ?? app.console.prdPath}</code> 를 정책 관점에서 검토합니다.
+          <br />
+          /ait-plan 이 파일을 읽고 Phase 0(앱인토스 정책) → BM → 리스크 순으로 짚어줘요.
+        </div>
+      )}
       <p className="wizard-active-produces">
         결과물 → <strong>{step.produces}</strong>
       </p>
@@ -370,13 +426,19 @@ function ActiveStepCard({
                 isDemo
                   ? '로컬에서 pnpm dev 실행 시 사용 가능'
                   : ideaTooShort
-                    ? '아이디어를 5자 이상 적어주세요'
+                    ? '아이디어를 5자 이상 적거나, 기획 문서 경로를 지정해주세요'
                     : inputState.missingRequired
                       ? '필수 입력이 비어있습니다'
                       : undefined
               }
             >
-              {starting ? '시작 중…' : retryable ? '다시 시도' : '이 단계 시작'}
+              {starting
+                ? '시작 중…'
+                : retryable
+                  ? '다시 시도'
+                  : reviewMode
+                    ? '정책 검토 시작'
+                    : '이 단계 시작'}
             </button>
           </div>
         </>
