@@ -9,6 +9,7 @@ import {
 } from '../lib/orchestration/run-session.js';
 import { getDefaultRunStore, type PersistedRunRow } from '../lib/orchestration/run-store.js';
 import { readSkillMeta } from '../lib/skills-meta.js';
+import { broadcast } from '../sse.js';
 
 const router: Router = Router();
 const REPO_ROOT = path.resolve(process.cwd(), '../../');
@@ -91,6 +92,9 @@ async function attachStore(session: RunSession): Promise<void> {
     endedAt: session.endedAt ?? null,
     cwd: session.cwd,
   });
+  // 한 세션 당 한 번만 broadcast. state/done 이벤트가 중복으로 들어와도, 리플레이로 과거
+  // 이벤트가 다시 흘러도, 글로벌 refresh 를 두 번 쏘지 않게 보장한다.
+  let terminalBroadcast = false;
   session.addListener(
     (event: HistoricRunEvent) => {
       try {
@@ -106,6 +110,14 @@ async function attachStore(session: RunSession): Promise<void> {
             session.exitCode ?? null,
             session.endedAt ?? null
           );
+          if (TERMINAL_STATES.has(session.state) && !terminalBroadcast) {
+            terminalBroadcast = true;
+            // 파일 와처(.meta-dashboard.json/.ait 만 감시)가 잡지 못하는 산출물
+            // — granite.config.ts, package.json, docs/PRD.md 등 — 도 즉시 메타/콘피그
+            // UI 에 반영되도록 글로벌 refresh 를 한 번 쏜다. useApps · useRuns 가 이를 듣고
+            // /api/apps · /api/orchestrations 를 다시 조회한다.
+            broadcast('refresh', `run-terminated:${session.skill}:${session.appName ?? ''}`);
+          }
         }
       } catch (err) {
         console.warn('[run-store] persistence failed', err);

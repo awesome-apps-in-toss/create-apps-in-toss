@@ -121,6 +121,41 @@ export function useRuns(appName: string | null): {
     };
   }, [refetch]);
 
+  // 서버는 run 이 terminal 상태에 도달하면 /api/events 로 refresh 를 쏜다.
+  // 라이브 패널이 없는 화면(타임라인만 보고 있거나 다른 페이지에서 진행한 경우)에서도
+  // 파이프라인 진행도/뱃지가 즉시 갱신되도록 함께 구독한다.
+  useEffect(() => {
+    if (IS_STATIC || !appName) return;
+    let cancelled = false;
+    let es: EventSource | null = null;
+    let reconnectTimer: number | null = null;
+    let retryCount = 0;
+
+    const connect = () => {
+      if (cancelled) return;
+      es = new EventSource('/api/events');
+      es.addEventListener('refresh', () => {
+        retryCount = 0;
+        void refetch();
+      });
+      es.addEventListener('error', () => {
+        es?.close();
+        es = null;
+        if (cancelled || retryCount >= 6) return;
+        retryCount += 1;
+        const delay = Math.min(500 * 2 ** (retryCount - 1), 10000);
+        reconnectTimer = window.setTimeout(connect, delay);
+      });
+    };
+    connect();
+
+    return () => {
+      cancelled = true;
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      es?.close();
+    };
+  }, [appName, refetch]);
+
   return { runs, loading, error, refetch };
 }
 
