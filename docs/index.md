@@ -16,6 +16,7 @@
 
 - [Create App](guides/create-app.md) - 새 미니앱 생성
 - [Dependencies](guides/dependencies.md) - 의존성 관리
+- [Design Assets](guides/design-assets.md) - 디자인 에셋 생성 시스템 (`/ait-assets` + `graphic-designer`)
 
 ## Conventions
 
