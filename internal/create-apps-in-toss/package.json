@@ -1,19 +1,30 @@
 {
   "name": "create-apps-in-toss",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Scaffolder for apps-in-toss mini-app monorepo template",
   "type": "module",
   "bin": {
     "create-apps-in-toss": "./bin/index.js"
   },
-  "files": ["bin/", "src/", "README.md", "LICENSE"],
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=20"
   },
   "publishConfig": {
     "access": "public"
   },
-  "keywords": ["apps-in-toss", "toss", "miniapp", "scaffold", "template"],
+  "keywords": [
+    "apps-in-toss",
+    "toss",
+    "miniapp",
+    "scaffold",
+    "template"
+  ],
   "homepage": "https://github.com/Awesome-Apps-in-Toss/create-apps-in-toss",
   "repository": {
     "type": "git",
