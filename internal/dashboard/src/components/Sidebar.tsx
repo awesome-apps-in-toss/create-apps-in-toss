@@ -1,6 +1,10 @@
+import { useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router';
+import { CheckCircle2, Plus } from 'lucide-react';
 import type { AppInfo } from '@/types';
 import { getFallbackColor, hexToRgba } from '@/lib/palette';
+import ThemeToggle from '@/components/ThemeToggle';
+import { useTheme } from '@/hooks/useTheme';
 
 interface SidebarProps {
   apps: AppInfo[];
@@ -10,6 +14,69 @@ interface SidebarProps {
 
 export default function Sidebar({ apps, mobileOpen, onMobileClose }: SidebarProps) {
   const navigate = useNavigate();
+  // 테마 변경 시 fallback 아바타 색상이 재계산되도록 구독.
+  useTheme();
+  const firstNavRef = useRef<HTMLAnchorElement | null>(null);
+  const asideRef = useRef<HTMLElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  // 모바일 drawer 가 열리면 첫 네비게이션 항목으로 포커스 이동.
+  // (키보드/스크린리더 사용자가 스크림을 지나치지 않게 하는 표준 a11y 패턴)
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+    if (!isMobile) return;
+    const t = window.setTimeout(() => {
+      firstNavRef.current?.focus();
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [mobileOpen]);
+
+  // 모바일 drawer 전용 ESC 닫기 + 포커스 트랩. 닫힐 때 이전 포커스로 복원.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+    if (!isMobile) return;
+    previousFocusRef.current = (document.activeElement as HTMLElement | null) ?? null;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const root = asideRef.current;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onMobileClose?.();
+        return;
+      }
+      if (e.key !== 'Tab' || !root) return;
+      const focusables = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.getAttribute('aria-hidden') !== 'true');
+      if (focusables.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey) {
+        if (active === first || !root.contains(active)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (active === last || !root.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocusRef.current?.focus?.();
+    };
+  }, [mobileOpen, onMobileClose]);
 
   const handleHeaderClick = () => {
     void navigate('/');
@@ -26,7 +93,12 @@ export default function Sidebar({ apps, mobileOpen, onMobileClose }: SidebarProp
   };
 
   return (
-    <aside className={`sidebar${mobileOpen ? ' sidebar--mobile-open' : ''}`}>
+    <aside
+      ref={asideRef}
+      className={`sidebar${mobileOpen ? ' sidebar--mobile-open' : ''}`}
+      aria-label="앱 목록"
+      {...(mobileOpen ? { role: 'dialog', 'aria-modal': 'true' as const } : {})}
+    >
       <button
         type="button"
         className="sidebar-header"
@@ -43,7 +115,10 @@ export default function Sidebar({ apps, mobileOpen, onMobileClose }: SidebarProp
         <div className="sidebar-subtitle">미니앱 관리 대시보드</div>
       </button>
 
-      <div className="sidebar-section-label">앱 목록</div>
+      <div className="sidebar-section-label">
+        <span>앱 목록</span>
+        {apps.length > 0 && <span className="sidebar-section-count">{apps.length}</span>}
+      </div>
 
       <nav className="sidebar-apps">
         {apps.map((app, i) => {
@@ -52,6 +127,7 @@ export default function Sidebar({ apps, mobileOpen, onMobileClose }: SidebarProp
           const iconUrl = app.granite?.icon;
           const primaryColor = app.granite?.primaryColor;
           const fallback = getFallbackColor(i);
+          const isComplete = app.completion >= 100;
 
           const avatarStyle = primaryColor
             ? { background: hexToRgba(primaryColor, 0.12), color: primaryColor }
@@ -63,6 +139,7 @@ export default function Sidebar({ apps, mobileOpen, onMobileClose }: SidebarProp
               to={`/apps/${app.folderName}`}
               className={({ isActive }) => `sidebar-app-item ${isActive ? 'active' : ''}`}
               onClick={handleNavClick}
+              ref={i === 0 ? firstNavRef : undefined}
             >
               <span className="sidebar-app-avatar" style={avatarStyle}>
                 {iconUrl ? (
@@ -80,22 +157,43 @@ export default function Sidebar({ apps, mobileOpen, onMobileClose }: SidebarProp
                 )}
               </span>
               <span className="sidebar-app-name">{displayName}</span>
-              <span
-                className="sidebar-app-dot"
-                style={{ opacity: app.completion >= 100 ? 1 : 0.3 }}
-                title={`${app.completion}%`}
-                aria-hidden="true"
-              />
+              {isComplete ? (
+                <span
+                  className="sidebar-app-status sidebar-app-status--done"
+                  title="완료"
+                  aria-hidden="true"
+                >
+                  <CheckCircle2 size={12} strokeWidth={2} />
+                </span>
+              ) : (
+                <span
+                  className="sidebar-app-status sidebar-app-status--pct"
+                  title={`${app.completion}%`}
+                  aria-hidden="true"
+                >
+                  {app.completion}
+                </span>
+              )}
               <span className="sr-only">{app.completion}% 완료</span>
             </NavLink>
           );
         })}
 
-        <button className="sidebar-new-app-btn" onClick={handleNewAppClick}>
-          <span className="sidebar-new-app-icon">+</span>
+        <button
+          type="button"
+          className="sidebar-new-app-btn"
+          onClick={handleNewAppClick}
+        >
+          <span className="sidebar-new-app-icon" aria-hidden="true">
+            <Plus size={14} strokeWidth={2.25} />
+          </span>
           <span>새 앱 만들기</span>
         </button>
       </nav>
+
+      <div className="sidebar-footer">
+        <ThemeToggle />
+      </div>
     </aside>
   );
 }

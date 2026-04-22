@@ -171,7 +171,10 @@ export class RunSession {
     return this.eventHistory;
   }
 
-  sendInput(text: string): { ok: true } | { ok: false; reason: string } {
+  sendInput(
+    text: string,
+    opts: { toolUseId?: string } = {},
+  ): { ok: true } | { ok: false; reason: string } {
     if (TERMINAL_STATES.has(this.state)) {
       return { ok: false, reason: `session is ${this.state}` };
     }
@@ -179,8 +182,10 @@ export class RunSession {
       this.child.stdin.write(encodeUserInput(text));
       const now = new Date().toISOString();
       // user_input 이벤트는 SSE 재연결 시 "이 질문은 이미 답변됨" 상태 복원에 쓰인다.
-      // 질문 이벤트 뒤의 첫 user_input 이 그 질문의 답변임을 순서로 매칭.
-      this.emit({ kind: 'user_input', data: { text }, at: now });
+      // toolUseId 가 같이 오면 정확한 질문 매칭이 가능하고, 없으면 레거시처럼 순서 매칭.
+      const data: { text: string; toolUseId?: string } = { text };
+      if (opts.toolUseId) data.toolUseId = opts.toolUseId;
+      this.emit({ kind: 'user_input', data, at: now });
       if (this.state === 'WAITING_USER_INPUT') this.transition('RUNNING');
       return { ok: true };
     } catch (err) {

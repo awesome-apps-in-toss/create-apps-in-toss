@@ -55,15 +55,21 @@ function runCreateScript(appName: string): Promise<{ code: number; logs: string[
   });
 }
 
-// granite.config.ts 의 displayName 교체 (사용자 입력이 있을 때만)
+// granite.config.ts 의 displayName 교체 (사용자 입력이 있을 때만).
+// create-app.js 가 single-quote 로 initial 값을 심지만, 누군가 double-quote 로 바꿔놓아도
+// 깨지지 않도록 양쪽 따옴표 모두 지원하고, 실패 시 사일런트 no-op 대신 명시 에러로 올린다.
 async function applyDisplayName(appName: string, displayName: string): Promise<void> {
   const configPath = path.join(APPS_ROOT, appName, 'granite.config.ts');
   const text = await fs.readFile(configPath, 'utf-8');
-  // create-app.js 가 생성하는 초기값은 displayName: '<appName>'
-  const replaced = text.replace(
-    /displayName:\s*'[^']*'/,
-    `displayName: '${displayName.replace(/'/g, "\\'")}'`,
-  );
+  const escaped = displayName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const nextLine = `displayName: '${escaped}'`;
+  const pattern = /displayName:\s*(?:'[^']*'|"[^"]*")/;
+  if (!pattern.test(text)) {
+    throw new Error(
+      `granite.config.ts 에서 displayName 항목을 찾지 못했어요 (${appName}).`,
+    );
+  }
+  const replaced = text.replace(pattern, nextLine);
   if (replaced !== text) {
     await fs.writeFile(configPath, replaced, 'utf-8');
   }
@@ -107,14 +113,14 @@ router.post('/', async (req, res) => {
 
   if (!validateAppName(appName)) {
     res.status(400).json({
-      error: '영문 소문자/숫자로 시작하는 64자 이하 이름만 허용됩니다 (하이픈, 점, 언더스코어 가능).',
+      error: '앱 폴더 이름은 영문 소문자 또는 숫자로 시작하고, 하이픈(-) · 점(.) · 언더스코어(_)만 쓸 수 있어요 (최대 64자).',
     });
     return;
   }
 
   const appDir = path.join(APPS_ROOT, appName);
   if (await dirExists(appDir)) {
-    res.status(409).json({ error: `apps/${appName} 폴더가 이미 존재합니다.` });
+    res.status(409).json({ error: `같은 이름의 앱 폴더(${appName})가 이미 있어요. 다른 이름으로 시도해 주세요.` });
     return;
   }
 
@@ -123,8 +129,10 @@ router.post('/', async (req, res) => {
   if (mode === 'full') {
     const { code, logs } = await runCreateScript(appName);
     if (code !== 0) {
+      // scripts/create-app.js 가 실패해도 부분 폴더를 남길 수 있으므로 정리.
+      await fs.rm(appDir, { recursive: true, force: true }).catch(() => {});
       res.status(500).json({
-        error: `스캐폴딩 실패 (exit code: ${code})`,
+        error: `프로젝트 틀을 만드는 중 실패했어요 (종료 코드 ${code}).`,
         logs,
       });
       return;
@@ -133,8 +141,10 @@ router.post('/', async (req, res) => {
       if (displayName) await applyDisplayName(appName, displayName);
       await writeMeta(appName, displayName, description);
     } catch (e) {
+      // 프로젝트 자체는 만들어졌지만 메타 기록이 깨졌다면 UX 상 "이미 존재" 에러가 나지 않도록 폴더 제거.
+      await fs.rm(appDir, { recursive: true, force: true }).catch(() => {});
       res.status(500).json({
-        error: `앱 메타 기록 실패: ${String(e)}`,
+        error: `앱 정보를 저장하던 중 실패했어요: ${String(e)}`,
         logs,
       });
       return;
@@ -144,7 +154,8 @@ router.post('/', async (req, res) => {
     return;
   }
 
-  // planning-first 모드: 최소 스텁만 만들어두고 스캐폴딩은 /ait-scaffold 에게 위임
+  // planning-first 모드: 최소 스텁만 만들어두고 스캐폴딩은 /ait-scaffold 에게 위임.
+  // 중간에 실패하면 지저분한 반쯤 만들어진 폴더가 남지 않도록 rm -rf 로 롤백한다.
   try {
     await fs.mkdir(appDir, { recursive: true });
     const stubPkg = {
@@ -162,7 +173,8 @@ router.post('/', async (req, res) => {
     );
     await writeMeta(appName, displayName, description);
   } catch (e) {
-    res.status(500).json({ error: `스텁 생성 실패: ${String(e)}` });
+    await fs.rm(appDir, { recursive: true, force: true }).catch(() => {});
+    res.status(500).json({ error: `앱 폴더를 만들던 중 실패했어요: ${String(e)}` });
     return;
   }
 

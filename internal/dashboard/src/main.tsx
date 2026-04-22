@@ -8,6 +8,7 @@ import NewApp from './pages/NewApp';
 import Wizard from './pages/Wizard';
 import { AppsProvider } from './hooks/useApps';
 import { SkillsProvider } from './hooks/useSkills';
+import { ThemeProvider } from './hooks/useTheme';
 import './App.css';
 
 const router = createBrowserRouter(
@@ -28,10 +29,12 @@ const router = createBrowserRouter(
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AppsProvider>
-      <SkillsProvider>
-        <RouterProvider router={router} />
-      </SkillsProvider>
-    </AppsProvider>
+    <ThemeProvider>
+      <AppsProvider>
+        <SkillsProvider>
+          <RouterProvider router={router} />
+        </SkillsProvider>
+      </AppsProvider>
+    </ThemeProvider>
   </StrictMode>
 );

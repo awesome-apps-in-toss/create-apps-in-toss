@@ -94,18 +94,18 @@ export default function RunErrorCard({
       <div className="run-error-card-head">
         <AlertTriangle size={18} strokeWidth={2} className="run-error-card-icon" />
         <div>
-          <h3 className="run-error-card-title">{step.label} 단계에서 문제가 발생했습니다</h3>
+          <h3 className="run-error-card-title">{step.label} 단계에서 문제가 발생했어요</h3>
           <p className="run-error-card-subtitle">
             {diag.summary}
             {run.exitCode !== null && (
-              <span className="run-error-card-exit">exit {run.exitCode}</span>
+              <span className="run-error-card-exit" title="프로세스 종료 코드">오류 코드 {run.exitCode}</span>
             )}
           </p>
         </div>
       </div>
 
       <div className="run-error-card-body">
-        <h4 className="run-error-card-section">이렇게 해보세요</h4>
+        <h4 className="run-error-card-section">이렇게 해 보세요</h4>
         <ul className="run-error-card-suggestions">
           {diag.suggestions.map((suggestion, index) => (
             <li key={index} className="run-error-card-suggestion">
@@ -125,13 +125,13 @@ export default function RunErrorCard({
               {effectiveHints.length > 0 ? ` (${effectiveHints.length}줄)` : ''}
             </summary>
             {detailsLoading ? (
-              <div className="run-error-card-log">로그를 불러오는 중...</div>
+              <div className="run-error-card-log">로그를 불러오는 중…</div>
             ) : detailsError ? (
               <div className="run-error-card-log">{detailsError}</div>
             ) : effectiveHints.length > 0 ? (
               <pre className="run-error-card-log">{effectiveHints.slice(-20).join('\n')}</pre>
             ) : detailsLoaded ? (
-              <div className="run-error-card-log">표시할 로그가 없어요.</div>
+              <div className="run-error-card-log">보여드릴 로그가 없어요.</div>
             ) : null}
           </details>
         )}
@@ -147,7 +147,7 @@ export default function RunErrorCard({
           disabled={isDemo || retrying}
         >
           <RefreshCw size={14} strokeWidth={1.75} />
-          {retrying ? '다시 시도 중...' : '다시 시도'}
+          {retrying ? '다시 시도 중…' : '다시 시도'}
         </button>
       </div>
     </div>
@@ -167,15 +167,18 @@ interface Diagnosis {
 function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis {
   const tail = hints.join('\n').toLowerCase();
 
+  const isWindows =
+    typeof navigator !== 'undefined' && /win/i.test(navigator.platform ?? '');
+
   if (exitCode === -1) {
     return {
-      summary: '서버가 재시작되면서 이 실행이 중단되었습니다.',
+      summary: '서버가 다시 시작되면서 이 실행이 중단됐어요.',
       suggestions: [
         {
           icon: <RefreshCw size={14} strokeWidth={1.75} />,
           text: (
             <>
-              <strong>다시 시도</strong>를 누르면 처음부터 재실행합니다.
+              <strong>다시 시도</strong>를 누르면 처음부터 다시 실행해요.
             </>
           ),
         },
@@ -185,21 +188,20 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
 
   if (/enoent|command not found|spawn.*claude/.test(tail)) {
     return {
-      summary: 'Claude CLI를 실행할 수 없습니다.',
+      summary: 'Claude Code가 설치돼 있지 않거나 실행할 수 없어요.',
       suggestions: [
         {
           icon: <Terminal size={14} strokeWidth={1.75} />,
           text: (
             <>
-              Claude Code CLI가 설치되어 있는지 확인하세요. 설치 가이드는{' '}
+              Claude Code를 먼저 설치해 주세요.{' '}
               <a
                 href="https://docs.claude.com/claude-code"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                docs.claude.com/claude-code
-              </a>{' '}
-              에서 확인할 수 있습니다.
+                설치 가이드 열기
+              </a>
             </>
           ),
         },
@@ -207,7 +209,7 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
           icon: <RefreshCw size={14} strokeWidth={1.75} />,
           text: (
             <>
-              설치 후 이 페이지를 새로고침하고 <strong>다시 시도</strong>를 눌러주세요.
+              설치를 마친 뒤 페이지를 새로고침하고 <strong>다시 시도</strong>를 눌러 주세요.
             </>
           ),
         },
@@ -217,13 +219,14 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
 
   if (/not logged in|unauthori|401|403|please login|claude[ /]login/.test(tail)) {
     return {
-      summary: 'Claude CLI 로그인이 필요합니다.',
+      summary: 'Claude Code 로그인이 필요해요.',
       suggestions: [
         {
           icon: <LogIn size={14} strokeWidth={1.75} />,
           text: (
             <>
-              터미널에서 <code>claude /login</code>을 실행해 로그인한 뒤 다시 시도해주세요.
+              {isWindows ? '명령 프롬프트(또는 PowerShell)' : '터미널'}을 연 뒤
+              <code>claude /login</code>을 실행해 로그인하고, 다시 시도해 주세요.
             </>
           ),
         },
@@ -233,13 +236,13 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
 
   if (/network|econnreset|etimedout|dns|fetch failed/.test(tail)) {
     return {
-      summary: '네트워크 연결에 문제가 있는 것 같습니다.',
+      summary: '네트워크 연결에 문제가 있는 것 같아요.',
       suggestions: [
         {
           icon: <Wifi size={14} strokeWidth={1.75} />,
           text: (
             <>
-              인터넷 연결을 확인하고 <strong>다시 시도</strong>를 눌러주세요.
+              인터넷 연결을 확인하고 <strong>다시 시도</strong>를 눌러 주세요.
             </>
           ),
         },
@@ -249,13 +252,17 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
 
   if (/permission denied|eacces/.test(tail)) {
     return {
-      summary: '파일에 접근할 권한이 없습니다.',
+      summary: '파일에 접근할 권한이 없어요.',
       suggestions: [
         {
           icon: <Terminal size={14} strokeWidth={1.75} />,
-          text: (
+          text: isWindows ? (
             <>
-              앱 폴더의 쓰기 권한을 확인해주세요. 필요 시 에디터를 관리자 권한으로 실행합니다.
+              앱 폴더의 쓰기 권한을 확인해 주세요. 필요하면 에디터를 <strong>관리자 권한으로 실행</strong>해 보세요.
+            </>
+          ) : (
+            <>
+              앱 폴더의 쓰기 권한을 확인해 주세요. 필요하면 <code>chmod -R u+w ./apps/&lt;앱-이름&gt;</code> 로 권한을 열어 주세요.
             </>
           ),
         },
@@ -265,13 +272,13 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
 
   if (/cancel|signal 15|sigterm/.test(tail)) {
     return {
-      summary: '실행이 중단되었습니다.',
+      summary: '실행이 중간에 멈췄어요.',
       suggestions: [
         {
           icon: <RefreshCw size={14} strokeWidth={1.75} />,
           text: (
             <>
-              문제가 없었다면 <strong>다시 시도</strong>를 눌러 재실행할 수 있습니다.
+              문제가 없었다면 <strong>다시 시도</strong>를 눌러 처음부터 실행할 수 있어요.
             </>
           ),
         },
@@ -280,13 +287,13 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
   }
 
   return {
-    summary: '예상치 못한 오류로 실패했습니다.',
+    summary: '예상치 못한 오류로 실패했어요.',
     suggestions: [
       {
         icon: <RefreshCw size={14} strokeWidth={1.75} />,
         text: (
           <>
-            일시적인 문제일 수 있습니다. <strong>다시 시도</strong>를 눌러보세요.
+            일시적인 문제일 수 있어요. <strong>다시 시도</strong>를 먼저 눌러 보세요.
           </>
         ),
       },
@@ -294,8 +301,7 @@ function diagnoseFromHints(exitCode: number | null, hints: string[]): Diagnosis 
         icon: <Terminal size={14} strokeWidth={1.75} />,
         text: (
           <>
-            계속 실패하면 아래 개발자용 로그를 확인하거나 <code>pnpm dev</code> 콘솔 출력을
-            확인해주세요.
+            계속 실패하면 아래 "개발자용 로그"를 펼쳐서 내용을 복사해 두고, 대시보드를 띄운 터미널 창의 출력도 함께 확인해 주세요.
           </>
         ),
       },

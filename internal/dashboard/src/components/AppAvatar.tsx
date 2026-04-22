@@ -1,5 +1,6 @@
 import type { AppInfo } from '@/types';
 import { getFallbackColor, hexToRgba } from '@/lib/palette';
+import { useTheme } from '@/hooks/useTheme';
 
 interface AppAvatarProps {
   app: AppInfo;
@@ -8,6 +9,8 @@ interface AppAvatarProps {
 }
 
 export default function AppAvatar({ app, index, size = 'md' }: AppAvatarProps) {
+  // 테마 변경 시 fallback 색상이 재계산되도록 context 를 구독.
+  useTheme();
   const iconUrl = app.granite?.icon;
   const primaryColor = app.granite?.primaryColor;
   const displayName = (app.granite?.displayName ?? app.console.nameKo) || app.folderName;

@@ -149,8 +149,8 @@ export function useRunStream(runId: string | null): {
   error: string | null;
   connected: boolean;
   /** optimistic 마킹 — sendRunInput 성공 직후 호출해 서버 user_input SSE 도착 전에 질문 카드를 닫는다.
-   *  중복 호출돼도 이미 모두 answered 면 no-op. */
-  markLatestQuestionAnswered: () => void;
+   *  toolUseId 가 주어지면 해당 질문을, 없으면 "가장 오래된 미답변" 을 마킹. */
+  markLatestQuestionAnswered: (toolUseId?: string) => void;
 } {
   const [state, setState] = useState<RunState | null>(null);
   const [logs, setLogs] = useState<RunLogEntry[]>([]);
@@ -260,10 +260,21 @@ export function useRunStream(runId: string | null): {
         }
       });
       es.addEventListener('user_input', (e) => {
-        trackSeq(parseData((e as MessageEvent).data));
-        // 서버가 sendInput 성공 시 emit. 순서상 "가장 오래된 미답변" 질문의 답변이다.
-        // optimistic 으로 이미 answered 처리됐다면 모두 true 라 no-op.
+        const payload = parseData((e as MessageEvent).data);
+        trackSeq(payload);
+        // 서버가 sendInput 성공 시 emit. toolUseId 가 있으면 정확한 매칭,
+        // 없으면 레거시 순서 매칭 (가장 오래된 미답변 질문).
+        const ansToolUseId = (payload.data as { toolUseId?: string } | undefined)?.toolUseId;
         setQuestions((prev) => {
+          if (ansToolUseId) {
+            const idx = prev.findIndex(
+              (q) => !q.answered && q.toolUseId === ansToolUseId,
+            );
+            if (idx === -1) return prev;
+            const next = prev.slice();
+            next[idx] = { ...prev[idx]!, answered: true };
+            return next;
+          }
           const idx = prev.findIndex((q) => !q.answered);
           if (idx === -1) return prev;
           const next = prev.slice();
@@ -304,9 +315,11 @@ export function useRunStream(runId: string | null): {
     };
   }, [runId]);
 
-  const markLatestQuestionAnswered = useCallback(() => {
+  const markLatestQuestionAnswered = useCallback((toolUseId?: string) => {
     setQuestions((prev) => {
-      const idx = prev.findIndex((q) => !q.answered);
+      const idx = toolUseId
+        ? prev.findIndex((q) => !q.answered && q.toolUseId === toolUseId)
+        : prev.findIndex((q) => !q.answered);
       if (idx === -1) return prev;
       const next = prev.slice();
       next[idx] = { ...prev[idx]!, answered: true };
@@ -439,12 +452,19 @@ export async function finishRun(runId: string): Promise<void> {
   }
 }
 
-/** POST /api/orchestrations/:runId/input — non-2xx 는 throw 해서 호출부가 UX 피드백 띄울 수 있도록. */
-export async function sendRunInput(runId: string, text: string): Promise<void> {
+/** POST /api/orchestrations/:runId/input — non-2xx 는 throw 해서 호출부가 UX 피드백 띄울 수 있도록.
+ *  toolUseId 를 함께 보내면 서버 user_input 이벤트에 그대로 실려 재연결/replay 시 정확한 매칭이 가능하다. */
+export async function sendRunInput(
+  runId: string,
+  text: string,
+  opts: { toolUseId?: string } = {},
+): Promise<void> {
+  const body: { text: string; toolUseId?: string } = { text };
+  if (opts.toolUseId) body.toolUseId = opts.toolUseId;
   const res = await fetch(`/api/orchestrations/${runId}/input`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = (await res.json().catch(() => ({ error: 'unknown' }))) as { error?: string };

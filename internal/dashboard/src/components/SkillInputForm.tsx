@@ -234,7 +234,7 @@ function describeInput(input: SkillInputDescriptor): InputDescription {
     case 'inspiration':
       return {
         label: '참고 서비스 / 영감',
-        placeholder: '예: 노션, 캘린들리, etc.',
+        placeholder: '예: 노션, 캘린들리 등',
         icon: <LinkIcon size={14} strokeWidth={1.75} />,
       };
     case 'planningDoc':
@@ -245,11 +245,20 @@ function describeInput(input: SkillInputDescriptor): InputDescription {
       };
     default:
       return {
-        label: input.key,
-        placeholder: input.required ? '(필수)' : '(선택)',
+        label: humanizeKey(input.key),
+        placeholder: input.required ? '(필수 입력)' : '(선택 입력)',
         icon: <FileText size={14} strokeWidth={1.75} />,
       };
   }
+}
+
+/** camelCase / kebab-case / snake_case 키를 읽기 좋은 한 덩어리로. 디폴트 라벨용. */
+function humanizeKey(key: string): string {
+  return key
+    .replace(/[-_]+/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
 }
 
 /** 구조화 값들을 `key: value` 여러 줄로 직렬화. 비어있는 값은 스킵. */

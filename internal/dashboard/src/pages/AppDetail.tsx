@@ -1,13 +1,24 @@
-import { useState, useEffect, useRef, useCallback, useId } from 'react';
+import { useState, useEffect, useRef, useCallback, useId, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import ReactMarkdown from 'react-markdown';
-import { Monitor, MessageSquare, FileText, Loader2, ShieldCheck } from 'lucide-react';
+import {
+  Monitor,
+  MessageSquare,
+  FileText,
+  Loader2,
+  ShieldCheck,
+  Lock,
+  Check,
+  ChevronDown,
+  Copy,
+  CheckCircle2,
+} from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
 import { useSkills } from '@/hooks/useSkills';
 import type { PipelineStep } from '@/hooks/useSkills';
-import LogStream from '@/components/LogStream';
 import AppAvatar from '@/components/AppAvatar';
 import RunTimeline from '@/components/RunTimeline';
+import { startRun } from '@/hooks/useRuns';
 import type { AppConsoleConfig, AllowedSkill, PipelineStepStatus } from '@/types';
 
 type ConsoleTextField = Extract<
@@ -30,7 +41,7 @@ const CONSOLE_TEXT_FIELDS: {
   copyable?: boolean;
 }[] = [
   { key: 'nameKo', label: '한국어 이름', placeholder: '예: 소개팅 발주서', copyable: true },
-  { key: 'nameEn', label: '영어 이름', placeholder: 'e.g. Dating Order Form', copyable: true },
+  { key: 'nameEn', label: '영어 이름', placeholder: '예: Dating Order Form', copyable: true },
   {
     key: 'aitCategory',
     label: '카테고리',
@@ -95,16 +106,62 @@ async function copyText(text: string) {
 
 
 // ── 파이프라인 단계 상태 판별 ──
-type StepState = 'completed' | 'enabled' | 'locked';
+type StepState = 'completed' | 'running' | 'enabled' | 'locked';
 
 function getStepState(
   step: PipelineStep,
-  progress: Record<number, PipelineStepStatus>
+  progress: Record<number, PipelineStepStatus>,
+  runningSkill: string | null = null
 ): StepState {
+  if (runningSkill && runningSkill === step.skill) return 'running';
   if (progress[step.step]) return 'completed';
   if (step.requiresSteps.length === 0) return 'enabled';
   const allDepsMet = step.requiresSteps.every((s) => !!progress[s]);
   return allDepsMet ? 'enabled' : 'locked';
+}
+
+function getNextEnabledStep(
+  pipeline: PipelineStep[],
+  progress: Record<number, PipelineStepStatus>
+): number | null {
+  for (const step of pipeline) {
+    const state = getStepState(step, progress);
+    if (state === 'enabled') return step.step;
+  }
+  return null;
+}
+
+// 브랜드/스토어 섹션 완성도 카운터 ----
+function computeBrandProgress(app: {
+  granite: { appName: string | null; displayName: string | null; primaryColor: string | null; icon: string | null } | null;
+  completionDetail: { layer1: number };
+}): { filled: number; total: number } {
+  const total = 5;
+  const g = app.granite;
+  let filled = 0;
+  if (g?.appName) filled++;
+  if (g?.displayName) filled++;
+  if (g?.primaryColor) filled++;
+  if (g?.icon) filled++;
+  if (app.completionDetail.layer1 >= 10) filled++;
+  return { filled, total };
+}
+
+function computeStoreProgress(console: AppConsoleConfig): { filled: number; total: number } {
+  // logo(1) + thumbnail(1) + screenshots>=1(1) + 6 text fields = 9 total
+  const total = 9;
+  let filled = 0;
+  if (console.logoPath) filled++;
+  if (console.thumbnailPath) filled++;
+  if (console.screenshotPaths.length > 0) filled++;
+  const textKeys: ConsoleTextField[] = ['nameKo', 'nameEn', 'aitCategory', 'subtitle', 'description', 'keywords'];
+  for (const k of textKeys) {
+    const raw = console[k];
+    if (Array.isArray(raw)) {
+      if (raw.length > 0) filled++;
+    } else if (raw) filled++;
+  }
+  return { filled, total };
 }
 
 export default function AppDetail() {
@@ -118,21 +175,14 @@ export default function AppDetail() {
   const [edit, setEdit] = useState<EditState>({ field: null, value: '' });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [logLines, setLogLines] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
   const [runningSkill, setRunningSkill] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [pipelineExpanded, setPipelineExpanded] = useState(true);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
-  const skillEsRef = useRef<EventSource | null>(null);
-  const planSectionRef = useRef<HTMLElement | null>(null);
-
-  // 언마운트 시 실행 중인 스킬 EventSource 정리
-  useEffect(() => {
-    return () => {
-      skillEsRef.current?.close();
-    };
-  }, []);
+  const [lookupFailed, setLookupFailed] = useState(false);
+  const [brandOpen, setBrandOpen] = useState(false);
+  const [storeOpen, setStoreOpen] = useState(false);
 
   async function copyCliCommand(skill: string) {
     const cmd = `claude -p /${skill}`;
@@ -144,25 +194,71 @@ export default function AppDetail() {
   // 앱 직후 생성 시 SSE refresh 가 살짝 늦게 오는 경우가 있어,
   // 목록에 아직 없으면 짧게 재시도 해서 "불러오는 중..." 이 멈춰 있지 않도록 한다.
   useEffect(() => {
-    if (app || !appId) return;
+    if (app || !appId) {
+      if (app && lookupFailed) setLookupFailed(false);
+      return;
+    }
     let cancelled = false;
     let attempts = 0;
+    setLookupFailed(false);
     const timer = setInterval(() => {
       if (cancelled) return;
       attempts += 1;
       void refetch();
-      if (attempts >= 5) clearInterval(timer);
+      if (attempts >= 5) {
+        clearInterval(timer);
+        if (!cancelled) setLookupFailed(true);
+      }
     }, 600);
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [app, appId, refetch]);
+  }, [app, appId, refetch, lookupFailed]);
+
+  // hook 호출 순서를 보장하기 위해 early return 앞에서 계산해둔다.
+  // app 이 아직 로드되기 전엔 안전한 기본값을 먹여 placeholder 결과만 내고, 이후 실제 값으로 바뀐다.
+  const brandProgress = useMemo(
+    () => (app ? computeBrandProgress(app) : { filled: 0, total: 5 }),
+    [app],
+  );
+  const storeProgress = useMemo(
+    () => (app ? computeStoreProgress(app.console) : { filled: 0, total: 9 }),
+    [app],
+  );
+  const nextStep = useMemo(
+    () =>
+      app ? getNextEnabledStep(pipeline, app.console.pipelineProgress) : null,
+    [pipeline, app],
+  );
+
+  // 파이프라인 현재 단계에 맞춰 자동으로 해당 섹션을 펼치기.
+  const lastAutoStepRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (nextStep === null || nextStep === lastAutoStepRef.current) return;
+    lastAutoStepRef.current = nextStep;
+    if (nextStep === 3) setBrandOpen(true);
+    if (nextStep === 2) setStoreOpen(true);
+  }, [nextStep]);
 
   if (!app) {
     return (
       <main className="main">
-        <div className="loading">앱 정보를 불러오는 중...</div>
+        {lookupFailed ? (
+          <div className="error-box">
+            <strong>앱을 찾을 수 없어요</strong>
+            <p>
+              <code>{appId}</code> 라는 이름의 앱을 찾지 못했어요. 주소가 맞는지 다시 확인하거나 홈에서 앱을 골라 주세요.
+            </p>
+            <div style={{ marginTop: 12 }}>
+              <button type="button" className="btn-cta btn-cta--primary" onClick={() => void navigate('/')}>
+                홈으로 돌아가기
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="loading">앱 정보를 불러오는 중…</div>
+        )}
       </main>
     );
   }
@@ -201,12 +297,23 @@ export default function AppDetail() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [edit.field]: value }),
       });
-      if (!res.ok) throw new Error('저장에 실패했습니다.');
+      if (!res.ok) {
+        let serverMsg: string | null = null;
+        try {
+          const data = (await res.json()) as { error?: string; message?: string };
+          serverMsg = data?.error ?? data?.message ?? null;
+        } catch {
+          // ignore JSON parse failure
+        }
+        throw new Error(
+          `저장에 실패했습니다 (상태 코드: ${res.status}). ${serverMsg ?? '잠시 후 다시 시도해주세요.'}`,
+        );
+      }
       setSaveError(null);
       setEdit({ field: null, value: '' });
       await refetch();
-    } catch {
-      setSaveError('저장에 실패했습니다. 다시 시도해주세요.');
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : '저장에 실패했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setSaving(false);
     }
@@ -220,31 +327,37 @@ export default function AppDetail() {
     setTimeout(() => setCopied(null), 1500);
   }
 
+  // 예전엔 별도의 /api/run-skill 스트림 엔드포인트를 썼지만, 상태머신·AskUserQuestion
+  // 라우팅·히스토리 리플레이가 모두 빠져 있어 통일된 /api/orchestrations 경로로 옮겼다.
+  // 시작 후엔 아래 "출시 파이프라인" 섹션으로 스크롤해서 RunTimeline 의 실시간 패널이 뜨게 한다.
   async function runSkill(skill: AllowedSkill) {
     if (running || !app || isDemo) return;
-    skillEsRef.current?.close();
     setRunning(true);
     setRunningSkill(skill);
-    setLogLines([]);
-    const es = new EventSource(`/api/run-skill/stream?skill=${skill}&app=${app.folderName}`);
-    skillEsRef.current = es;
-    es.addEventListener('log', (e) => {
-      setLogLines((prev) => [...prev, e.data].slice(-200));
-    });
-    es.addEventListener('done', () => {
-      setRunning(false);
-      setRunningSkill(null);
-      es.close();
-      skillEsRef.current = null;
+    setPipelineExpanded(true);
+    try {
+      await startRun({
+        skill,
+        appName: app.folderName,
+        forceRerun: true,
+      });
+      if (typeof window !== 'undefined') {
+        const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        document.querySelector('.pipeline-section')?.scrollIntoView({
+          behavior: reduced ? 'auto' : 'smooth',
+          block: 'start',
+        });
+      }
+      // RunTimeline 의 useRuns 훅이 refetch 되면서 새 run 을 픽업하고 라이브 패널을 연다.
       void refetch();
-    });
-    es.addEventListener('error', () => {
+    } catch (e) {
+      // 시작 자체에 실패했으면 사용자에게 알린다 (디스크 권한 / Claude CLI 미설치 등).
+      const message = e instanceof Error ? e.message : String(e);
+      alert(`실행을 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.\n\n(${message})`);
+    } finally {
       setRunning(false);
       setRunningSkill(null);
-      es.close();
-      skillEsRef.current = null;
-      setLogLines((prev) => [...prev, '[오류] 스킬 실행 중 오류가 발생했습니다.']);
-    });
+    }
   }
 
   function getFieldDisplayValue(field: (typeof CONSOLE_TEXT_FIELDS)[number]): string | null {
@@ -252,6 +365,8 @@ export default function AppDetail() {
     if (Array.isArray(raw)) return raw.length > 0 ? raw.join(', ') : null;
     return (raw as string) || null;
   }
+
+  const isComplete = app.completion >= 100;
 
   return (
     <main className="main">
@@ -274,9 +389,10 @@ export default function AppDetail() {
             <div className="detail-package">{app.packageName}</div>
           </div>
         </div>
-        <div className="detail-header-completion">
+        <div className={`detail-header-completion ${isComplete ? 'detail-header-completion--done' : ''}`}>
           <span className="completion-label">완성도</span>
           <span className="completion-value">{app.completion}%</span>
+          {isComplete && <CheckCircle2 size={22} strokeWidth={2.25} className="completion-check" aria-label="완성" />}
         </div>
       </div>
 
@@ -287,48 +403,101 @@ export default function AppDetail() {
           <div className="pipeline-header-actions">
             <button
               type="button"
-              className={`btn-cli-copy ${copiedCmd === 'ait-launch' ? 'btn-cli-copy--copied' : ''}`}
-              onClick={() => void copyCliCommand('ait-launch')}
-              title="CLI에서 7단계 파이프라인 순차 실행 (클립보드 복사)"
-            >
-              {copiedCmd === 'ait-launch' ? '복사됨' : 'claude -p /ait-launch'}
-            </button>
-            <button
-              type="button"
               className="btn-pipeline-toggle"
               onClick={() => setPipelineExpanded((v) => !v)}
+              aria-expanded={pipelineExpanded}
             >
-              {pipelineExpanded ? '접기' : '개별 단계'}
+              {pipelineExpanded ? '간단히 보기' : '자세히 보기'}
             </button>
           </div>
         </div>
 
-        {/* 미니 스테퍼 (항상 보임) */}
-        <div className="pipeline-mini-stepper">
+        {/* 라벨 + 번호가 항상 보이는 스테퍼 */}
+        <ol
+          className="pipeline-stepper"
+          role="list"
+          aria-label="출시 파이프라인 단계"
+        >
           {pipeline.map((item, idx) => {
-            const state = getStepState(item, app.console.pipelineProgress);
+            const state = getStepState(item, app.console.pipelineProgress, runningSkill);
+            const prevState =
+              idx > 0 ? getStepState(pipeline[idx - 1]!, app.console.pipelineProgress) : null;
+            const isNextStep = nextStep === item.step && state === 'enabled';
+            const blockerSteps = item.requiresSteps.filter(
+              (s) => !app.console.pipelineProgress[s],
+            );
             return (
-              <div key={item.skill} className="pipeline-mini-step-wrap">
+              <li key={item.skill} className="pipeline-stepper-item">
                 {idx > 0 && (
-                  <div className={`pipeline-mini-connector ${
-                    getStepState(pipeline[idx - 1]!, app.console.pipelineProgress) === 'completed'
-                      ? 'pipeline-mini-connector--done'
-                      : ''
-                  }`} />
+                  <div
+                    className={`pipeline-stepper-connector${
+                      prevState === 'completed' ? ' pipeline-stepper-connector--done' : ''
+                    }`}
+                    aria-hidden="true"
+                  />
                 )}
                 <div
-                  className={`pipeline-mini-dot pipeline-mini-dot--${state} ${
-                    runningSkill === item.skill ? 'pipeline-mini-dot--running' : ''
+                  className={`pipeline-stepper-node pipeline-stepper-node--${state}${
+                    isNextStep ? ' pipeline-stepper-node--next' : ''
                   }`}
-                  title={`Step ${item.step}: ${item.label} — ${item.description}${
-                    state === 'completed' ? ' ✓' : state === 'locked' ? ` (필요: ${item.requires})` : ''
+                  title={`${item.step}단계: ${item.label} — ${item.description}${
+                    state === 'completed'
+                      ? ' (완료)'
+                      : state === 'locked'
+                        ? ` (필요: ${item.requires})`
+                        : ''
+                  }`}
+                  aria-current={isNextStep ? 'step' : undefined}
+                  aria-label={`${item.step}단계 ${item.label} · ${
+                    state === 'completed'
+                      ? '완료'
+                      : state === 'running'
+                        ? '실행 중'
+                        : state === 'locked'
+                          ? '잠김'
+                          : '진행 가능'
                   }`}
                 >
-                  {state === 'completed' && <span className="pipeline-mini-check">✓</span>}
+                  <span className="pipeline-stepper-number">
+                    {state === 'completed' ? (
+                      <Check size={16} strokeWidth={2.5} aria-hidden="true" />
+                    ) : state === 'locked' ? (
+                      <Lock size={13} strokeWidth={2} aria-hidden="true" />
+                    ) : (
+                      item.step
+                    )}
+                  </span>
+                  {state === 'running' && (
+                    <span className="pipeline-stepper-ring" aria-hidden="true" />
+                  )}
                 </div>
-              </div>
+                <span className="pipeline-stepper-label">{item.label}</span>
+                {state === 'locked' && blockerSteps.length > 0 && (
+                  <span className="pipeline-stepper-blocker" aria-hidden="true">
+                    ↑ {blockerSteps[0]} 필요
+                  </span>
+                )}
+              </li>
             );
           })}
+        </ol>
+
+        {/* CLI 한 방에 실행 (보조 affordance) */}
+        <div className="pipeline-cli-row">
+          <span className="pipeline-cli-row-label">전체 파이프라인을 터미널에서 한 번에 실행:</span>
+          <button
+            type="button"
+            className={`btn-cli-chip ${copiedCmd === 'ait-launch' ? 'btn-cli-chip--copied' : ''}`}
+            onClick={() => void copyCliCommand('ait-launch')}
+            title="앱 폴더에서 실행하세요"
+            aria-label="전체 실행 명령어 복사"
+          >
+            <code>claude -p /ait-launch</code>
+            <Copy size={12} strokeWidth={2} aria-hidden="true" />
+            <span className="btn-cli-chip-feedback">
+              {copiedCmd === 'ait-launch' ? '복사됨' : '복사'}
+            </span>
+          </button>
         </div>
 
         {/* 실행 기록/현재 진행 (오케스트레이션 API 기반) */}
@@ -337,13 +506,10 @@ export default function AppDetail() {
             appName={app.folderName}
             pipeline={pipeline}
             isDemo={isDemo}
-            onInteractiveStep={() => {
-              const reduced =
-                typeof window !== 'undefined' &&
-                window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-              planSectionRef.current?.scrollIntoView({
-                behavior: reduced ? 'auto' : 'smooth',
-              });
+            onInteractiveStep={(step) => {
+              // 입력 폼·CTA 는 Wizard 에만 있으므로 해당 step 으로 바로 점프.
+              // (예전엔 plan 섹션으로만 스크롤해서 Step 2+ 에선 의미 없는 이동이었음)
+              void navigate(`/wizard/${app.folderName}?skill=${encodeURIComponent(step.skill)}`);
             }}
             onRunComplete={() => void refetch()}
           />
@@ -352,7 +518,7 @@ export default function AppDetail() {
       </section>
 
       {/* ── 기획 (PRD) ── */}
-      <section id="plan-section" ref={planSectionRef} className="detail-section">
+      <section id="plan-section" className="detail-section">
         <h2 className="detail-section-title">기획</h2>
         {app.docs.prd.exists ? (
           /* PRD가 있을 때: 경로 + 뷰어 */
@@ -401,17 +567,22 @@ export default function AppDetail() {
               />
               <div className="plan-entry">
                 <div className="plan-entry-icon"><Monitor size={20} strokeWidth={1.75} /></div>
-                <div className="plan-entry-title">CLI에서 기획</div>
+                <div className="plan-entry-title">CLI에서 직접 실행</div>
                 <p className="plan-entry-desc">
-                  AI와 대화하며 정책 검토부터 PRD 작성까지 진행합니다.
+                  터미널이 익숙하다면, 앱 폴더에서 명령어를 실행해 AI와 대화하며 기획할 수 있어요.
                 </p>
                 <button
                   type="button"
-                  className={`btn-cli-copy ${copiedCmd === 'ait-plan' ? 'btn-cli-copy--copied' : ''}`}
+                  className={`btn-cli-chip ${copiedCmd === 'ait-plan' ? 'btn-cli-chip--copied' : ''}`}
                   onClick={() => void copyCliCommand('ait-plan')}
-                  title="앱 폴더에서 실행"
+                  title="앱 폴더에서 실행하세요"
+                  aria-label="기획 명령어 복사"
                 >
-                  {copiedCmd === 'ait-plan' ? '복사됨' : 'claude -p /ait-plan'}
+                  <code>claude -p /ait-plan</code>
+                  <Copy size={12} strokeWidth={2} aria-hidden="true" />
+                  <span className="btn-cli-chip-feedback">
+                    {copiedCmd === 'ait-plan' ? '복사됨' : '복사'}
+                  </span>
                 </button>
               </div>
               <button
@@ -432,61 +603,114 @@ export default function AppDetail() {
         )}
       </section>
 
-      {/* ── 브랜드 & 코드 설정 | 스토어 등록 자료 (2컬럼) ── */}
-      <div className="detail-columns">
-        {/* 브랜드 & 코드 설정 (Layer 1) */}
-        <section className="detail-section">
-          <h2 className="detail-section-title">
+      {/* ── 브랜드 & 코드 설정 | 스토어 등록 자료 (진행형 공개) ── */}
+      {/* 브랜드 & 코드 설정 (Layer 1) */}
+      <section className={`detail-section collapsible-section ${brandOpen ? 'collapsible-section--open' : ''}`}>
+        <button
+          type="button"
+          className="collapsible-section-summary"
+          onClick={() => setBrandOpen((v) => !v)}
+          aria-expanded={brandOpen}
+          aria-controls="brand-section-body"
+        >
+          <span className="collapsible-section-title">
             브랜드 & 코드 설정
-            <span className="section-source">granite.config.ts</span>
-          </h2>
-          <div className="meta-table">
-            <ReadonlyRow label="appName" value={app.granite?.appName} />
-            <ReadonlyRow label="displayName" value={app.granite?.displayName} />
-            <ReadonlyRow
-              label="primaryColor"
-              value={app.granite?.primaryColor}
-              render={(v) => (
-                <span className="color-swatch-row">
-                  <span className="color-swatch" style={{ background: v }} />
-                  {v}
-                </span>
-              )}
+            <span className="collapsible-section-source">granite.config.ts</span>
+          </span>
+          <span className="collapsible-section-progress" aria-label={`${brandProgress.filled} / ${brandProgress.total} 완료`}>
+            <span className="collapsible-section-progress-text">
+              {brandProgress.filled}/{brandProgress.total} 설정
+            </span>
+            <span
+              className="collapsible-section-progress-bar"
+              aria-hidden="true"
+              style={{ ['--progress' as string]: `${(brandProgress.filled / brandProgress.total) * 100}%` }}
             />
-            <ReadonlyRow
-              label="icon"
-              value={app.granite?.icon}
-              render={(v) => (
-                <span className="granite-icon-row">
-                  <img
-                    src={v}
-                    alt=""
-                    className="granite-icon-preview"
-                    loading="lazy"
-                    decoding="async"
-                    width={40}
-                    height={40}
-                  />
-                  <span className="granite-icon-url">{v}</span>
-                </span>
-              )}
-            />
-            <div className="meta-row">
-              <div className="meta-label">.ait 파일</div>
-              <div className="meta-value">
-                <span>{app.completionDetail.layer1 >= 10 ? '있음' : '없음'}</span>
+          </span>
+          <ChevronDown
+            size={18}
+            strokeWidth={2}
+            className="collapsible-section-chevron"
+            aria-hidden="true"
+          />
+        </button>
+        {brandOpen && (
+          <div id="brand-section-body" className="collapsible-section-body">
+            <div className="meta-table">
+              <ReadonlyRow label="appName" value={app.granite?.appName} />
+              <ReadonlyRow label="displayName" value={app.granite?.displayName} />
+              <ReadonlyRow
+                label="primaryColor"
+                value={app.granite?.primaryColor}
+                render={(v) => (
+                  <span className="color-swatch-row">
+                    <span className="color-swatch" style={{ background: v }} />
+                    {v}
+                  </span>
+                )}
+              />
+              <ReadonlyRow
+                label="icon"
+                value={app.granite?.icon}
+                render={(v) => (
+                  <span className="granite-icon-row">
+                    <img
+                      src={v}
+                      alt=""
+                      className="granite-icon-preview"
+                      loading="lazy"
+                      decoding="async"
+                      width={40}
+                      height={40}
+                    />
+                    <span className="granite-icon-url">{v}</span>
+                  </span>
+                )}
+              />
+              <div className="meta-row">
+                <div className="meta-label">.ait 파일</div>
+                <div className="meta-value">
+                  <span>{app.completionDetail.layer1 >= 10 ? '있음' : '없음'}</span>
+                </div>
               </div>
             </div>
           </div>
-        </section>
+        )}
+      </section>
 
-        {/* 스토어 등록 자료 (Layer 2) */}
-        <section className="detail-section">
-          <h2 className="detail-section-title">
+      {/* 스토어 등록 자료 (Layer 2) */}
+      <section className={`detail-section collapsible-section ${storeOpen ? 'collapsible-section--open' : ''}`}>
+        <button
+          type="button"
+          className="collapsible-section-summary"
+          onClick={() => setStoreOpen((v) => !v)}
+          aria-expanded={storeOpen}
+          aria-controls="store-section-body"
+        >
+          <span className="collapsible-section-title">
             스토어 등록 자료
-            <span className="section-source">.meta-dashboard.json</span>
-          </h2>
-          <div className="meta-table">
+            <span className="collapsible-section-source">.meta-dashboard.json</span>
+          </span>
+          <span className="collapsible-section-progress" aria-label={`${storeProgress.filled} / ${storeProgress.total} 항목 완료`}>
+            <span className="collapsible-section-progress-text">
+              {storeProgress.filled}/{storeProgress.total} 항목 완료
+            </span>
+            <span
+              className="collapsible-section-progress-bar"
+              aria-hidden="true"
+              style={{ ['--progress' as string]: `${(storeProgress.filled / storeProgress.total) * 100}%` }}
+            />
+          </span>
+          <ChevronDown
+            size={18}
+            strokeWidth={2}
+            className="collapsible-section-chevron"
+            aria-hidden="true"
+          />
+        </button>
+        {storeOpen && (
+          <div id="store-section-body" className="collapsible-section-body">
+            <div className="meta-table">
             {/* 앱 로고 */}
             <div className="meta-row">
               <div className="meta-label">앱 로고</div>
@@ -506,15 +730,15 @@ export default function AppDetail() {
                   </div>
                 ) : (
                   <div className="meta-display">
-                    <span className="meta-empty">없음 (600x600)</span>
+                    <span className="meta-empty">아직 없어요 · 600×600 px 로고 필요</span>
                     <button
                       type="button"
                       className="btn-skill btn-skill-sm"
                       onClick={() => void runSkill('ait-assets')}
                       disabled={running || isDemo}
-                      title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : undefined}
+                      title={isDemo ? '내 PC에서 대시보드를 실행한 뒤 사용할 수 있어요' : undefined}
                     >
-                      /ait-assets
+                      이미지 만들기
                     </button>
                   </div>
                 )}
@@ -626,15 +850,15 @@ export default function AppDetail() {
                   </div>
                 ) : (
                   <div className="meta-display">
-                    <span className="meta-empty">없음 (1932x828)</span>
+                    <span className="meta-empty">아직 없어요 · 1932×828 px 썸네일 필요</span>
                     <button
                       type="button"
                       className="btn-skill btn-skill-sm"
                       onClick={() => void runSkill('ait-assets')}
                       disabled={running || isDemo}
-                      title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : undefined}
+                      title={isDemo ? '내 PC에서 대시보드를 실행한 뒤 사용할 수 있어요' : undefined}
                     >
-                      /ait-assets
+                      이미지 만들기
                     </button>
                   </div>
                 )}
@@ -661,13 +885,14 @@ export default function AppDetail() {
                     ))}
                   </div>
                 ) : (
-                  <span className="meta-empty">없음 (세로 636x1048, 3장 이상)</span>
+                  <span className="meta-empty">아직 없어요 · 세로 636×1048 px 3장 이상 필요</span>
                 )}
               </div>
             </div>
+            </div>
           </div>
-        </section>
-      </div>
+        )}
+      </section>
 
       {/* ── 테스트 리포트 (UT) ── */}
       <section className="detail-section">
@@ -696,16 +921,15 @@ export default function AppDetail() {
                 className="btn-skill btn-skill-sm"
                 onClick={() => void runSkill('ait-ut')}
                 disabled={running || isDemo}
-                title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : undefined}
+                title={isDemo ? '내 PC에서 대시보드를 실행한 뒤 사용할 수 있어요' : undefined}
               >
-                /ait-ut
+                테스트 리포트 만들기
               </button>
             )}
           </div>
         </div>
       </section>
 
-      <LogStream lines={logLines} running={running} skillName={runningSkill} />
     </main>
   );
 }
@@ -1092,8 +1316,8 @@ function PlanReviewBanner({
         <span className="plan-review-banner-title">{headline}</span>
       </div>
       <p className="plan-review-banner-desc">
-        <strong>/ait-plan</strong> 이 이 기획서를 읽고 앱인토스 정책 · BM · 리스크를 짚어드릴 수 있어요.
-        이미 검토를 마쳤으면 "검토 완료" 로 배지만 제거할 수 있습니다.
+        <strong>AI 검토</strong> 기능으로 이 기획서를 앱인토스 정책 · 비즈니스 모델 · 리스크 관점에서 짚어드릴 수 있어요.
+        이미 검토를 마쳤으면 "검토 완료"로 배지만 제거할 수 있어요.
       </p>
       <div className="plan-review-banner-actions">
         <button
@@ -1102,7 +1326,7 @@ function PlanReviewBanner({
           onClick={onReviewByPlan}
           disabled={saving}
         >
-          /ait-plan 에게 검토 맡기기 →
+          AI에게 검토 맡기기 →
         </button>
         <button
           type="button"

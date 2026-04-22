@@ -22,7 +22,7 @@ export default function NewApp() {
     setError(null);
 
     if (!APP_NAME_RE.test(appName)) {
-      setError('앱 폴더 이름은 영문 소문자/숫자로 시작하고, 하이픈(-), 점(.), 언더스코어(_)만 사용할 수 있습니다.');
+      setError('앱 폴더 이름은 영문 소문자 또는 숫자로 시작하고, 하이픈(-), 점(.), 언더스코어(_)만 사용할 수 있어요.');
       return;
     }
 
@@ -36,7 +36,7 @@ export default function NewApp() {
 
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data.error ?? `생성 실패 (HTTP ${res.status})`);
+        setError(data.error ?? `앱을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요. (상태 코드 ${res.status})`);
         return;
       }
 
@@ -46,7 +46,7 @@ export default function NewApp() {
       const targetPath = mode === 'planning-first' ? `/wizard/${appName}` : `/apps/${appName}`;
       void navigate(targetPath);
     } catch (err) {
-      setError(`네트워크 오류: ${err instanceof Error ? err.message : String(err)}`);
+      setError(`네트워크 연결에 문제가 있어요: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSubmitting(false);
     }
@@ -79,7 +79,7 @@ export default function NewApp() {
             aria-describedby={`new-app-name-hint${error ? ' new-app-error' : ''}`}
             aria-invalid={error ? true : undefined}
           />
-          <p id="new-app-name-hint" className="new-app-hint">영문 소문자와 하이픈(-)만 사용 가능합니다.</p>
+          <p id="new-app-name-hint" className="new-app-hint">영문 소문자 또는 숫자로 시작, 하이픈(-) · 점(.) · 언더스코어(_) 사용 가능.</p>
         </div>
 
         <div className="new-app-field">
@@ -126,8 +126,8 @@ export default function NewApp() {
             <div className="new-app-mode-body">
               <div className="new-app-mode-title">기획부터 시작 (권장)</div>
               <div className="new-app-mode-desc">
-                폴더만 먼저 만들고, <code>/ait-plan</code> → <code>/ait-scaffold</code> 순으로 위저드에서 진행합니다.
-                PRD 결과가 스캐폴딩에 그대로 반영됩니다.
+                AI와 대화하며 기획서를 먼저 만든 뒤, 그 내용으로 프로젝트 틀을 세팅해요.
+                처음 만드는 앱이라면 이 방식을 추천해요.
               </div>
             </div>
           </label>
@@ -141,10 +141,10 @@ export default function NewApp() {
               disabled={submitting}
             />
             <div className="new-app-mode-body">
-              <div className="new-app-mode-title">바로 스캐폴딩</div>
+              <div className="new-app-mode-title">프로젝트 틀부터 만들기</div>
               <div className="new-app-mode-desc">
-                <code>pnpm new-app</code>으로 프로젝트를 즉시 스캐폴드합니다.
-                기획 없이 빠르게 손대고 싶을 때.
+                기획 단계를 건너뛰고 빈 프로젝트를 바로 만들어요.
+                이미 뭘 만들지 정해진 경우에만 선택하세요.
               </div>
             </div>
           </label>
@@ -152,20 +152,12 @@ export default function NewApp() {
 
         <div className="new-app-command-preview">
           <p className="new-app-command-label">
-            {mode === 'full' ? '실행될 명령어' : '첫 단계'}
+            {mode === 'full' ? '다음 동작' : '다음 단계'}
           </p>
-          <div className="new-app-command">
-            <span className="prompt-symbol">$</span>
-            <code>
-              {mode === 'full'
-                ? `pnpm new-app ${appName || '<앱-이름>'}`
-                : `웹 위저드 → /ait-plan`}
-            </code>
-          </div>
           <p className="new-app-command-note">
             {mode === 'full'
-              ? '아래 버튼을 누르면 웹에서 바로 스캐폴딩을 실행합니다. 터미널에서 직접 실행해도 동일하게 동작합니다.'
-              : '앱 폴더와 메타데이터만 먼저 만든 뒤, 위저드에서 기획 · 스캐폴딩 · TDS 순으로 안내합니다.'}
+              ? '앱 폴더와 빈 프로젝트를 만들고 상세 페이지로 이동해요. 필요한 기능은 거기서 하나씩 채울 수 있어요.'
+              : '앱 폴더를 먼저 만든 뒤 웹 마법사로 이동해 AI와 함께 기획 → 프로젝트 세팅 → 디자인 시스템 순으로 안내해 드려요.'}
           </p>
         </div>
 

@@ -123,8 +123,7 @@ export default function RunTimeline({
     return (
       <div className="run-timeline run-timeline--demo">
         <p>
-          데모 환경에서는 실제 실행을 시작할 수 없습니다. 로컬에서 <code>pnpm dev</code>로 대시보드를
-          띄운 뒤 다시 시도하세요.
+          데모 화면에서는 실제 실행을 시작할 수 없어요. 내 PC에서 대시보드를 설치·실행한 뒤 다시 시도해 주세요.
         </p>
       </div>
     );
@@ -135,7 +134,7 @@ export default function RunTimeline({
       {error && <div className="run-timeline-error">{error}</div>}
       {startError && <div className="run-timeline-error">실행 시작 실패: {startError}</div>}
       {loading && runs.length === 0 && (
-        <div className="run-timeline-loading">실행 이력을 불러오는 중입니다.</div>
+        <div className="run-timeline-loading">이전 실행 기록을 불러오는 중이에요.</div>
       )}
 
       <ol className="run-timeline-list">
@@ -163,13 +162,13 @@ export default function RunTimeline({
               </div>
               <div className="run-timeline-body">
                 <div className="run-timeline-head">
-                  <span className="run-timeline-step">Step {step.step}</span>
+                  <span className="run-timeline-step">{step.step}단계</span>
                   <span className="run-timeline-label">{step.label}</span>
                   {latest && <RunStateBadge state={latest.state} />}
                 </div>
                 <div className="run-timeline-desc">
                   {step.description}
-                  <span className="run-timeline-produces"> 산출물: {step.produces}</span>
+                  <span className="run-timeline-produces"> 결과물: {step.produces}</span>
                 </div>
 
                 {latest && (
@@ -183,7 +182,7 @@ export default function RunTimeline({
                       </>
                     )}
                     {latest.exitCode !== null && latest.exitCode !== 0 && (
-                      <span className="run-timeline-exit">exit {latest.exitCode}</span>
+                      <span className="run-timeline-exit" title="프로세스 종료 코드 (0이 아니면 비정상 종료)">오류 코드 {latest.exitCode}</span>
                     )}
                   </div>
                 )}
@@ -205,10 +204,10 @@ export default function RunTimeline({
                         }}
                       >
                         {suppressLivePanel
-                          ? '대화창으로 이동'
+                          ? '진행 화면으로 이동'
                           : activeRunId === latest.runId
-                            ? '대화창 열림'
-                            : '대화창 열기'}
+                            ? '진행 화면 열림'
+                            : '진행 화면 열기'}
                       </button>
                       <button
                         type="button"
@@ -224,10 +223,10 @@ export default function RunTimeline({
                       className="run-timeline-action run-timeline-action--secondary"
                       onClick={() => void handleRerun(step.skill)}
                       disabled={busy || disabled}
-                      title={disabled ? `선행 단계 완료 필요: ${step.requires}` : undefined}
+                      title={disabled ? `먼저 완료돼야 해요: ${step.requires}` : undefined}
                     >
                       <RotateCcw size={14} strokeWidth={1.75} />
-                      재실행
+                      다시 하기
                     </button>
                   ) : (
                     <button
@@ -244,18 +243,14 @@ export default function RunTimeline({
                         void handleStart(step.skill);
                       }}
                       disabled={busy || disabled}
-                      title={disabled ? `선행 단계 완료 필요: ${step.requires}` : step.description}
+                      title={disabled ? `먼저 완료돼야 해요: ${step.requires}` : step.description}
                     >
                       <Play size={14} strokeWidth={1.75} />
                       {busy
-                        ? '시작 중...'
+                        ? '시작하는 중…'
                         : latest?.state === 'FAILED'
-                          ? '다시 실행'
-                          : step.mode === 'interactive' && onInteractiveStep
-                            ? '입력 시작'
-                            : step.mode === 'interactive'
-                              ? '대화 시작'
-                              : '실행'}
+                          ? '다시 하기'
+                          : '시작하기'}
                     </button>
                   )}
                 </div>
@@ -319,11 +314,11 @@ function RunStateIcon({ state }: { state: RunState | null }) {
 
 function RunStateBadge({ state }: { state: RunState }) {
   const text: Record<RunState, string> = {
-    DRAFT: '초안',
-    VALIDATING_INPUT: '입력 검증 중',
-    READY: '준비됨',
+    DRAFT: '대기 중',
+    VALIDATING_INPUT: '입력 확인 중',
+    READY: '시작 준비',
     RUNNING: '실행 중',
-    WAITING_USER_INPUT: '입력 대기',
+    WAITING_USER_INPUT: '답변 대기',
     COMPLETED: '완료',
     FAILED: '실패',
     CANCELED: '취소됨',
@@ -470,11 +465,12 @@ export function RunLivePanel({
     if (!trimmed || sending) return;
     setSending(true);
     setSendError(null);
+    const answeringId = activeQuestion?.toolUseId;
     try {
-      await sendRunInput(runId, trimmed);
+      await sendRunInput(runId, trimmed, answeringId ? { toolUseId: answeringId } : {});
       // optimistic: 서버 user_input SSE 도착 전에 질문 카드를 닫아 UX 지연 제거.
-      // 중복 호출돼도 markLatestQuestionAnswered 는 모두 answered 면 no-op.
-      markLatestQuestionAnswered();
+      // toolUseId 가 있으면 정확한 매칭, 없으면 레거시 순서 매칭.
+      markLatestQuestionAnswered(answeringId);
       setInputText('');
       setMultiSelections(new Set());
     } catch (e) {
@@ -538,7 +534,7 @@ export function RunLivePanel({
     <div className={`run-live-panel${embedded ? ' run-live-panel--embedded' : ''}`}>
       <div className="run-live-panel-head">
         <span className="run-live-panel-title">
-          라이브 실행 {state && <RunStateBadge state={state} />}
+          실시간 진행 {state && <RunStateBadge state={state} />}
         </span>
         {!embedded && (
           <button type="button" className="run-live-panel-close" onClick={onClose} aria-label="패널 닫기">
@@ -551,7 +547,7 @@ export function RunLivePanel({
         <div className="run-live-panel-artifacts">
           {artifacts.map((artifact, index) => (
             <span key={`${artifact.path ?? 'artifact'}-${index}`} className="run-live-panel-artifact">
-              생성 파일: {artifact.path ?? '(경로 없음)'}
+              생성 파일: {artifact.path ?? '(이름 확인 중)'}
             </span>
           ))}
         </div>
@@ -561,10 +557,10 @@ export function RunLivePanel({
         className="run-live-panel-body"
         role="log"
         aria-live="polite"
-        aria-label="실행 로그"
+        aria-label="진행 내용"
       >
         {logs.length === 0 && !streamingText ? (
-          <div className="run-live-panel-empty">아직 출력된 로그가 없습니다.</div>
+          <div className="run-live-panel-empty">아직 진행 내용이 없어요.</div>
         ) : (
           <>
             {logs.map((entry, index) => (
@@ -584,7 +580,7 @@ export function RunLivePanel({
         {isThinking && !streamingText && (
           <div className="run-live-panel-thinking" aria-live="polite">
             <Loader2 size={14} strokeWidth={2} className="run-live-panel-thinking-spin" />
-            Claude 가 작업 중이에요…
+            AI가 작업 중이에요…
           </div>
         )}
       </div>
@@ -599,7 +595,7 @@ export function RunLivePanel({
             <QuestionCard question={activeQuestion} id={questionId} />
           ) : (
             <div id={inputLabelId} className="run-live-panel-input-label">
-              Claude 응답 입력
+              AI에게 답변 보내기
             </div>
           )}
 
@@ -618,7 +614,7 @@ export function RunLivePanel({
               ? isMultiSelect
                 ? '여러 개 선택 후 전송하거나, 추가 설명이 있으면 아래에 입력하세요.'
                 : '위 선택지 중 하나를 누르거나, 다른 답이 있다면 직접 입력하세요.'
-              : 'Claude가 입력을 기다리고 있어요. 자유롭게 답변을 적어주세요.'}{' '}
+              : 'AI가 답을 기다리고 있어요. 자유롭게 적어 주세요.'}{' '}
             <span className="run-live-panel-kbd-hint">
               <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Enter</kbd>로 전송
             </span>
@@ -659,9 +655,9 @@ export function RunLivePanel({
                 className="run-live-panel-finish"
                 onClick={() => void handleFinish()}
                 disabled={finishing || sending}
-                title="이 단계를 완료 처리하고 대시보드가 다음 단계로 넘어가도록 합니다"
+                title="이 단계를 마치고 다음 단계로 넘어가요"
               >
-                {finishing ? '완료 처리 중…' : '이 단계 완료 · 다음으로'}
+                {finishing ? '마무리 중…' : '이 단계 마치기'}
               </button>
             )}
             <button
@@ -677,7 +673,7 @@ export function RunLivePanel({
               }
             >
               {sending
-                ? '전송 중...'
+                ? '전송 중…'
                 : isMultiSelect && multiSelections.size > 0
                   ? `${multiSelections.size}개 선택 · 전송`
                   : '전송'}
@@ -733,7 +729,7 @@ function QuestionCard({ question, id }: { question: RunQuestion; id: string }) {
       role="status"
     >
       {question.header && <span className="run-live-panel-question-tag">{question.header}</span>}
-      <strong>Claude의 질문</strong>
+      <strong>AI의 질문</strong>
       <p>{question.prompt}</p>
     </div>
   );

@@ -99,7 +99,7 @@ function PrdReview({ app, expanded }: { app: AppInfo; expanded: boolean }) {
       tone={app.docs.prd.exists ? 'ok' : 'warn'}
     >
       {!app.docs.prd.exists ? (
-        <EmptyNote label="아직 PRD가 생성되지 않았습니다." />
+        <EmptyNote label="아직 기획서(PRD)가 없어요." />
       ) : (
         <>
           <div className="artifact-card-meta">
@@ -114,7 +114,7 @@ function PrdReview({ app, expanded }: { app: AppInfo; expanded: boolean }) {
               {error ? (
                 <div className="artifact-card-empty">{error}</div>
               ) : content === null ? (
-                <div className="artifact-card-empty">불러오는 중…</div>
+                <div className="artifact-card-empty">기획서를 불러오는 중…</div>
               ) : (
                 <ReactMarkdown>{content}</ReactMarkdown>
               )}
@@ -132,9 +132,9 @@ function AssetsReview({ app }: { app: AppInfo }) {
     (logoPath ? 1 : 0) + (thumbnailPath ? 1 : 0) + screenshotPaths.length;
   const tone: 'ok' | 'warn' = count > 0 ? 'ok' : 'warn';
   return (
-    <CardShell title="에셋 (로고/썸네일/스크린샷)" icon={<Image size={16} strokeWidth={1.75} />} tone={tone}>
+    <CardShell title="이미지 자료 (로고/썸네일/스크린샷)" icon={<Image size={16} strokeWidth={1.75} />} tone={tone}>
       {count === 0 ? (
-        <EmptyNote label="아직 생성된 에셋이 없습니다. ait-assets 실행 후 다시 확인하세요." />
+        <EmptyNote label="아직 만들어진 이미지가 없어요. 에셋 생성 단계를 실행한 뒤 다시 확인해 주세요." />
       ) : (
         <div className="artifact-asset-grid">
           {logoPath && (
@@ -183,9 +183,9 @@ function ScaffoldReview({ app }: { app: AppInfo }) {
   const g = app.granite;
   const tone: 'ok' | 'warn' = g ? 'ok' : 'warn';
   return (
-    <CardShell title="프로젝트 설정 (granite.config.ts)" icon={<Package size={16} strokeWidth={1.75} />} tone={tone}>
+    <CardShell title="프로젝트 설정" icon={<Package size={16} strokeWidth={1.75} />} tone={tone}>
       {!g ? (
-        <EmptyNote label="granite.config.ts 를 찾을 수 없습니다." />
+        <EmptyNote label="프로젝트 설정 파일을 찾을 수 없어요." />
       ) : (
         <dl className="artifact-kv">
           <KV label="appName" value={g.appName} />
@@ -212,9 +212,9 @@ function TdsReview({ app }: { app: AppInfo }) {
   const sdk = app.dependencies['@apps-in-toss/web-framework'];
   const tone: 'ok' | 'warn' = tossDeps.length > 0 ? 'ok' : 'warn';
   return (
-    <CardShell title="TDS / SDK 설정" icon={<Code2 size={16} strokeWidth={1.75} />} tone={tone}>
+    <CardShell title="디자인 시스템 · SDK" icon={<Code2 size={16} strokeWidth={1.75} />} tone={tone}>
       {tossDeps.length === 0 ? (
-        <EmptyNote label="@toss/* 패키지가 설치되어 있지 않습니다." />
+        <EmptyNote label="토스 디자인 시스템(@toss/*) 패키지가 아직 설치되어 있지 않아요." />
       ) : (
         <ul className="artifact-card-list">
           {tossDeps.map((d) => (
@@ -242,8 +242,8 @@ function ImplementReview({ app }: { app: AppInfo }) {
     <CardShell title="구현 결과" icon={<ClipboardList size={16} strokeWidth={1.75} />} tone={tone}>
       <p className="artifact-card-text">
         {srcPresent
-          ? 'React + TDS 기반 구현이 감지되었습니다. 상세 git diff 는 후속 업데이트에서 제공됩니다.'
-          : '아직 구현 코드가 검출되지 않았습니다.'}
+          ? 'React + 디자인 시스템 기반으로 화면이 붙어 있어요. 어떤 코드가 바뀌었는지 보는 기능은 곧 추가될 예정이에요.'
+          : '아직 구현된 코드가 없어요.'}
       </p>
     </CardShell>
   );
@@ -257,8 +257,8 @@ function ReviewReportReview({ app }: { app: AppInfo }) {
     <CardShell title="검수 리포트" icon={<CheckCircle2 size={16} strokeWidth={1.75} />} tone={tone}>
       <p className="artifact-card-text">
         {hasPrd
-          ? '검수 스킬(ait-review)을 실행하면 docs/ 하위에 리포트가 생성됩니다. 생성 후 여기서 요약이 표시될 예정입니다.'
-          : '먼저 PRD가 필요합니다. Step 1 을 완료해주세요.'}
+          ? '검수 단계를 실행하면 docs/ 폴더 안에 리포트 파일이 만들어져요. 만들어지고 나면 여기서 요약을 볼 수 있게 될 예정이에요.'
+          : '먼저 기획서(PRD)가 필요해요. 1단계를 먼저 완료해 주세요.'}
       </p>
     </CardShell>
   );
@@ -268,11 +268,11 @@ function BuildReview({ app }: { app: AppInfo }) {
   const hasAit = app.completionDetail.layer1 >= 10; // Layer 1 의 .ait 가중치 10
   const tone: 'ok' | 'warn' = hasAit ? 'ok' : 'warn';
   return (
-    <CardShell title=".ait 번들" icon={<Rocket size={16} strokeWidth={1.75} />} tone={tone}>
+    <CardShell title="업로드용 빌드 파일 (.ait)" icon={<Rocket size={16} strokeWidth={1.75} />} tone={tone}>
       <p className="artifact-card-text">
         {hasAit
-          ? '.ait 번들 파일이 존재합니다. 앱인토스 콘솔에 업로드 준비 완료.'
-          : '.ait 번들이 아직 생성되지 않았습니다. Step 7 (ait-build) 을 실행해 주세요.'}
+          ? '업로드용 빌드 파일(.ait)이 준비됐어요. 앱인토스 콘솔에 바로 올릴 수 있어요.'
+          : '아직 빌드 파일이 없어요. 마지막 빌드 단계를 실행해 주세요.'}
       </p>
     </CardShell>
   );

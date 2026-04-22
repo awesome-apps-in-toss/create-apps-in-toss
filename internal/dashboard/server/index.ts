@@ -3,7 +3,6 @@ import cors from 'cors';
 import path from 'path';
 import { appsRouter } from './routes/apps.js';
 import { metaRouter } from './routes/meta.js';
-import { runSkillRouter } from './routes/run-skill.js';
 import { createAppRouter } from './routes/create-app.js';
 import { skillsRouter } from './routes/skills.js';
 import { orchestrationsRouter } from './routes/orchestrations.js';
@@ -64,7 +63,6 @@ app.get('/api/apps/:id/asset', (req, res) => {
 app.use('/api/apps/create', createAppRouter);
 app.use('/api/apps', appsRouter);
 app.use('/api/apps', metaRouter);
-app.use('/api/run-skill', runSkillRouter);
 app.use('/api/skills', skillsRouter);
 app.use('/api/orchestrations', orchestrationsRouter);
 app.use('/api/diagnostics', diagnosticsRouter);

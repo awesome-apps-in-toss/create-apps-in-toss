@@ -53,8 +53,8 @@ export interface PipelineStep {
 // 실제 로컬 개발 시에는 서버 응답이 항상 우선.
 const DEMO_SKILLS: SkillMeta[] = [
   { id: 'ait-plan', name: 'ait-plan', description: '정책 검토 + PRD 생성', mode: 'interactive', step: 1, label: '기획', produces: 'PRD 문서', requires: [], inputs: [], outputs: [], idempotencyKey: 'ait-plan' },
-  { id: 'ait-assets', name: 'ait-assets', description: '이미지/텍스트 리소스 생성', mode: 'automated', step: 2, label: '에셋', produces: '로고, 썸네일, 스크린샷', requires: [], inputs: [], outputs: [], idempotencyKey: 'ait-assets' },
-  { id: 'ait-scaffold', name: 'ait-scaffold', description: '프로젝트 생성 + 설정', mode: 'automated', step: 3, label: '스캐폴딩', produces: '프로젝트 구조, granite.config.ts', requires: ['ait-plan'], inputs: [], outputs: [], idempotencyKey: 'ait-scaffold' },
+  { id: 'ait-assets', name: 'ait-assets', description: '이미지/텍스트 리소스 생성', mode: 'interactive', step: 2, label: '에셋', produces: '로고, 썸네일, 스크린샷', requires: [], inputs: [], outputs: [], idempotencyKey: 'ait-assets' },
+  { id: 'ait-scaffold', name: 'ait-scaffold', description: '프로젝트 생성 + 설정', mode: 'interactive', step: 3, label: '스캐폴딩', produces: '프로젝트 구조, granite.config.ts', requires: ['ait-plan'], inputs: [], outputs: [], idempotencyKey: 'ait-scaffold' },
   { id: 'ait-tds-setup', name: 'ait-tds-setup', description: 'TDS 패키지 설치 + 검증', mode: 'automated', step: 4, label: 'TDS', produces: 'TDS 패키지, Provider 설정', requires: ['ait-scaffold'], inputs: [], outputs: [], idempotencyKey: 'ait-tds-setup' },
   { id: 'ait-implement', name: 'ait-implement', description: '기획서 기반 기능 구현', mode: 'automated', step: 5, label: '구현', produces: '기능 코드, 라우팅', requires: ['ait-plan', 'ait-tds-setup'], inputs: [], outputs: [], idempotencyKey: 'ait-implement' },
   { id: 'ait-review', name: 'ait-review', description: '검수 체크리스트 점검', mode: 'automated', step: 6, label: '검수', produces: '검수 리포트', requires: ['ait-implement'], inputs: [], outputs: [], idempotencyKey: 'ait-review' },

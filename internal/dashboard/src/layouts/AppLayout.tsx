@@ -29,8 +29,10 @@ export default function AppLayout() {
   return (
     <div className="layout">
       {isDemo && (
-        <div className="demo-banner">
-          <span className="demo-banner-icon"><Info size={16} strokeWidth={2} /></span>
+        <div className="demo-banner" role="status">
+          <span className="demo-banner-icon" aria-hidden="true">
+            <Info size={16} strokeWidth={2} />
+          </span>
           <span>
             데모 모드입니다. 실제 앱 데이터와 편집 기능은 로컬에서{' '}
             <code>pnpm dev</code> 실행 후 사용 가능합니다.
@@ -44,7 +46,7 @@ export default function AppLayout() {
         aria-expanded={mobileOpen}
         onClick={() => setMobileOpen((v) => !v)}
       >
-        <Menu size={20} strokeWidth={2} />
+        <Menu size={20} strokeWidth={2} aria-hidden="true" />
       </button>
       <div className={`layout-body${isDemo ? ' layout-body--demo' : ''}`}>
         <Sidebar

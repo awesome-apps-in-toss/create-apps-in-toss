@@ -10,8 +10,8 @@ export default function ClaudeStatus({ compact = false }: { compact?: boolean })
 
   if (loading && !diag) {
     return (
-      <div className="claude-status claude-status--loading">
-        <Terminal size={16} strokeWidth={1.75} />
+      <div className="claude-status claude-status--loading" role="status" aria-live="polite">
+        <Terminal size={16} strokeWidth={1.75} aria-hidden="true" />
         <span>Claude CLI 상태 확인 중…</span>
       </div>
     );
@@ -19,8 +19,8 @@ export default function ClaudeStatus({ compact = false }: { compact?: boolean })
 
   if (error) {
     return (
-      <div className="claude-status claude-status--error">
-        <XCircle size={16} strokeWidth={2} />
+      <div className="claude-status claude-status--error" role="alert">
+        <XCircle size={16} strokeWidth={2} aria-hidden="true" />
         <span>진단 API 호출 실패: {error}</span>
         <button
           type="button"
@@ -28,7 +28,7 @@ export default function ClaudeStatus({ compact = false }: { compact?: boolean })
           onClick={() => refetch()}
           aria-label="다시 시도"
         >
-          <RefreshCcw size={14} strokeWidth={1.75} />
+          <RefreshCcw size={14} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </div>
     );
@@ -47,8 +47,12 @@ export default function ClaudeStatus({ compact = false }: { compact?: boolean })
   const Icon = level === 'ok' ? CheckCircle2 : level === 'warn' ? AlertTriangle : XCircle;
 
   return (
-    <div className={`claude-status claude-status--${level} ${compact ? 'claude-status--compact' : ''}`}>
-      <Icon size={16} strokeWidth={2} className="claude-status-icon" />
+    <div
+      className={`claude-status claude-status--${level} ${compact ? 'claude-status--compact' : ''}`}
+      role={level === 'error' ? 'alert' : 'status'}
+      aria-live={level === 'error' ? 'assertive' : 'polite'}
+    >
+      <Icon size={16} strokeWidth={2} className="claude-status-icon" aria-hidden="true" />
       <div className="claude-status-body">
         <div className="claude-status-message">{diag.message}</div>
         {!compact && (
@@ -68,7 +72,7 @@ export default function ClaudeStatus({ compact = false }: { compact?: boolean })
         aria-label="다시 확인"
         title="다시 확인"
       >
-        <RefreshCcw size={14} strokeWidth={1.75} />
+        <RefreshCcw size={14} strokeWidth={1.75} aria-hidden="true" />
       </button>
     </div>
   );

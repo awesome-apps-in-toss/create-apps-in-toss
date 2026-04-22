@@ -359,12 +359,13 @@ router.post('/:runId/input', (req, res) => {
     res.status(404).json({ error: 'run not found' });
     return;
   }
-  const body = req.body as { text?: unknown };
+  const body = req.body as { text?: unknown; toolUseId?: unknown };
   if (typeof body.text !== 'string') {
     res.status(400).json({ error: 'text (string) required' });
     return;
   }
-  const result = session.sendInput(body.text);
+  const toolUseId = typeof body.toolUseId === 'string' ? body.toolUseId : undefined;
+  const result = session.sendInput(body.text, toolUseId ? { toolUseId } : {});
   if (!result.ok) {
     res.status(409).json({ error: result.reason });
     return;

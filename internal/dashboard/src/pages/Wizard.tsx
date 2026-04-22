@@ -171,7 +171,7 @@ export default function Wizard() {
           {displayName}
         </button>
         <span className="breadcrumb-sep">/</span>
-        <span>출시 위저드</span>
+        <span>앱 만들기 마법사</span>
       </div>
 
       <header className="wizard-header">
@@ -181,8 +181,8 @@ export default function Wizard() {
             <h1 className="wizard-title">{displayName}</h1>
             <p className="wizard-subtitle">
               {nextStep
-                ? `다음 단계: Step ${nextStep.step} · ${nextStep.label}`
-                : '모든 단계가 완료되었습니다 🎉'}
+                ? `다음 단계: ${nextStep.step}단계 · ${nextStep.label}`
+                : '모든 단계를 완료했어요 🎉'}
             </p>
           </div>
         </div>
@@ -196,7 +196,7 @@ export default function Wizard() {
           aria-valuetext={`${completedCount} of ${pipeline.length} steps completed`}
         >
           <div className="wizard-progress-label">
-            {completedCount} / {pipeline.length} 단계
+            {pipeline.length}단계 중 {completedCount}단계 완료
           </div>
           <div className="wizard-progress-bar">
             <div className="wizard-progress-fill" style={{ width: `${progressPct}%` }} />
@@ -377,7 +377,7 @@ function ActiveStepCard({
       aria-labelledby="wizard-active-step-title"
     >
       <div className="wizard-active-head">
-        <div className="wizard-active-step-label">Step {step.step}</div>
+        <div className="wizard-active-step-label">{step.step}단계</div>
         <h2 id="wizard-active-step-title" className="wizard-active-title">
           {running ? <Loader2 size={18} strokeWidth={1.75} className="spin" /> : <Rocket size={18} strokeWidth={1.75} />}
           {step.label}
@@ -386,16 +386,16 @@ function ActiveStepCard({
       <p className="wizard-active-desc">{step.description}</p>
       {reviewMode && (
         <aside className="wizard-review-notice">
-          기존 기획서 <code>{forcedPrdPath ?? app.console.prdPath}</code> 를 정책 관점에서 검토합니다.
+          <code>{forcedPrdPath ?? app.console.prdPath}</code> 기획서를 AI가 읽고
           <br />
-          /ait-plan 이 파일을 읽고 Phase 0(앱인토스 정책) → BM → 리스크 순으로 짚어줘요.
+          앱인토스 정책 → 비즈니스 모델 → 리스크 순으로 짚어드려요.
         </aside>
       )}
       <p className="wizard-active-produces">
-        결과물 → <strong>{step.produces}</strong>
+        이 단계가 만드는 것 → <strong>{step.produces}</strong>
       </p>
       {step.requires && (
-        <p className="wizard-active-requires">선행 단계: {step.requires}</p>
+        <p className="wizard-active-requires">먼저 완료돼야 해요: {step.requires}</p>
       )}
 
       {running && latestRun ? (
@@ -452,11 +452,11 @@ function ActiveStepCard({
               const ctaDisabled =
                 isDemo || starting || inputState.missingRequired || ideaTooShort;
               const errorHint = isDemo
-                ? '로컬에서 pnpm dev 실행 시 사용 가능'
+                ? '내 PC에서 대시보드를 실행한 뒤 사용할 수 있어요'
                 : ideaTooShort
-                  ? '아이디어를 5자 이상 적거나, 기획 문서 경로를 지정해주세요'
+                  ? '아이디어를 한 문장 이상 적어 주세요 (이미 기획서가 있다면 위에 파일 경로를 입력하세요)'
                   : inputState.missingRequired
-                    ? '필수 입력이 비어있습니다'
+                    ? '필수 입력 칸이 비어 있어요'
                     : undefined;
               const hintVisible = ctaDisabled && !!errorHint;
               return (
@@ -470,11 +470,11 @@ function ActiveStepCard({
                     aria-describedby={hintVisible ? 'wizard-cta-hint' : undefined}
                   >
                     {starting
-                      ? '시작 중…'
+                      ? '시작하는 중…'
                       : retryable
-                        ? '다시 시도'
+                        ? '다시 시작'
                         : reviewMode
-                          ? '정책 검토 시작'
+                          ? 'AI 검토 시작'
                           : '이 단계 시작'}
                   </button>
                   {hintVisible && (
