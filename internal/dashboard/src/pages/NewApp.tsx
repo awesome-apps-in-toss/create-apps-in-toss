@@ -76,8 +76,10 @@ export default function NewApp() {
             onChange={(e) => setAppName(e.target.value)}
             disabled={submitting}
             required
+            aria-describedby={`new-app-name-hint${error ? ' new-app-error' : ''}`}
+            aria-invalid={error ? true : undefined}
           />
-          <p className="new-app-hint">영문 소문자와 하이픈(-)만 사용 가능합니다.</p>
+          <p id="new-app-name-hint" className="new-app-hint">영문 소문자와 하이픈(-)만 사용 가능합니다.</p>
         </div>
 
         <div className="new-app-field">
@@ -168,7 +170,7 @@ export default function NewApp() {
         </div>
 
         {error && (
-          <div className="new-app-error" role="alert">
+          <div id="new-app-error" className="new-app-error" role="alert">
             {error}
           </div>
         )}

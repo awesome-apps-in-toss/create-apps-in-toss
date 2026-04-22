@@ -232,11 +232,45 @@ UX 플로우 상세화   → ASCII 목업 그려서 확인
 
 PRD가 충분히 완성되면 사용자에게 저장 여부를 확인한 뒤 파일로 저장한다.
 
-**저장 경로**: `docs/prd/{앱명}-prd-v{버전}.md`
+**실행 컨텍스트에 따라 저장 방식이 다르다**:
 
-- 예: `docs/prd/coupon-wallet-prd-v0.1.md`
+#### (A) 대시보드 세션 — `[Dashboard session contract]` 가 시스템 프롬프트에 주입돼 있으면
+
+"기존 PRD 를 제자리에 갱신(overwrite)" 로 동작한다.
+
+1. 사용자 입력 `planningDoc` 경로(또는 `app.console.prdPath`)가 **있으면**: 그 경로에 덮어쓴다. 버전 파일 누적 금지.
+2. `planningDoc` 이 없으면 (신규 생성 케이스): `docs/prd/{appName}-prd.md` (버전 suffix 없이) 로 저장.
+3. 버전 bump 나 `-v0.2.md` 같은 새 파일 생성 금지 — 히스토리는 git 으로만 추적한다.
+
+이유: 대시보드는 `app.console.prdPath` 로 현재 PRD 를 참조하므로, 경로가 매번 바뀌면 UI 정합이 깨진다. overwrite 하면 diff 추적은 git 에 맡기고 경로는 안정적으로 유지할 수 있다.
+
+#### (B) CLI / 외부 호출 — `[Dashboard session contract]` 가 없으면
+
+기존 방식대로 버전 파일로 저장한다.
+
+- 경로: `docs/prd/{앱명}-prd-v{버전}.md` (예: `docs/prd/coupon-wallet-prd-v0.1.md`)
 - `docs/prd/` 폴더가 없으면 생성
 - 이미 파일이 존재하면 버전 번호를 올려서 새 파일로 저장
+
+---
+
+### Phase 6. 종료
+
+PRD 저장이 끝나면 **짧은 완료 보고 한 번** 출력하고 세션을 마무리한다.
+
+**형식**:
+
+```
+✅ PRD 저장: <저장한 파일 경로>
+<한 줄 요약 — 앱명, 핵심 BM, 다음 단계 산출물 1개 정도>
+```
+
+**반드시 지킬 것**:
+
+- 추가 AskUserQuestion 호출 금지 — 사용자가 추가 수정 요청을 보내기 전까지는 새 질문을 던지지 않는다.
+- "이제 `/ait-scaffold` 로 넘어가세요" 같은 **CLI 스킬 호출 권유 문구 금지** (대시보드 세션일 때). 대시보드가 다음 단계 카드를 자동으로 표시한다.
+- CLI 세션일 때만 "다음은 /ait-scaffold 로 스캐폴딩 가능합니다" 형태의 안내를 1줄 덧붙여도 된다.
+- 사과/추임새 최소화, 본론만.
 
 ---
 

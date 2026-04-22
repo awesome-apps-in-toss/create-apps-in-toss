@@ -193,6 +193,32 @@ export class RunSession {
     }
   }
 
+  /**
+   * 사용자가 대시보드에서 "이 단계 완료" 를 눌렀을 때 호출.
+   * stdin 을 닫아 CLI 가 현재 턴을 마무리하고 스스로 exit 하게 한다 (→ COMPLETED).
+   * cancel() 과 달리 SIGTERM 을 보내지 않으므로, 진행 중이던 tool_use 는 정상 완료된다.
+   * 이미 terminal 이면 no-op.
+   */
+  finishInteractive(): { ok: true } | { ok: false; reason: string } {
+    if (TERMINAL_STATES.has(this.state)) {
+      return { ok: false, reason: `session is ${this.state}` };
+    }
+    if (this.mode !== 'interactive') {
+      return { ok: false, reason: 'finishInteractive only applies to interactive sessions' };
+    }
+    try {
+      this.child.stdin.end();
+      return { ok: true };
+    } catch (err) {
+      this.emit({
+        kind: 'error',
+        data: { message: err instanceof Error ? err.message : String(err) },
+        at: new Date().toISOString(),
+      });
+      return { ok: false, reason: 'stdin end failed' };
+    }
+  }
+
   async cancel(): Promise<void> {
     if (TERMINAL_STATES.has(this.state)) return;
     try {

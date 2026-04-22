@@ -427,6 +427,18 @@ export async function cancelRun(runId: string): Promise<void> {
   await fetch(`/api/orchestrations/${runId}/cancel`, { method: 'POST' });
 }
 
+/**
+ * POST /api/orchestrations/:runId/finish — interactive 세션을 graceful 하게 종료.
+ * stdin 만 닫아서 CLI 가 현재 턴을 마무리한 뒤 자연스럽게 exit 하게 한다 (→ COMPLETED).
+ */
+export async function finishRun(runId: string): Promise<void> {
+  const res = await fetch(`/api/orchestrations/${runId}/finish`, { method: 'POST' });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({ error: 'unknown' }))) as { error?: string };
+    throw new Error(err.error ?? `Failed to finish run: ${res.status}`);
+  }
+}
+
 /** POST /api/orchestrations/:runId/input — non-2xx 는 throw 해서 호출부가 UX 피드백 띄울 수 있도록. */
 export async function sendRunInput(runId: string, text: string): Promise<void> {
   const res = await fetch(`/api/orchestrations/${runId}/input`, {

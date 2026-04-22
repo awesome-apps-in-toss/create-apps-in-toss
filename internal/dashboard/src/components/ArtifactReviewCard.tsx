@@ -141,7 +141,7 @@ function AssetsReview({ app }: { app: AppInfo }) {
             <figure className="artifact-asset-figure">
               <img
                 src={`/api/apps/${app.folderName}/asset?path=${encodeURIComponent(logoPath)}`}
-                alt="logo"
+                alt=""
                 width={64}
                 height={64}
                 className="asset-preview asset-preview-square"
@@ -153,7 +153,7 @@ function AssetsReview({ app }: { app: AppInfo }) {
             <figure className="artifact-asset-figure">
               <img
                 src={`/api/apps/${app.folderName}/asset?path=${encodeURIComponent(thumbnailPath)}`}
-                alt="thumbnail"
+                alt=""
                 width={128}
                 height={55}
                 className="asset-preview asset-preview-wide"
@@ -165,7 +165,7 @@ function AssetsReview({ app }: { app: AppInfo }) {
             <figure key={p} className="artifact-asset-figure">
               <img
                 src={`/api/apps/${app.folderName}/asset?path=${encodeURIComponent(p)}`}
-                alt={`screenshot ${i + 1}`}
+                alt=""
                 width={48}
                 height={80}
                 className="asset-preview asset-preview-screenshot"

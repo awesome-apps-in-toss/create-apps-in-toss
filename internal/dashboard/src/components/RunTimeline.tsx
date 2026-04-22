@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import {
   AlertCircle,
@@ -16,6 +16,7 @@ import ArtifactReviewCard from '@/components/ArtifactReviewCard';
 import RunErrorCard from '@/components/RunErrorCard';
 import {
   cancelRun,
+  finishRun,
   sendRunInput,
   startRun,
   TERMINAL_RUN_STATES,
@@ -262,8 +263,10 @@ export default function RunTimeline({
                 {!suppressLivePanel && activeRunId && latest?.runId === activeRunId && (
                   <RunLivePanel
                     runId={activeRunId}
+                    interactive={step.mode === 'interactive'}
                     onClose={() => setActiveRunId(null)}
                     onDone={() => {
+                      // 타임라인 경로에서는 아직 artifact 파이프가 없으므로 기존 동작 유지.
                       void refetch().then(() => {
                         if (latest && onRunComplete) onRunComplete(latest);
                       });
@@ -352,17 +355,28 @@ function formatTime(iso: string): string {
   }
 }
 
+/** run 이 terminal 에 도달했을 때 부모로 전달되는 결과. */
+export interface RunCompletionResult {
+  /** 이 run 에서 감지된 Write/Edit artifact 들. 마지막 항목이 최신 산출물인 경우가 일반적. */
+  artifacts: Array<{ path?: string }>;
+}
+
 export function RunLivePanel({
   runId,
   onClose,
   onDone,
   embedded = false,
+  interactive = false,
 }: {
   runId: string;
   onClose: () => void;
-  onDone: () => void;
+  /** terminal 도달 시 한 번만 호출. 부모가 artifact 로부터 후속 액션(예: prdPath 갱신)을 수행할 수 있도록 */
+  onDone: (result: RunCompletionResult) => void;
   /** true 면 viewport 전체가 아니라 부모 카드 안에 박힌 스타일로. */
   embedded?: boolean;
+  /** interactive 스킬이면 "이 단계 완료" 버튼으로 stdin 을 graceful 종료할 수 있게 한다.
+   *  automated 스킬은 어차피 한 턴 뒤 CLI 가 자연 exit 하므로 버튼 불필요. */
+  interactive?: boolean;
 }) {
   const { state, logs, streamingText, artifacts, questions, error, markLatestQuestionAnswered } =
     useRunStream(runId);
@@ -373,6 +387,8 @@ export function RunLivePanel({
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
   const [multiSelections, setMultiSelections] = useState<Set<string>>(new Set());
   const inputLabelId = useId();
   const inputHintId = useId();
@@ -406,12 +422,17 @@ export function RunLivePanel({
     });
   }, [logs, streamingText]);
 
+  // onDone 콜백이 부모 리렌더마다 새 함수로 바뀌어도 useEffect 가 다시 트리거되지 않게 ref 로 고정.
+  // doneFiredRef 가 이미 막고 있긴 하지만, artifacts 배열이 쌓이는 중에 effect deps 가 흔들리는 걸 피한다.
+  const onDoneRef = useRef(onDone);
+  useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
+
   useEffect(() => {
     if (state && TERMINAL_RUN_STATES.has(state) && !doneFiredRef.current) {
       doneFiredRef.current = true;
-      onDone();
+      onDoneRef.current({ artifacts });
     }
-  }, [state, onDone]);
+  }, [state, artifacts]);
 
   const waitingInput = state === 'WAITING_USER_INPUT';
 
@@ -492,6 +513,19 @@ export function RunLivePanel({
     await submitAnswer(free ? `${joined} (${free})` : joined);
   }
 
+  async function handleFinish() {
+    if (finishing) return;
+    setFinishing(true);
+    setFinishError(null);
+    try {
+      await finishRun(runId);
+      // 서버에서 stdin 을 닫으면 CLI 가 턴을 마무리하고 exit → state 전이 → onDone 자동 발화.
+    } catch (e) {
+      setFinishError(e instanceof Error ? e.message : 'Failed to finish');
+      setFinishing(false);
+    }
+  }
+
   const describedBy = [
     activeQuestion ? questionId : null,
     inputHintId,
@@ -537,7 +571,10 @@ export function RunLivePanel({
               <LogEntry key={`${index}-${entry.text.slice(0, 24)}`} entry={entry} />
             ))}
             {streamingText !== null && (
-              <div className="run-live-panel-line run-live-panel-line--streaming">
+              <div
+                className="run-live-panel-line run-live-panel-line--streaming"
+                aria-hidden="true"
+              >
                 <MarkdownText text={streamingText || '…'} />
                 <span className="run-live-panel-caret" aria-hidden="true" />
               </div>
@@ -598,7 +635,7 @@ export function RunLivePanel({
                 else void handleSend();
               }
             }}
-            aria-labelledby={inputLabelId}
+            aria-label="메시지 입력"
             aria-describedby={describedBy || undefined}
             placeholder={
               hasOptions
@@ -616,12 +653,24 @@ export function RunLivePanel({
             </div>
           )}
           <div className="run-live-panel-input-actions">
+            {interactive && (
+              <button
+                type="button"
+                className="run-live-panel-finish"
+                onClick={() => void handleFinish()}
+                disabled={finishing || sending}
+                title="이 단계를 완료 처리하고 대시보드가 다음 단계로 넘어가도록 합니다"
+              >
+                {finishing ? '완료 처리 중…' : '이 단계 완료 · 다음으로'}
+              </button>
+            )}
             <button
               type="button"
               className="run-live-panel-send"
               onClick={() => void (isMultiSelect ? handleSendMulti() : handleSend())}
               disabled={
                 sending ||
+                finishing ||
                 (isMultiSelect
                   ? multiSelections.size === 0 && inputText.trim().length === 0
                   : inputText.trim().length === 0)
@@ -634,6 +683,11 @@ export function RunLivePanel({
                   : '전송'}
             </button>
           </div>
+          {finishError && (
+            <div className="run-live-panel-input-error" role="alert">
+              완료 처리 실패: {finishError}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -677,7 +731,6 @@ function QuestionCard({ question, id }: { question: RunQuestion; id: string }) {
       id={id}
       className="run-live-panel-question"
       role="status"
-      aria-live="assertive"
     >
       {question.header && <span className="run-live-panel-question-tag">{question.header}</span>}
       <strong>Claude의 질문</strong>
@@ -699,23 +752,61 @@ function OptionChoices({
   onPick: (label: string) => void;
   disabled: boolean;
 }) {
+  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  // For the radio pattern: determine the currently "focusable" radio.
+  // If one is selected, it is focusable; otherwise the first one is.
+  const selectedIndex = multiSelect
+    ? -1
+    : (() => {
+        const idx = options.findIndex((o) => selected.has(o.label));
+        return idx >= 0 ? idx : 0;
+      })();
+
+  const handleRadioKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (multiSelect) return;
+    const lastIndex = options.length - 1;
+    let nextIndex: number | null = null;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      nextIndex = index === lastIndex ? 0 : index + 1;
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      nextIndex = index === 0 ? lastIndex : index - 1;
+    } else if (e.key === 'Home') {
+      nextIndex = 0;
+    } else if (e.key === 'End') {
+      nextIndex = lastIndex;
+    }
+    if (nextIndex === null) return;
+    e.preventDefault();
+    const nextOpt = options[nextIndex];
+    if (!nextOpt) return;
+    // APG: for radios, moving focus also selects.
+    onPick(nextOpt.label);
+    buttonRefs.current[nextIndex]?.focus();
+  };
+
   return (
     <div
       className={`run-live-panel-options${multiSelect ? ' run-live-panel-options--multi' : ''}`}
       role={multiSelect ? 'group' : 'radiogroup'}
       aria-label="응답 선택지"
     >
-      {options.map((opt) => {
+      {options.map((opt, index) => {
         const isSelected = selected.has(opt.label);
+        const isRadioFocusable = !multiSelect && index === selectedIndex;
         return (
           <button
             key={opt.label}
+            ref={(el) => {
+              buttonRefs.current[index] = el;
+            }}
             type="button"
             className={`run-live-panel-option${isSelected ? ' is-selected' : ''}`}
             onClick={() => onPick(opt.label)}
+            onKeyDown={multiSelect ? undefined : (e) => handleRadioKeyDown(e, index)}
             disabled={disabled}
             role={multiSelect ? 'checkbox' : 'radio'}
-            aria-checked={multiSelect ? isSelected : undefined}
+            aria-checked={isSelected}
+            tabIndex={multiSelect ? undefined : isRadioFocusable ? 0 : -1}
           >
             <span className="run-live-panel-option-label">{opt.label}</span>
             {opt.description && (

@@ -14,6 +14,18 @@ export default function AppLayout() {
     setMobileOpen(false);
   }, [location.pathname]);
 
+  // 모바일 drawer 가 열려있는 동안 Escape 키로 닫히도록.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileOpen(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [mobileOpen]);
+
   return (
     <div className="layout">
       {isDemo && (

@@ -34,6 +34,7 @@ const DASHBOARD_SYSTEM_NOTE = [
   '이 세션은 대시보드(React UI) 안에서 돌고 있고, AskUserQuestion 은 그 UI 로 라우팅된다.',
   'CLI 관측 동작: AskUserQuestion 을 호출하면 즉시 `{ type: "tool_result", is_error: true, content: "Answer questions?" }` 가 반환되지만, 이건 stream-json 모드의 transport artifact 일 뿐 사용자 취소/거부 신호가 아니다. 대시보드는 질문을 사용자에게 보여주고 실제 답변은 다음 user 메시지로 전달한다.',
   '반드시 지켜야 할 것: (1) "Answer questions?" tool_result 를 "질문이 취소됐다"/"사용자가 거부했다" 로 해석하지 말 것. (2) 사과하거나 "질문이 취소됐네요" 같은 문구를 출력하지 말 것. (3) 같은 AskUserQuestion 을 재호출해서 재질문하지 말 것 — 답변이 모호하면 자유 텍스트로 한 번만 되묻는다. (4) 다음 user 메시지를 방금 던진 질문의 답변으로 그대로 받아들여서 진행할 것.',
+  '[Termination contract] 이 세션은 한 번의 산출물(스킬 frontmatter 의 produces)을 만들어내면 끝나는 단발성 태스크다. 산출물을 저장한 뒤에는 다음 규칙을 지킨다: (a) 어떤 파일이 어디에 저장됐는지 한두 줄로 요약만 출력. (b) 더 이상 AskUserQuestion 을 호출하거나 "추가로 뭐 해드릴까요?" 같은 추가 질문을 하지 말 것. (c) 다음 스킬(`/ait-scaffold`, `/ait-tds-setup` 등)을 실행하라고 사용자에게 권유하지 말 것 — 대시보드가 다음 단계 카드를 자동으로 보여준다. (d) 요약 출력 후 사용자 입력을 기다리지 말고 턴을 끝낼 것. 사용자가 추가 수정 요청을 보내면 그때 다시 돌아와서 반영하면 된다.',
 ].join(' ');
 
 /**

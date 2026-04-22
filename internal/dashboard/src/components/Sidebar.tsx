@@ -84,7 +84,9 @@ export default function Sidebar({ apps, mobileOpen, onMobileClose }: SidebarProp
                 className="sidebar-app-dot"
                 style={{ opacity: app.completion >= 100 ? 1 : 0.3 }}
                 title={`${app.completion}%`}
+                aria-hidden="true"
               />
+              <span className="sr-only">{app.completion}% 완료</span>
             </NavLink>
           );
         })}

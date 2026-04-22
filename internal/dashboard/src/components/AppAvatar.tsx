@@ -43,6 +43,7 @@ export default function AppAvatar({ app, index, size = 'md' }: AppAvatarProps) {
       <div
         className={sizeClass}
         style={{ background: hexToRgba(primaryColor, 0.12), color: primaryColor }}
+        aria-hidden="true"
       >
         {initials}
       </div>
@@ -51,7 +52,11 @@ export default function AppAvatar({ app, index, size = 'md' }: AppAvatarProps) {
 
   const fallback = getFallbackColor(index);
   return (
-    <div className={sizeClass} style={{ background: fallback.bg, color: fallback.color }}>
+    <div
+      className={sizeClass}
+      style={{ background: fallback.bg, color: fallback.color }}
+      aria-hidden="true"
+    >
       {initials}
     </div>
   );

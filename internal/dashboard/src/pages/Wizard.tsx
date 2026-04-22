@@ -6,7 +6,7 @@ import { useSkills } from '@/hooks/useSkills';
 import { useRuns, startRun, TERMINAL_RUN_STATES } from '@/hooks/useRuns';
 import AppAvatar from '@/components/AppAvatar';
 import ClaudeStatus from '@/components/ClaudeStatus';
-import RunTimeline, { RunLivePanel } from '@/components/RunTimeline';
+import RunTimeline, { RunLivePanel, type RunCompletionResult } from '@/components/RunTimeline';
 import SkillInputForm from '@/components/SkillInputForm';
 import type { SkillInputState } from '@/components/SkillInputForm';
 import type { PipelineStep } from '@/hooks/useSkills';
@@ -14,6 +14,25 @@ import type { RunSummary } from '@/hooks/useRuns';
 import type { AppInfo } from '@/types';
 
 const DEFAULT_PRIMARY_COLOR = '#3182F6';
+
+/**
+ * run artifact 중 `docs/prd/*.md` 또는 `docs/PRD.md` 같은 PRD 경로만 뽑아 마지막 것을 반환.
+ * ait-plan 이 새로 저장한 PRD 파일을 감지해 console.prdPath 에 자동 반영하는 데 사용한다.
+ */
+function extractLatestPrdPath(artifacts: Array<{ path?: string }>): string | null {
+  let latest: string | null = null;
+  for (const a of artifacts) {
+    const p = a.path;
+    if (typeof p !== 'string') continue;
+    // 윈도우/유닉스 경로 모두 허용 — 두 구분자 다 체크.
+    const norm = p.replace(/\\/g, '/');
+    if (!norm.toLowerCase().endsWith('.md')) continue;
+    if (norm.includes('docs/prd/') || /(^|\/)docs\/prd\.md$/i.test(norm) || /(^|\/)docs\/PRD\.md$/.test(norm)) {
+      latest = norm;
+    }
+  }
+  return latest;
+}
 
 /**
  * 위저드 단계별로 app 메타데이터에서 뽑아 쓸 수 있는 기본값.
@@ -200,20 +219,29 @@ export default function Wizard() {
           onStarted={() => {
             void refetchRuns();
           }}
-          onRunComplete={() => {
-            // ait-plan 이 완료됐고 PRD 가 있었다면 자동으로 "정책 검토 완료" 로 기록.
-            // 이렇게 해야 배너가 반복해서 뜨지 않고 UX 가 매끄러워진다.
-            if (nextStep.skill === 'ait-plan' && app.console.prdPath) {
-              void fetch(`/api/apps/${app.folderName}/console`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  prdReviewedAt: new Date().toISOString(),
-                  prdSource: 'generated',
-                }),
-              }).catch(() => {
-                /* best-effort: 실패해도 UI 는 돌려받고 사용자가 "검토 완료" 버튼 다시 누를 수 있음. */
-              });
+          onRunComplete={(result) => {
+            // ait-plan 이 완료됐을 때 두 가지 자동 갱신:
+            //   (1) 이번 run 에서 새로 저장된 PRD (docs/prd/*.md) 가 있으면 console.prdPath 를 거기에 맞춘다.
+            //       사용자가 overwrite 가 아니라 새 경로로 저장했을 때도 UI 가 최신 파일을 가리키게 함.
+            //   (2) 기존에 prdPath 가 있었으면 (정책 검토 모드) "검토 완료" 타임스탬프만 기록해 배너가 재노출되는 걸 막는다.
+            if (nextStep.skill === 'ait-plan') {
+              const newPrd = extractLatestPrdPath(result?.artifacts ?? []);
+              const payload: Record<string, unknown> = {
+                prdReviewedAt: new Date().toISOString(),
+                prdSource: 'generated',
+              };
+              if (newPrd && newPrd !== app.console.prdPath) {
+                payload['prdPath'] = newPrd;
+              }
+              if (newPrd || app.console.prdPath) {
+                void fetch(`/api/apps/${app.folderName}/console`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload),
+                }).catch(() => {
+                  /* best-effort: 실패해도 UI 는 돌려받고 사용자가 수동 갱신 가능. */
+                });
+              }
             }
             void refetch();
             void refetchRuns();
@@ -265,7 +293,7 @@ function ActiveStepCard({
   /** URL 로 전달된 검토 대상 PRD 경로 (review 모드에서 사용) */
   forcedPrdPath?: string | null;
   onStarted: () => void;
-  onRunComplete: () => void;
+  onRunComplete: (result: RunCompletionResult) => void;
 }) {
   const appName = app.folderName;
   const { raw } = useSkills();
@@ -343,21 +371,25 @@ function ActiveStepCard({
   }
 
   return (
-    <section id="wizard-active-step" className="wizard-active-step">
+    <section
+      id="wizard-active-step"
+      className="wizard-active-step"
+      aria-labelledby="wizard-active-step-title"
+    >
       <div className="wizard-active-head">
         <div className="wizard-active-step-label">Step {step.step}</div>
-        <h2 className="wizard-active-title">
+        <h2 id="wizard-active-step-title" className="wizard-active-title">
           {running ? <Loader2 size={18} strokeWidth={1.75} className="spin" /> : <Rocket size={18} strokeWidth={1.75} />}
           {step.label}
         </h2>
       </div>
       <p className="wizard-active-desc">{step.description}</p>
       {reviewMode && (
-        <div className="wizard-review-notice" role="note">
+        <aside className="wizard-review-notice">
           기존 기획서 <code>{forcedPrdPath ?? app.console.prdPath}</code> 를 정책 관점에서 검토합니다.
           <br />
           /ait-plan 이 파일을 읽고 Phase 0(앱인토스 정책) → BM → 리스크 순으로 짚어줘요.
-        </div>
+        </aside>
       )}
       <p className="wizard-active-produces">
         결과물 → <strong>{step.produces}</strong>
@@ -371,6 +403,7 @@ function ActiveStepCard({
           <RunLivePanel
             runId={latestRun.runId}
             embedded
+            interactive={step.mode === 'interactive'}
             onClose={() => {
               /* embedded 에서는 닫기 버튼 자체가 없음. */
             }}
@@ -415,31 +448,43 @@ function ActiveStepCard({
           {error && <div className="wizard-error">{error}</div>}
 
           <div className="wizard-active-actions">
-            <button
-              type="button"
-              className="wizard-cta"
-              onClick={() => void handleStart()}
-              disabled={
-                isDemo || starting || inputState.missingRequired || ideaTooShort
-              }
-              title={
-                isDemo
-                  ? '로컬에서 pnpm dev 실행 시 사용 가능'
-                  : ideaTooShort
-                    ? '아이디어를 5자 이상 적거나, 기획 문서 경로를 지정해주세요'
-                    : inputState.missingRequired
-                      ? '필수 입력이 비어있습니다'
-                      : undefined
-              }
-            >
-              {starting
-                ? '시작 중…'
-                : retryable
-                  ? '다시 시도'
-                  : reviewMode
-                    ? '정책 검토 시작'
-                    : '이 단계 시작'}
-            </button>
+            {(() => {
+              const ctaDisabled =
+                isDemo || starting || inputState.missingRequired || ideaTooShort;
+              const errorHint = isDemo
+                ? '로컬에서 pnpm dev 실행 시 사용 가능'
+                : ideaTooShort
+                  ? '아이디어를 5자 이상 적거나, 기획 문서 경로를 지정해주세요'
+                  : inputState.missingRequired
+                    ? '필수 입력이 비어있습니다'
+                    : undefined;
+              const hintVisible = ctaDisabled && !!errorHint;
+              return (
+                <>
+                  <button
+                    type="button"
+                    className="wizard-cta"
+                    onClick={() => void handleStart()}
+                    disabled={ctaDisabled}
+                    title={errorHint}
+                    aria-describedby={hintVisible ? 'wizard-cta-hint' : undefined}
+                  >
+                    {starting
+                      ? '시작 중…'
+                      : retryable
+                        ? '다시 시도'
+                        : reviewMode
+                          ? '정책 검토 시작'
+                          : '이 단계 시작'}
+                  </button>
+                  {hintVisible && (
+                    <span id="wizard-cta-hint" className="sr-only">
+                      {errorHint}
+                    </span>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </>
       )}

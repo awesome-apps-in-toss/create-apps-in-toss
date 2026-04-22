@@ -108,12 +108,12 @@ function SkillInputField({
   const isFile = input.type === 'file';
 
   return (
-    <label className="skill-input-field">
-      <span className="skill-input-label">
+    <div className="skill-input-field">
+      <label className="skill-input-label" htmlFor={inputId}>
         {icon}
         {label}
         {input.required && <span className="skill-input-required">*</span>}
-      </span>
+      </label>
       <span id={hintId} className="skill-input-hint">
         {placeholder}
       </span>
@@ -195,7 +195,7 @@ function SkillInputField({
           onChange={(e) => onChange(e.target.value)}
         />
       )}
-    </label>
+    </div>
   );
 }
 

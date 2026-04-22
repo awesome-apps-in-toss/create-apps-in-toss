@@ -256,7 +256,7 @@ export default function AppDetail() {
   return (
     <main className="main">
       <div className="breadcrumb">
-        <button className="breadcrumb-back" onClick={() => void navigate('/')}>
+        <button type="button" className="breadcrumb-back" onClick={() => void navigate('/')}>
           ← 홈
         </button>
         <span className="breadcrumb-sep">/</span>
@@ -286,6 +286,7 @@ export default function AppDetail() {
           <h2 className="detail-section-title">출시 파이프라인</h2>
           <div className="pipeline-header-actions">
             <button
+              type="button"
               className={`btn-cli-copy ${copiedCmd === 'ait-launch' ? 'btn-cli-copy--copied' : ''}`}
               onClick={() => void copyCliCommand('ait-launch')}
               title="CLI에서 7단계 파이프라인 순차 실행 (클립보드 복사)"
@@ -293,6 +294,7 @@ export default function AppDetail() {
               {copiedCmd === 'ait-launch' ? '복사됨' : 'claude -p /ait-launch'}
             </button>
             <button
+              type="button"
               className="btn-pipeline-toggle"
               onClick={() => setPipelineExpanded((v) => !v)}
             >
@@ -404,6 +406,7 @@ export default function AppDetail() {
                   AI와 대화하며 정책 검토부터 PRD 작성까지 진행합니다.
                 </p>
                 <button
+                  type="button"
                   className={`btn-cli-copy ${copiedCmd === 'ait-plan' ? 'btn-cli-copy--copied' : ''}`}
                   onClick={() => void copyCliCommand('ait-plan')}
                   title="앱 폴더에서 실행"
@@ -457,7 +460,7 @@ export default function AppDetail() {
                 <span className="granite-icon-row">
                   <img
                     src={v}
-                    alt="icon"
+                    alt=""
                     className="granite-icon-preview"
                     loading="lazy"
                     decoding="async"
@@ -492,7 +495,7 @@ export default function AppDetail() {
                   <div className="asset-preview-row">
                     <img
                       src={assetUrl(app.folderName, app.console.logoPath)}
-                      alt="logo"
+                      alt=""
                       className="asset-preview asset-preview-square"
                       loading="lazy"
                       decoding="async"
@@ -505,6 +508,7 @@ export default function AppDetail() {
                   <div className="meta-display">
                     <span className="meta-empty">없음 (600x600)</span>
                     <button
+                      type="button"
                       className="btn-skill btn-skill-sm"
                       onClick={() => void runSkill('ait-assets')}
                       disabled={running || isDemo}
@@ -552,21 +556,18 @@ export default function AppDetail() {
                           />
                         )}
                         <button
+                          type="button"
                           className="btn-save"
                           onClick={() => void saveField()}
                           disabled={saving}
                         >
                           {saving ? '저장 중...' : '저장'}
                         </button>
-                        <button className="btn-cancel" onClick={cancelEdit}>
+                        <button type="button" className="btn-cancel" onClick={cancelEdit}>
                           취소
                         </button>
                         {saveError && (
-                          <span
-                            className="meta-error"
-                            role="alert"
-                            style={{ color: 'var(--color-danger)', fontSize: 11 }}
-                          >
+                          <span className="meta-error" role="alert">
                             {saveError}
                           </span>
                         )}
@@ -581,6 +582,7 @@ export default function AppDetail() {
                         <div className="meta-actions">
                           {field.copyable && value && (
                             <button
+                              type="button"
                               className={`btn-copy ${copied === field.key ? 'copied' : ''}`}
                               onClick={() => void handleCopy(field.key)}
                               title="클립보드에 복사"
@@ -589,6 +591,7 @@ export default function AppDetail() {
                             </button>
                           )}
                           <button
+                            type="button"
                             className="btn-edit"
                             onClick={() => startEdit(field.key)}
                             disabled={isDemo}
@@ -612,7 +615,7 @@ export default function AppDetail() {
                   <div className="asset-preview-row">
                     <img
                       src={assetUrl(app.folderName, app.console.thumbnailPath)}
-                      alt="thumbnail"
+                      alt=""
                       className="asset-preview asset-preview-wide"
                       loading="lazy"
                       decoding="async"
@@ -625,6 +628,7 @@ export default function AppDetail() {
                   <div className="meta-display">
                     <span className="meta-empty">없음 (1932x828)</span>
                     <button
+                      type="button"
                       className="btn-skill btn-skill-sm"
                       onClick={() => void runSkill('ait-assets')}
                       disabled={running || isDemo}
@@ -688,6 +692,7 @@ export default function AppDetail() {
           <div className="doc-actions">
             {!app.docs.ut.exists && (
               <button
+                type="button"
                 className="btn-skill btn-skill-sm"
                 onClick={() => void runSkill('ait-ut')}
                 disabled={running || isDemo}
@@ -753,18 +758,14 @@ function PathField({
               if (e.key === 'Escape') onCancel();
             }}
           />
-          <button className="btn-save" onClick={onSave} disabled={saving}>
+          <button type="button" className="btn-save" onClick={onSave} disabled={saving}>
             {saving ? '저장 중...' : '저장'}
           </button>
-          <button className="btn-cancel" onClick={onCancel}>
+          <button type="button" className="btn-cancel" onClick={onCancel}>
             취소
           </button>
           {saveError && (
-            <span
-              className="meta-error"
-              role="alert"
-              style={{ color: 'var(--color-danger)', fontSize: 11 }}
-            >
+            <span className="meta-error" role="alert">
               {saveError}
             </span>
           )}
@@ -781,7 +782,7 @@ function PathField({
           )}
           {autoDetected && <span className="path-auto-badge">자동 감지</span>}
           {exists && date && <span className="doc-date">{date}</span>}
-          <button className="btn-edit" onClick={() => onEdit(field)}>
+          <button type="button" className="btn-edit" onClick={() => onEdit(field)}>
             편집
           </button>
         </div>
@@ -804,6 +805,7 @@ function MarkdownViewer({
   const [modal, setModal] = useState(false);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
   const reactId = useId();
   const titleId = `md-modal-title-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
@@ -842,6 +844,37 @@ function MarkdownViewer({
       if (e.key === 'Escape') {
         e.preventDefault();
         setModal(false);
+        return;
+      }
+      // 포커스 트랩: Tab / Shift+Tab 이 모달 밖으로 빠져나가지 않도록 순환시킴
+      if (e.key === 'Tab') {
+        const root = modalRef.current;
+        if (!root) return;
+        const focusables = Array.from(
+          root.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter(
+          (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true'
+        );
+        if (focusables.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        const first = focusables[0]!;
+        const last = focusables[focusables.length - 1]!;
+        const active = document.activeElement as HTMLElement | null;
+        if (e.shiftKey) {
+          if (active === first || !root.contains(active)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (active === last || !root.contains(active)) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -861,7 +894,7 @@ function MarkdownViewer({
           <ReactMarkdown>{content}</ReactMarkdown>
         </div>
         <div className="md-preview-fade" />
-        <button className="md-expand-btn" onClick={() => setModal(true)}>
+        <button type="button" className="md-expand-btn" onClick={() => setModal(true)}>
           크게 보기
         </button>
       </div>
@@ -873,6 +906,7 @@ function MarkdownViewer({
           onClick={() => setModal(false)}
         >
           <div
+            ref={modalRef}
             className="md-modal"
             role="dialog"
             aria-modal="true"
@@ -885,6 +919,7 @@ function MarkdownViewer({
               </span>
               <button
                 ref={closeBtnRef}
+                type="button"
                 className="md-modal-close"
                 onClick={() => setModal(false)}
                 aria-label="닫기"

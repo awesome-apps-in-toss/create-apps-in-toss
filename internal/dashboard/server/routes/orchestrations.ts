@@ -372,6 +372,24 @@ router.post('/:runId/input', (req, res) => {
   res.json({ ok: true, state: session.state });
 });
 
+// POST /api/orchestrations/:runId/finish
+// interactive 세션을 graceful 하게 종료 (stdin 닫기 → 현재 턴 마무리 후 CLI 자연 exit → COMPLETED).
+// cancel 과 달리 SIGTERM 을 보내지 않는다. 사용자가 대시보드에서 "이 단계 완료" 를 눌렀을 때 사용.
+router.post('/:runId/finish', (req, res) => {
+  const runId = req.params['runId'];
+  const session = runId ? runSessions.get(runId) : undefined;
+  if (!session) {
+    res.status(404).json({ error: 'run not found' });
+    return;
+  }
+  const result = session.finishInteractive();
+  if (!result.ok) {
+    res.status(409).json({ error: result.reason });
+    return;
+  }
+  res.json({ ok: true, state: session.state });
+});
+
 // POST /api/orchestrations/:runId/cancel
 router.post('/:runId/cancel', async (req, res) => {
   const runId = req.params['runId'];
