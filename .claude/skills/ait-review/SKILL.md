@@ -1,14 +1,13 @@
 ---
 name: ait-review
 description: 앱인토스 검수 체크리스트 기반 코드 리뷰. light(핵심만)/full(전수검사) 모드 지원
-argument-hint: '<app-name> [light|full] [game|partner]'
+argument-hint: '[light|full] [game|partner]'
 mode: automated
 step: 6
 label: 검수
 produces: 검수 리포트
 requires: [ait-implement]
 inputs:
-  - { key: appName, type: text, required: true }
   - { key: reviewMode, type: enum, values: [light, full], required: false }
   - { key: appType, type: enum, values: [game, partner], required: false }
 outputs:
@@ -22,11 +21,12 @@ idempotencyKey: ait-review
 
 ## 입력
 
-- **앱 이름**: 대상 앱 (`$ARGUMENTS`의 첫 번째 인자 또는 사용자에게 확인)
-- **검수 모드**: `$ARGUMENTS`의 두 번째 인자 — `light`(기본) 또는 `full`
+- **검수 모드**: `$ARGUMENTS`의 첫 번째 인자 — `light`(기본) 또는 `full`
   - `light`: 설정/TDS/코드 품질 등 핵심 항목만 자동 점검
   - `full`: 공식 게임/비게임 출시 가이드 전수 검사
-- **앱 유형**: `$ARGUMENTS`의 세 번째 인자 — `game` 또는 `partner` (없으면 granite.config.ts에서 확인)
+- **앱 유형**: `$ARGUMENTS`의 두 번째 인자 — `game` 또는 `partner` (없으면 granite.config.ts에서 확인)
+
+(앱 이름은 cwd 가 이미 `apps/<app-name>` 에 고정돼 있으므로 별도 인자로 받지 않는다.)
 
 ## 실행 절차
 
@@ -52,6 +52,28 @@ idempotencyKey: ait-review
 ## 결과물
 
 전체 체크리스트 점검 결과표와 수정 완료 보고
+
+---
+
+## 종료
+
+체크리스트 점검 · 자동 수정이 끝나면 **짧은 완료 보고 한 번**만 출력하고 세션을 마무리한다.
+
+**형식**:
+
+```
+✅ 검수 완료 (mode: light|full)
+PASS: <개수> · FAIL: <개수> · MANUAL: <개수>
+자동 수정: <수정한 항목 요약>
+```
+
+**반드시 지킬 것**:
+
+- 다음 단계로 **어떤 슬래시 커맨드도** 권유하지 말 것. 대시보드가 파이프라인 카드로 다음 단계를 자동 안내한다.
+- `.meta-dashboard.json` 을 직접 편집하지 말 것. 소스 · 설정 변경만 하면 대시보드 서버가 자동 감지·반영한다.
+- 사과/추임새 최소화, 본론만.
+
+---
 
 ## UI 디자인 리뷰 보강 (impeccable 스킬 연계)
 

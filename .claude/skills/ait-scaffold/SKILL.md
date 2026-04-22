@@ -1,14 +1,13 @@
 ---
 name: ait-scaffold
-description: 미니앱 기본 틀(React + Vite + granite)을 세팅하고, 필요한 추가 기능(라우팅/서버 데이터/TDS 등) 을 사용자에게 확인해 맞춤 설치합니다.
+description: 미니앱 기본 틀(React + Vite + granite)을 세팅하고, PRD 에 맞춰 라우팅/서버 데이터/TDS 를 자동 판단해 설치합니다.
 argument-hint: '<app-name>'
-mode: interactive
+mode: automated
 step: 3
 label: 프로젝트 틀 만들기
 produces: 최소 앱 구조 + 선택한 추가 기능
 requires: [ait-plan]
 inputs:
-  - { key: appName, type: text, required: true }
   - { key: displayName, type: text, required: false }
   - { key: primaryColor, type: color, required: false }
   - { key: appType, type: select, values: [partner, game], required: false }
@@ -29,7 +28,13 @@ idempotencyKey: ait-scaffold
 
 ## 실행 절차
 
-### 1. 최소 스캐폴딩
+### 0. Idempotent 체크
+
+`apps/<app-name>/` 이 이미 존재하고 `package.json` 이 stub(`barreleye:stub: true`) 이 아니면, step 1 은 스킵하고 바로 step 2 로 넘어간다. 대시보드의 `full` 모드는 NewApp 단계에서 이미 `pnpm new-app` 을 끝내고 진입하므로 이 경로가 기본이다.
+
+### 1. 최소 스캐폴딩 (필요 시만)
+
+앱 폴더가 없거나 stub 상태면:
 
 ```bash
 pnpm new-app <app-name>
@@ -43,29 +48,23 @@ pnpm install
 
 ### 2. granite.config.ts 정리
 
-사용자에게 확인:
-- **displayName** (한국어 앱 이름)
-- **primaryColor** (HEX)
-- **appType**: `partner` (일반) / `game`
+대시보드 inputs(`displayName`, `primaryColor`, `appType`) 가 전달됐으면 그 값으로 `apps/<app-name>/granite.config.ts` 를 수정한다. 누락된 값은 PRD 에서 추론하고, 그래도 애매하면 안전한 기본값(`displayName` = 영문 appName 의 공백 분해, `primaryColor` = `#3182F6`, `appType` = `partner`)을 사용한 뒤 완료 보고에 "선택: X (이유: ...)" 로 명시한다.
 
-입력 값으로 `apps/<app-name>/granite.config.ts` 를 수정합니다.
+### 3. PRD 기반 추가 기능 자동 판단
 
-### 3. PRD 기반 추가 기능 제안
+**`app.console.prdPath`** 또는 `docs/prd/*.md` 를 읽어, 아래 규칙으로 **질문 없이 스스로** 결정한다. 결정과 근거는 완료 보고에 한 줄씩 남겨 사용자가 사후에 추가/제거할 수 있게 한다.
 
-**`app.console.prdPath`** 또는 `docs/prd/*.md` 를 읽어, 기획 내용에 맞춰 아래를 **AskUserQuestion 으로 개별 확인**합니다.
-
-| 기능 | 판단 기준 | 설치 스킬 |
+| 기능 | 설치 규칙 | 설치 스킬 |
 |------|-----------|-----------|
-| 화면 이동 (React Router) | PRD 에 "홈/상세/결과" 같은 **2개 이상 화면**이 등장하면 제안 | `/ait-add-routing` |
-| 서버 데이터 (TanStack Query) | PRD 에 "API", "서버에서 가져와서", "외부 데이터" 문구가 있거나, 로컬 저장으로 충분하지 않으면 제안 | `/ait-add-query` |
-| 토스 스타일 UI (TDS) | 비게임(`partner`) 앱이면 기본 제안 (앱인토스 정책상 **필수**). 게임은 스킵 | `/ait-tds-setup` |
+| 화면 이동 (React Router) | PRD 에 "홈/상세/결과" 같은 **2개 이상 화면**이 등장하면 설치. 애매하면 설치 안 함. | `/ait-add-routing` |
+| 서버 데이터 (TanStack Query) | PRD 에 "API", "서버에서 가져와서", "외부 데이터" 문구가 있으면 설치. 로컬 저장으로 충분해 보이면 설치 안 함. | `/ait-add-query` |
+| 토스 스타일 UI (TDS) | 비게임(`partner`) 앱이면 **항상 설치** (앱인토스 정책상 필수). 게임(`game`)은 스킵. | `/ait-tds-setup` |
 
-각 질문은 "필요한지 모르겠으면 스킵해도 됨. 나중에 다시 붙일 수 있음" 이라는 안전망을 넣으세요.
+PRD 가 없거나 비어있으면: 라우팅·쿼리는 스킵, TDS 는 appType 규칙대로. 이유를 완료 보고에 명시.
 
-### 4. 선택된 스킬 순차 실행
+### 4. 결정된 추가 스킬 순차 실행
 
-사용자가 "예" 라고 답한 스킬을 순서대로 실행합니다.
-각 스킬은 독립적으로 idempotent 해야 하며, 이미 붙어있으면 건너뜁니다.
+위 규칙으로 "설치" 로 판정된 스킬을 순서대로 실행한다. 각 스킬은 독립적으로 idempotent 해야 하며, 이미 붙어있으면 건너뛴다. 설치 중 에러가 나면 해당 스킬만 스킵하고 사유를 보고에 남긴 뒤 다음으로 진행 — 멈추지 않는다.
 
 ### 5. 검증
 
@@ -99,7 +98,7 @@ typecheck / dev 서버 OK
 
 **반드시 지킬 것**:
 
-- 추가 AskUserQuestion 호출 금지 — 사용자가 수정 요청을 보내기 전까지 새 질문을 던지지 않는다.
-- `[Dashboard session contract]` 가 시스템 프롬프트에 주입돼 있으면: "이제 `/ait-tds-setup` 으로 넘어가세요" 같은 **CLI 스킬 호출 권유 금지**. 대시보드가 다음 단계 카드를 자동으로 보여준다.
-- CLI 세션일 때만 다음 단계 안내 1줄 덧붙여도 된다.
+- 추가 AskUserQuestion 호출 금지. 사용자가 수정 요청을 보내기 전까지 새 질문을 던지지 않는다.
+- 다음 단계로 **어떤 슬래시 커맨드도** 권유하지 말 것 — `/ait-*`, 다른 스킬명, 존재하지 않는 단계 조어("Phase C", "Step 8") 모두 금지. 대시보드가 파이프라인 카드로 다음 단계를 자동 안내한다.
+- `.meta-dashboard.json` 을 직접 편집하지 말 것. `granite.config.ts` 와 `package.json` 변경만 하면 대시보드 서버가 자동 감지·반영한다.
 - 사과/추임새 최소화, 본론만.

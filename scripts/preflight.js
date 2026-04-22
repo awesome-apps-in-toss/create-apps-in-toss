@@ -59,7 +59,25 @@ if (mcpListOut === null) {
   const puppeteerOk = /puppeteer.*Connected/i.test(mcpListOut);
   record('Claude Code', 'puppeteer MCP', puppeteerOk ? 'pass' : 'fail',
     puppeteerOk ? '' : '연결 안됨 — Claude Code 재시작 또는 최초 승인 필요');
+
+  const appsInTossOk = /apps-in-toss.*Connected/i.test(mcpListOut);
+  record(
+    'Claude Code',
+    'apps-in-toss MCP',
+    appsInTossOk ? 'pass' : 'warn',
+    appsInTossOk
+      ? ''
+      : 'ax 바이너리 미설치 또는 연결 실패 — SDK/TDS 문서 검색(search_docs)이 비활성. sibling 앱 참조 폴백은 동작',
+  );
 }
+
+const axPath = tryExec('command -v ax') || tryExec('where ax 2>NUL');
+record(
+  '시스템',
+  'ax (AppsInToss CLI)',
+  axPath ? 'pass' : 'warn',
+  axPath || '미설치 — SDK/TDS 문서 MCP 가 안 뜸. 설치: scoop install ax (Windows) / brew install ax (macOS) / 또는 https://developers-apps-in-toss.toss.im 의 ax CLI 가이드 참고',
+);
 
 // ========== 에셋 도구 ==========
 

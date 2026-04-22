@@ -1,14 +1,13 @@
 ---
 name: ait-add-routing
 description: 미니앱에 화면 이동(라우팅) 기능을 추가합니다. React Router 를 설치하고 기본 페이지 구조를 잡아줍니다.
-argument-hint: '<app-name>'
+argument-hint: ''
 mode: automated
 step: null
 label: 화면 이동 설정
 produces: React Router + 페이지 폴더 구조
 requires: [ait-scaffold]
-inputs:
-  - { key: appName, type: text, required: true }
+inputs: []
 outputs:
   - { key: routerSetup, type: config, path: 'apps/<appName>/src/App.tsx' }
 idempotencyKey: ait-add-routing
@@ -28,9 +27,11 @@ idempotencyKey: ait-add-routing
 
 ## 실행 절차
 
-1. 앱 디렉토리 확인: `apps/<app-name>/`. 없으면 먼저 `/ait-scaffold` 를 돌리세요.
+1. **Idempotent 체크**: `package.json` 에 `react-router-dom` 이 이미 있으면 "이미 설치됨" 로그만 남기고 종료. 세팅(BrowserRouter 래핑·Routes 구조) 누락만 재점검해서 빠진 부분만 채운다.
 
-2. 패키지 설치
+2. 앱 디렉토리 확인: `apps/<app-name>/`. 없으면 먼저 스캐폴딩이 끝난 앱인지 확인하고, 아니라면 이 세션은 실패 메시지로 종료한다 (외부 스킬 호출 권유 금지).
+
+3. 패키지 설치
    ```bash
    pnpm --filter @barreleye/<app-name> add react-router-dom
    ```
@@ -82,3 +83,23 @@ export default function App() {
 - [ ] `pnpm --filter @barreleye/<app-name> dev` 로 실행 시 홈 화면이 뜸
 - [ ] 브라우저 URL 을 `/` 에서 바꿔도 라우팅이 동작
 - [ ] typecheck 통과
+
+---
+
+## 종료
+
+라우팅 세팅 · typecheck 가 끝나면 **짧은 완료 보고 한 번**만 출력하고 세션을 마무리한다.
+
+**형식**:
+
+```
+✅ 라우팅 추가 완료
+설치: react-router-dom
+세팅: src/main.tsx BrowserRouter, src/App.tsx Routes, src/pages/HomePage.tsx
+```
+
+**반드시 지킬 것**:
+
+- 다음 단계로 **어떤 슬래시 커맨드도** 권유하지 말 것. 대시보드가 파이프라인 카드로 다음 단계를 자동 안내한다.
+- `.meta-dashboard.json` 을 직접 편집하지 말 것. 소스 · `package.json` 변경만 하면 대시보드 서버가 자동 감지·반영한다.
+- 사과/추임새 최소화, 본론만.

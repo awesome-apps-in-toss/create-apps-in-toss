@@ -4,8 +4,7 @@ description: 앱의 .meta-dashboard.json을 PRD와 소스코드 분석으로 자
 allowed-tools: Read, Bash, Glob, Write
 mode: automated
 requires: []
-inputs:
-  - { key: appName, type: text, required: false }
+inputs: []
 outputs:
   - { key: metaFile, type: file, path: 'apps/<appName>/.meta-dashboard.json' }
 idempotencyKey: ait-meta
@@ -135,3 +134,22 @@ PRD에서 추론할 정보:
 - 질문 없이 한 번에 생성한다. 어짜피 대시보드에서 수정 가능하다.
 - 이미 `.meta-dashboard.json`이 존재하면 덮어쓰기 전에 확인을 구한다.
 - 모든 경로는 `appDir` 기준 상대경로로 작성한다 (절대경로 금지).
+
+---
+
+## 종료
+
+파일 생성이 끝나면 **짧은 완료 보고 한 번**만 출력하고 세션을 마무리한다.
+
+**형식**:
+
+```
+✅ .meta-dashboard.json 생성: <파일 경로>
+추론한 값: nameKo=<...>, aitCategory=<...>, 키워드 <개수>개
+```
+
+**반드시 지킬 것**:
+
+- 이 스킬은 예외적으로 `.meta-dashboard.json` 을 **초기 생성할 수 있는 유일한 스킬**이다. 단, 한 번 생성한 뒤에는 대시보드 서버가 SSOT 로 소유하므로 갱신은 대시보드에서 이루어져야 한다.
+- 다음 단계로 **어떤 슬래시 커맨드도** 권유하지 말 것. 대시보드가 파이프라인 카드로 다음 단계를 자동 안내한다.
+- 사과/추임새 최소화, 본론만.

@@ -43,7 +43,13 @@ export default function NewApp() {
       // 목록이 SSE refresh 보다 먼저 도착한 네비게이션 때문에
       // "앱 정보를 불러오는 중..." 가 멈추는 문제가 있어, navigate 전에 한 번 동기화.
       await refetch();
-      const targetPath = mode === 'planning-first' ? `/wizard/${appName}` : `/apps/${appName}`;
+      // full 모드: pnpm new-app 이 끝난 상태 → Wizard 의 ait-scaffold 스텝으로 바로 진입.
+      //   스킬이 이미 scaffolded 됨을 감지하고 (step 1 스킵) 라우팅/쿼리/TDS 결정만 수행.
+      // planning-first 모드: stub 만 존재 → Wizard 의 ait-plan 부터 순차 진행.
+      const targetPath =
+        mode === 'planning-first'
+          ? `/wizard/${appName}`
+          : `/wizard/${appName}?skill=ait-scaffold`;
       void navigate(targetPath);
     } catch (err) {
       setError(`네트워크 연결에 문제가 있어요: ${err instanceof Error ? err.message : String(err)}`);
@@ -159,7 +165,7 @@ export default function NewApp() {
           </p>
           <p className="new-app-command-note">
             {mode === 'full'
-              ? '앱 폴더와 빈 프로젝트를 만들고 상세 페이지로 이동해요. 필요한 기능은 거기서 하나씩 채울 수 있어요.'
+              ? '앱 폴더와 빈 프로젝트를 만든 뒤 바로 AI 대화로 이동해 라우팅·서버 데이터·디자인 시스템을 결정해요.'
               : '앱 폴더를 먼저 만든 뒤 웹 마법사로 이동해 AI와 함께 기획 → 프로젝트 세팅 → 디자인 시스템 순으로 안내해 드려요.'}
           </p>
         </div>

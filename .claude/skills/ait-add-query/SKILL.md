@@ -1,14 +1,13 @@
 ---
 name: ait-add-query
 description: 서버에서 데이터를 받아와 화면에 보여주는 TanStack Query 를 앱에 붙입니다. 로딩/에러/캐시 처리가 자동으로 됩니다.
-argument-hint: '<app-name>'
+argument-hint: ''
 mode: automated
 step: null
 label: 서버 데이터 연결
 produces: TanStack Query + QueryProvider 설정
 requires: [ait-scaffold]
-inputs:
-  - { key: appName, type: text, required: true }
+inputs: []
 outputs:
   - { key: queryProvider, type: config, path: 'apps/<appName>/src/providers/QueryProvider.tsx' }
 idempotencyKey: ait-add-query
@@ -29,9 +28,11 @@ API 에서 데이터를 받아와 화면에 뿌리고 싶을 때 **TanStack Quer
 
 ## 실행 절차
 
-1. 앱 디렉토리 확인: `apps/<app-name>/`. 없으면 먼저 `/ait-scaffold` 를 돌리세요.
+1. **Idempotent 체크**: `package.json` 에 `@tanstack/react-query` 가 이미 있으면 "이미 설치됨" 로그만 남기고 종료. `QueryProvider` 래핑 누락만 재점검해서 빠진 부분만 채운다.
 
-2. 패키지 설치
+2. 앱 디렉토리 확인: `apps/<app-name>/`. 없으면 스캐폴딩 미완료 상태로 보고 실패 메시지로 종료 (외부 스킬 호출 권유 금지).
+
+3. 패키지 설치
    ```bash
    pnpm --filter @barreleye/<app-name> add @tanstack/react-query
    ```
@@ -86,3 +87,23 @@ export function useExampleQuery() {
 - [ ] `main.tsx` 가 `QueryProvider` 로 감싸져 있음
 - [ ] 예시 훅을 화면에서 호출하면 로딩 → 결과가 교체됨
 - [ ] typecheck 통과
+
+---
+
+## 종료
+
+설치·Provider 래핑·typecheck 가 끝나면 **짧은 완료 보고 한 번**만 출력하고 세션을 마무리한다.
+
+**형식**:
+
+```
+✅ TanStack Query 추가 완료
+설치: @tanstack/react-query
+세팅: src/providers/QueryProvider.tsx, src/main.tsx 래핑, 예시 훅 1개
+```
+
+**반드시 지킬 것**:
+
+- 다음 단계로 **어떤 슬래시 커맨드도** 권유하지 말 것. 대시보드가 파이프라인 카드로 다음 단계를 자동 안내한다.
+- `.meta-dashboard.json` 을 직접 편집하지 말 것. 소스 · `package.json` 변경만 하면 대시보드 서버가 자동 감지·반영한다.
+- 사과/추임새 최소화, 본론만.

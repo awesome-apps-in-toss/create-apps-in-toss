@@ -104,7 +104,7 @@ export class RunSession {
     this.transition('VALIDATING_INPUT');
     this.transition('READY');
 
-    this.child = spawnClaudeForSkill({ cwd: init.cwd });
+    this.child = spawnClaudeForSkill({ cwd: init.cwd, mode: init.mode });
     this.transition('RUNNING');
     this.wireChild();
 

@@ -168,9 +168,18 @@ router.post('/', async (req, res) => {
 
   const idea = body.input?.idea;
   const promptOverride = body.input?.prompt;
-  const initialPrompt = (
+  const rawInitial = (
     typeof promptOverride === 'string' ? promptOverride : typeof idea === 'string' ? idea : ''
   ).trim();
+
+  // ait-scaffold / ait-launch 는 cwd 가 REPO_ROOT 이므로 어떤 앱인지 argv 로 전달해야 한다.
+  // 다른 스킬은 cwd 가 이미 `apps/<name>` 이라 별도 인자 불필요.
+  // 사용자가 명시 prompt 에 appName 을 이미 넣었으면 그대로 두고, 없을 때만 앞에 붙인다.
+  const needsAppArg = skillId === 'ait-scaffold' || skillId === 'ait-launch';
+  const initialPrompt =
+    needsAppArg && appName && !rawInitial.split(/\s+/).includes(appName)
+      ? [appName, rawInitial].filter(Boolean).join(' ')
+      : rawInitial;
 
   const idempotencyKey =
     typeof body.idempotencyKey === 'string' && body.idempotencyKey.trim()

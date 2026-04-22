@@ -4,6 +4,11 @@
       "command": "npx",
       "args": ["-y", "puppeteer-mcp-server"],
       "env": {}
+    },
+    "apps-in-toss": {
+      "command": "ax",
+      "args": ["mcp", "start"],
+      "env": {}
     }
   }
 }

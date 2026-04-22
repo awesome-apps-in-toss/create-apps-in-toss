@@ -45,6 +45,9 @@ function computeInitialInputs(skillId: string, app: AppInfo): Record<string, str
   const hasCustomColor =
     !!primaryColor && primaryColor.toLowerCase() !== DEFAULT_PRIMARY_COLOR.toLowerCase();
 
+  // appName 은 스킬 frontmatter 의 inputs 에서 제거됐다. cwd(`apps/<name>`) 또는 server 가
+  // 주입하는 argv 로 전달되므로 여기서 prefill 하지 않는다. displayName · primaryColor 등도
+  // NewApp 에서 이미 granite.config.ts 에 저장됐으면 스킬이 파일에서 읽는다.
   switch (skillId) {
     case 'ait-plan': {
       // 앱 이름 + 한 줄 설명을 합쳐 초안 아이디어로 사용.
@@ -55,19 +58,6 @@ function computeInitialInputs(skillId: string, app: AppInfo): Record<string, str
         ...(app.console.prdPath ? { planningDoc: app.console.prdPath } : {}),
       };
     }
-    case 'ait-scaffold':
-      return {
-        appName: app.folderName,
-        ...(displayName ? { displayName } : {}),
-        ...(hasCustomColor ? { primaryColor } : {}),
-      };
-    case 'ait-tds-setup':
-      return { appName: app.folderName };
-    case 'ait-implement':
-      return {
-        appName: app.folderName,
-        ...(app.console.prdPath ? { prdPath: app.console.prdPath } : {}),
-      };
     default:
       return {};
   }
@@ -112,23 +102,31 @@ export default function Wizard() {
       const match = pipeline.find((s) => s.skill === forcedSkill);
       if (match) return match;
     }
+    // 서버의 pipelineProgress(산출물 존재 여부로 판정) 도 함께 본다.
+    // 예: NewApp full 모드로 이미 granite.config.ts 가 생성된 상태면 ait-scaffold 는 done 취급.
+    //     @toss/* 가 이미 deps 에 있으면 ait-tds-setup 은 done 취급.
+    //     이렇게 해야 "이미 돼 있는 단계" 를 Wizard 가 또 띄우지 않는다.
+    const pipelineProgress = app?.console?.pipelineProgress ?? {};
     for (const step of pipeline) {
       const latest = latestBySkill.get(step.skill);
-      if (!latest || (latest.state !== 'COMPLETED' && !TERMINAL_RUN_STATES.has(latest.state))) {
-        return step;
-      }
-      if (latest.state !== 'COMPLETED') return step;
+      const runCompleted = latest?.state === 'COMPLETED';
+      const artifactCompleted = !!pipelineProgress[step.step];
+      if (runCompleted || artifactCompleted) continue;
+      return step;
     }
     return null;
-  }, [pipeline, latestBySkill, forcedSkill]);
+  }, [pipeline, latestBySkill, forcedSkill, app]);
 
   const completedCount = useMemo(() => {
+    const pipelineProgress = app?.console?.pipelineProgress ?? {};
     let n = 0;
     for (const step of pipeline) {
-      if (latestBySkill.get(step.skill)?.state === 'COMPLETED') n += 1;
+      const runCompleted = latestBySkill.get(step.skill)?.state === 'COMPLETED';
+      const artifactCompleted = !!pipelineProgress[step.step];
+      if (runCompleted || artifactCompleted) n += 1;
     }
     return n;
-  }, [pipeline, latestBySkill]);
+  }, [pipeline, latestBySkill, app]);
 
   if (loading) {
     return (
