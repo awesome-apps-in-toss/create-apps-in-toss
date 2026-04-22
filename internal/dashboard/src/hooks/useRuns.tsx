@@ -40,8 +40,22 @@ export interface RunDetail extends RunSummary {
   }>;
 }
 
+export interface RunQuestionOption {
+  label: string;
+  description?: string;
+}
+
 export interface RunQuestion {
+  /** 사람에게 보여줄 프롬프트 텍스트 (요약). */
   prompt: string;
+  /** AskUserQuestion 의 header (짧은 제목). */
+  header?: string;
+  /** 선택지. 비어있거나 undefined 면 자유 텍스트 응답. */
+  options?: RunQuestionOption[];
+  /** 다중 선택 여부. */
+  multiSelect?: boolean;
+  /** Claude 의 tool_use_id (디버깅용). */
+  toolUseId?: string;
   raw: unknown;
 }
 
@@ -109,7 +123,9 @@ export function useRuns(appName: string | null): {
 
 /**
  * runId의 SSE 스트림을 구독한다. live 로그/질문/산출물 표시와 상태 반영에 사용한다.
- * 터미널 상태(COMPLETED/FAILED/CANCELED) 또는 연결 오류 시 스트림을 닫는다.
+ *   - 연결 끊김 시 exponential backoff 로 자동 재연결 (최대 10s).
+ *   - 재연결 시 fromSeq 쿼리로 이미 받은 이벤트 중복 수신을 스킵.
+ *   - 터미널 상태(COMPLETED/FAILED/CANCELED) 도달 시 재연결 중단.
  */
 export function useRunStream(runId: string | null): {
   state: RunState | null;
@@ -134,55 +150,91 @@ export function useRunStream(runId: string | null): {
     setQuestions([]);
     setError(null);
 
-    const es = new EventSource(`/api/orchestrations/${runId}/stream?replay=true`);
-    setConnected(true);
+    let cancelled = false;
+    let es: EventSource | null = null;
+    let reconnectTimer: number | null = null;
+    let retryCount = 0;
+    let lastSeq = -1;
+    let stateRef: RunState | null = null;
 
-    const parseData = (raw: string): unknown => {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return raw;
-      }
+    const connect = () => {
+      if (cancelled) return;
+      const url =
+        lastSeq >= 0
+          ? `/api/orchestrations/${runId}/stream?replay=true&fromSeq=${lastSeq + 1}`
+          : `/api/orchestrations/${runId}/stream?replay=true`;
+      es = new EventSource(url);
+      setConnected(true);
+
+      const parseData = (raw: string): { seq?: number; data?: unknown } => {
+        try {
+          return JSON.parse(raw) as { seq?: number; data?: unknown };
+        } catch {
+          return {};
+        }
+      };
+      const trackSeq = (p: { seq?: number }) => {
+        if (typeof p.seq === 'number' && p.seq > lastSeq) lastSeq = p.seq;
+      };
+
+      es.addEventListener('state', (e) => {
+        const payload = parseData((e as MessageEvent).data);
+        trackSeq(payload);
+        const next = (payload.data as { state?: RunState } | undefined)?.state;
+        if (next) {
+          stateRef = next;
+          setState(next);
+        }
+      });
+      es.addEventListener('log', (e) => {
+        const payload = parseData((e as MessageEvent).data);
+        trackSeq(payload);
+        const line = (payload.data as { line?: string } | undefined)?.line;
+        if (typeof line === 'string' && line.length > 0) {
+          setLogs((prev) => [...prev, line].slice(-500));
+        }
+      });
+      es.addEventListener('artifact', (e) => {
+        const payload = parseData((e as MessageEvent).data);
+        trackSeq(payload);
+        if (payload.data) setArtifacts((prev) => [...prev, payload.data as { path?: string }]);
+      });
+      es.addEventListener('question', (e) => {
+        const payload = parseData((e as MessageEvent).data);
+        trackSeq(payload);
+        if (payload.data !== undefined) {
+          setQuestions((prev) => [...prev, toRunQuestion(payload.data)]);
+        }
+      });
+      es.addEventListener('done', (e) => {
+        trackSeq(parseData((e as MessageEvent).data));
+        setConnected(false);
+        es?.close();
+        es = null;
+      });
+      es.addEventListener('error', () => {
+        setConnected(false);
+        es?.close();
+        es = null;
+        // terminal 상태면 재연결 금지. 아니면 backoff 로 재시도.
+        if (stateRef && TERMINAL_RUN_STATES.has(stateRef)) return;
+        retryCount += 1;
+        const delay = Math.min(500 * 2 ** (retryCount - 1), 10000);
+        setError(`연결 끊김 — ${Math.round(delay / 1000) || 1}s 뒤 재연결`);
+        reconnectTimer = window.setTimeout(() => {
+          if (cancelled) return;
+          setError(null);
+          connect();
+        }, delay);
+      });
     };
 
-    es.addEventListener('state', (e) => {
-      const payload = parseData((e as MessageEvent).data) as { data?: { state?: RunState } };
-      const next = payload?.data?.state;
-      if (next) setState(next);
-    });
-    es.addEventListener('log', (e) => {
-      const payload = parseData((e as MessageEvent).data) as {
-        data?: { line?: string; stream?: string };
-      };
-      const line = payload?.data?.line;
-      if (typeof line === 'string' && line.length > 0) {
-        setLogs((prev) => [...prev, line].slice(-500));
-      }
-    });
-    es.addEventListener('artifact', (e) => {
-      const payload = parseData((e as MessageEvent).data) as {
-        data?: { path?: string; preview?: string };
-      };
-      if (payload?.data) setArtifacts((prev) => [...prev, payload.data as { path?: string }]);
-    });
-    es.addEventListener('question', (e) => {
-      const payload = parseData((e as MessageEvent).data) as { data?: unknown };
-      if (payload?.data !== undefined) {
-        setQuestions((prev) => [...prev, toRunQuestion(payload.data)]);
-      }
-    });
-    es.addEventListener('error', () => {
-      setError('stream disconnected');
-      setConnected(false);
-      es.close();
-    });
-    es.addEventListener('done', () => {
-      setConnected(false);
-      es.close();
-    });
+    connect();
 
     return () => {
-      es.close();
+      cancelled = true;
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      es?.close();
       setConnected(false);
     };
   }, [runId]);
@@ -190,7 +242,36 @@ export function useRunStream(runId: string | null): {
   return { state, logs, artifacts, questions, error, connected };
 }
 
+/**
+ * 서버에서 오는 question 이벤트 data 를 클라이언트 RunQuestion 으로 변환.
+ *
+ * 서버 최신 포맷 (stream-parser.ParsedQuestion):
+ *   { text, header?, options?: [{label, description?}], multiSelect?, toolUseId? }
+ *
+ * 레거시 포맷 (raw Claude tool_use 블록) 도 폴백으로 허용 — SQLite 에 저장된 옛 이벤트가 있을 수 있다.
+ */
 function toRunQuestion(data: unknown): RunQuestion {
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+    // 서버 포맷 우선.
+    if (typeof obj['text'] === 'string') {
+      const q: RunQuestion = { prompt: obj['text'], raw: data };
+      if (typeof obj['header'] === 'string') q.header = obj['header'];
+      if (Array.isArray(obj['options'])) {
+        q.options = obj['options']
+          .map((o) => o as { label?: unknown; description?: unknown })
+          .filter((o) => typeof o.label === 'string')
+          .map((o) => {
+            const opt: RunQuestionOption = { label: o.label as string };
+            if (typeof o.description === 'string') opt.description = o.description;
+            return opt;
+          });
+      }
+      if (typeof obj['multiSelect'] === 'boolean') q.multiSelect = obj['multiSelect'];
+      if (typeof obj['toolUseId'] === 'string') q.toolUseId = obj['toolUseId'];
+      return q;
+    }
+  }
   return {
     prompt: extractQuestionPrompt(data),
     raw: data,
@@ -215,8 +296,8 @@ function collectQuestionText(data: unknown): string[] {
   const preferredKeys = [
     'prompt',
     'question',
-    'message',
     'text',
+    'message',
     'content',
     'body',
     'detail',

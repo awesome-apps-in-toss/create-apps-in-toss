@@ -1,7 +1,7 @@
 ---
 name: ait-plan
 description: 토스 미니앱 아이디어를 정책 검토 + 대화형 핑퐁 방식으로 검증하고, 비즈니스 모델 설계 후 PRD 파일로 완성합니다.
-allowed-tools: Read, Write
+allowed-tools: Read, Write, AskUserQuestion
 mode: interactive
 step: 1
 label: 기획
@@ -67,6 +67,10 @@ idempotencyKey: ait-plan
 ## 대화 원칙 (반드시 지킬 것)
 
 - **한 번에 질문 하나만** — 여러 질문 나열 금지. 핵심 하나만 골라서 물어볼 것
+- **선택지가 있는 질문은 AskUserQuestion 도구 사용** — 대시보드 웹 UI 에서 버튼으로 렌더링된다.
+  - 예: BM 선택, 타깃 사용자 카테고리, A/B 방향 결정 등 "N개 중 하나/여럿 고르기" 는 반드시 AskUserQuestion 사용.
+  - 자유 서술이 필요한 경우(아이디어 상세, 불만 포인트 등)에는 일반 텍스트로 질문하고 사용자 답을 기다리면 됨.
+  - AskUserQuestion 사용 시 `options[*].label` 은 짧게(10자 내외), `description` 으로 맥락 보충.
 - **먼저 최선의 해석으로 답하고, 이후 확인** — 애매한 말도 일단 해석해서 전진
 - **PRD는 섹션별로 대화하며 발전** — 한 번에 완성하지 말 것
 - **항상 비판적으로 검토** — "토스 유저가 이 앱을 왜 쓰겠어?"를 반복 질문
