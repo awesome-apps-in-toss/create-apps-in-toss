@@ -56,8 +56,8 @@ barreleye/
 │   ├── conventions/        # 코드 컨벤션 (code-style, commits)
 │   ├── guides/             # 기술 가이드 (create-app, dependencies)
 │   └── troubleshooting/    # 에러 해결
+├── .mcp.json               # MCP 서버 설정 (puppeteer, openai-image) — Claude Code 표준 경로
 ├── .claude/
-│   ├── mcp.json            # MCP 서버 설정 (puppeteer, openai-image)
 │   ├── agents/
 │   │   └── graphic-designer.md
 │   └── skills/             # Claude 스킬 (10개)
@@ -135,7 +135,7 @@ pnpm new-app X    # 새 앱 생성
 | `puppeteer` MCP | HTML → PNG 캡처 |
 | `openai-image` MCP | DALL-E 이미지 생성 |
 
-설정 파일: `.claude/mcp.json`
+설정 파일: `.mcp.json` (프로젝트 루트)
 
 ---
 
