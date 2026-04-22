@@ -76,6 +76,7 @@ export default function NewApp() {
             onChange={(e) => setAppName(e.target.value)}
             disabled={submitting}
             required
+            maxLength={64}
             aria-describedby={`new-app-name-hint${error ? ' new-app-error' : ''}`}
             aria-invalid={error ? true : undefined}
           />
@@ -94,6 +95,7 @@ export default function NewApp() {
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             disabled={submitting}
+            maxLength={120}
           />
         </div>
 
@@ -109,6 +111,7 @@ export default function NewApp() {
             onChange={(e) => setDescription(e.target.value)}
             disabled={submitting}
             rows={3}
+            maxLength={1000}
           />
         </div>
 

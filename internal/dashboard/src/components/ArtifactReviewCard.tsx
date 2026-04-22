@@ -131,6 +131,7 @@ function AssetsReview({ app }: { app: AppInfo }) {
   const count =
     (logoPath ? 1 : 0) + (thumbnailPath ? 1 : 0) + screenshotPaths.length;
   const tone: 'ok' | 'warn' = count > 0 ? 'ok' : 'warn';
+  const appLabel = app.console.nameKo || app.granite?.displayName || app.folderName;
   return (
     <CardShell title="이미지 자료 (로고/썸네일/스크린샷)" icon={<Image size={16} strokeWidth={1.75} />} tone={tone}>
       {count === 0 ? (
@@ -141,10 +142,11 @@ function AssetsReview({ app }: { app: AppInfo }) {
             <figure className="artifact-asset-figure">
               <img
                 src={`/api/apps/${app.folderName}/asset?path=${encodeURIComponent(logoPath)}`}
-                alt=""
+                alt={`${appLabel} 로고`}
                 width={64}
                 height={64}
                 className="asset-preview asset-preview-square"
+                loading="lazy"
               />
               <figcaption>로고</figcaption>
             </figure>
@@ -153,10 +155,11 @@ function AssetsReview({ app }: { app: AppInfo }) {
             <figure className="artifact-asset-figure">
               <img
                 src={`/api/apps/${app.folderName}/asset?path=${encodeURIComponent(thumbnailPath)}`}
-                alt=""
+                alt={`${appLabel} 썸네일`}
                 width={128}
                 height={55}
                 className="asset-preview asset-preview-wide"
+                loading="lazy"
               />
               <figcaption>썸네일 (가로)</figcaption>
             </figure>
@@ -165,10 +168,11 @@ function AssetsReview({ app }: { app: AppInfo }) {
             <figure key={p} className="artifact-asset-figure">
               <img
                 src={`/api/apps/${app.folderName}/asset?path=${encodeURIComponent(p)}`}
-                alt=""
+                alt={`${appLabel} 스크린샷 ${i + 1}`}
                 width={48}
                 height={80}
                 className="asset-preview asset-preview-screenshot"
+                loading="lazy"
               />
               <figcaption>스크린샷 {i + 1}</figcaption>
             </figure>

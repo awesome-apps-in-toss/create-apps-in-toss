@@ -177,6 +177,7 @@ export default function AppDetail() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [runningSkill, setRunningSkill] = useState<string | null>(null);
+  const [runError, setRunError] = useState<{ skill: string; message: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [pipelineExpanded, setPipelineExpanded] = useState(true);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
@@ -335,6 +336,7 @@ export default function AppDetail() {
     setRunning(true);
     setRunningSkill(skill);
     setPipelineExpanded(true);
+    setRunError(null);
     try {
       await startRun({
         skill,
@@ -353,7 +355,7 @@ export default function AppDetail() {
     } catch (e) {
       // 시작 자체에 실패했으면 사용자에게 알린다 (디스크 권한 / Claude CLI 미설치 등).
       const message = e instanceof Error ? e.message : String(e);
-      alert(`실행을 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.\n\n(${message})`);
+      setRunError({ skill, message });
     } finally {
       setRunning(false);
       setRunningSkill(null);
@@ -411,6 +413,33 @@ export default function AppDetail() {
             </button>
           </div>
         </div>
+
+        {runError && (
+          <div className="run-start-error" role="alert">
+            <div className="run-start-error-body">
+              <strong>실행을 시작하지 못했어요</strong>
+              <p>Claude CLI 가 설치/로그인 되어 있고 디스크 권한이 열려 있는지 확인해 주세요.</p>
+              <p className="run-start-error-detail">{runError.message}</p>
+            </div>
+            <div className="run-start-error-actions">
+              <button
+                type="button"
+                className="btn-pipeline-toggle"
+                onClick={() => void runSkill(runError.skill as AllowedSkill)}
+                disabled={running}
+              >
+                다시 시도
+              </button>
+              <button
+                type="button"
+                className="btn-pipeline-toggle"
+                onClick={() => setRunError(null)}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 라벨 + 번호가 항상 보이는 스테퍼 */}
         <ol
@@ -1040,19 +1069,30 @@ function MarkdownViewer({
       setContent(cached);
       return;
     }
+    // relPath 가 빠르게 바뀌면 이전 fetch 응답이 뒤늦게 도착해 새 응답을 덮을 수 있어서,
+    // AbortController 로 취소하고 cancelled 플래그로도 한 번 더 막는다.
+    const ctrl = new AbortController();
     let cancelled = false;
-    void fetch(`/api/apps/${appId}/asset?path=${encodeURIComponent(relPath)}`)
-      .then((r) => r.text())
-      .then((text) => {
+    setContent(null);
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/apps/${appId}/asset?path=${encodeURIComponent(relPath)}`,
+          { signal: ctrl.signal },
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
         if (cancelled) return;
         cacheMarkdown(key, text);
         setContent(text);
-      })
-      .catch(() => {
-        if (!cancelled) setContent('파일을 불러올 수 없습니다.');
-      });
+      } catch (err) {
+        if (cancelled || (err instanceof DOMException && err.name === 'AbortError')) return;
+        setContent('파일을 불러올 수 없어요. 경로가 올바른지 확인하고 잠시 뒤 다시 시도해 주세요.');
+      }
+    })();
     return () => {
       cancelled = true;
+      ctrl.abort();
     };
   }, [appId, relPath]);
 

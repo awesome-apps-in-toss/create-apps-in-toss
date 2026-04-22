@@ -1,5 +1,5 @@
 import { AlertTriangle, LogIn, RefreshCw, Terminal, Wifi } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchRunDetail, startRun } from '@/hooks/useRuns';
 import type { RunSummary } from '@/hooks/useRuns';
 import type { PipelineStep } from '@/hooks/useSkills';
@@ -33,6 +33,16 @@ export default function RunErrorCard({
   const [detailsLoaded, setDetailsLoaded] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
 
+  // 펼치기/접기/runId 변경 과정에서 component 가 unmount 되면 loadHints 의 늦은 응답이
+  // 이미 사라진 state 에 setter 를 호출할 수 있어서, 컴포넌트 생존 여부를 추적한다.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const effectiveHints = hintLines ?? fetchedHints ?? [];
   const diag = diagnoseFromHints(run.exitCode, effectiveHints);
   const canShowDetails = hintLines !== undefined ? effectiveHints.length > 0 : !isDemo;
@@ -44,6 +54,7 @@ export default function RunErrorCard({
     setDetailsError(null);
     try {
       const detail = await fetchRunDetail(run.runId);
+      if (!mountedRef.current) return;
       if (!detail) {
         setDetailsError('로그를 불러오지 못했어요.');
         return;
@@ -62,7 +73,7 @@ export default function RunErrorCard({
       setFetchedHints(lines.slice(-60));
       setDetailsLoaded(true);
     } finally {
-      setDetailsLoading(false);
+      if (mountedRef.current) setDetailsLoading(false);
     }
   }
 
@@ -81,11 +92,13 @@ export default function RunErrorCard({
         appName,
         forceRerun: true,
       });
-      onRetry?.();
+      if (mountedRef.current) onRetry?.();
     } catch (error) {
-      setRetryError(error instanceof Error ? error.message : 'Failed to retry');
+      if (mountedRef.current) {
+        setRetryError(error instanceof Error ? error.message : 'Failed to retry');
+      }
     } finally {
-      setRetrying(false);
+      if (mountedRef.current) setRetrying(false);
     }
   }
 

@@ -266,7 +266,8 @@ export default function Wizard() {
             // wizard 내에서는 ActiveStepCard 에 embedded RunLivePanel 이 이미 붙어 있다.
             // 타임라인에서 시작 버튼 눌러도 카드로 스크롤해서 대화를 이어가게 함.
             const card = document.getElementById('wizard-active-step');
-            card?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+            card?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
           }}
         />
       </section>

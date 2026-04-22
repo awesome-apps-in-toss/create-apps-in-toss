@@ -40,10 +40,37 @@ export function AppsProvider({ children }: { children: ReactNode }) {
 
     void fetchApps();
 
-    // SSE로 파일 변경 감지 → 앱 목록 갱신
-    const es = new EventSource('/api/events');
-    es.addEventListener('refresh', () => void fetchApps());
-    return () => es.close();
+    // SSE로 파일 변경 감지 → 앱 목록 갱신.
+    // 서버가 재시작되면 브라우저가 자동으로 재연결하지만, 영구 장애에 대비해
+    // retryCount 가 너무 쌓이면 중단하고 사용자가 수동으로 새로고침하도록 한다.
+    let cancelled = false;
+    let es: EventSource | null = null;
+    let reconnectTimer: number | null = null;
+    let retryCount = 0;
+
+    const connect = () => {
+      if (cancelled) return;
+      es = new EventSource('/api/events');
+      es.addEventListener('refresh', () => {
+        retryCount = 0;
+        void fetchApps();
+      });
+      es.addEventListener('error', () => {
+        es?.close();
+        es = null;
+        if (cancelled || retryCount >= 6) return;
+        retryCount += 1;
+        const delay = Math.min(500 * 2 ** (retryCount - 1), 10000);
+        reconnectTimer = window.setTimeout(connect, delay);
+      });
+    };
+    connect();
+
+    return () => {
+      cancelled = true;
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      es?.close();
+    };
   }, [fetchApps]);
 
   const value = useMemo<AppsContextValue>(

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { AlertTriangle, ArrowUpRight, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
 import { useSkills } from '@/hooks/useSkills';
 import type { PipelineStep } from '@/hooks/useSkills';
@@ -27,7 +27,7 @@ function getMostUrgentApp(apps: AppInfo[]): AppInfo | null {
 }
 
 export default function Home() {
-  const { apps, loading, error, isDemo } = useApps();
+  const { apps, loading, error, isDemo, refetch } = useApps();
   const { pipeline } = useSkills();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<AppFilter>('all');
@@ -49,7 +49,7 @@ export default function Home() {
   if (error) {
     return (
       <main className="main">
-        <div className="error-box">
+        <div className="error-box" role="alert">
           <div className="error-box-head">
             <AlertTriangle size={18} aria-hidden="true" />
             <strong>서버 연결 실패</strong>
@@ -58,15 +58,25 @@ export default function Home() {
             로컬 API 서버가 실행 중인지 확인하세요. (<code>pnpm dev</code>)
           </p>
           <p className="error-detail">{error}</p>
-          <a
-            className="btn-cta btn-cta--ghost"
-            href={`${REPO_URL}/issues`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            GitHub 에서 이슈 보고
-            <ArrowUpRight size={14} aria-hidden="true" />
-          </a>
+          <div className="error-box-actions">
+            <button
+              type="button"
+              className="btn-cta btn-cta--primary"
+              onClick={() => void refetch()}
+            >
+              <RefreshCw size={14} aria-hidden="true" />
+              다시 시도
+            </button>
+            <a
+              className="btn-cta btn-cta--ghost"
+              href={`${REPO_URL}/issues`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GitHub 에서 이슈 보고
+              <ArrowUpRight size={14} aria-hidden="true" />
+            </a>
+          </div>
         </div>
       </main>
     );
@@ -184,6 +194,40 @@ export default function Home() {
           </button>
         ))}
       </div>
+
+      {filteredApps.length === 0 && (
+        <div className="apps-empty" role="status">
+          {apps.length === 0 ? (
+            <>
+              <p className="apps-empty-title">아직 등록된 앱이 없어요</p>
+              <p className="apps-empty-desc">
+                새 앱을 추가해 첫 미니앱을 만들어보세요.
+              </p>
+              <button
+                type="button"
+                className="btn-cta btn-cta--primary"
+                onClick={() => void navigate('/new-app')}
+              >
+                새 앱 만들기
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="apps-empty-title">조건에 맞는 앱이 없어요</p>
+              <p className="apps-empty-desc">
+                필터를 바꾸거나 전체 보기로 돌아가 보세요.
+              </p>
+              <button
+                type="button"
+                className="btn-cta btn-cta--ghost"
+                onClick={() => setFilter('all')}
+              >
+                전체 보기
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="apps-grid">
         {filteredApps.map((app, i) => {

@@ -613,6 +613,17 @@ body {
   border-color: var(--color-danger-strong);
 }
 
+.error-box-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.error-box-actions .btn-cta {
+  margin-top: 0;
+}
+
 /* ========================
    Hero
    ======================== */
@@ -1027,6 +1038,38 @@ body {
   }
 }
 
+.apps-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.apps-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.apps-empty-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 360px;
+}
+
+.apps-empty .btn-cta {
+  margin-top: 6px;
+}
+
 .app-card {
   position: relative;
   background: var(--color-surface);
@@ -1238,6 +1281,10 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .detail-version {
@@ -1249,6 +1296,7 @@ body {
   padding: 2px 8px;
   font-variant-numeric: tabular-nums;
   font-family: var(--font-mono);
+  flex-shrink: 0;
 }
 
 .detail-package {
@@ -1256,6 +1304,8 @@ body {
   font-family: var(--font-mono);
   color: var(--color-text-muted);
   margin-top: 4px;
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .detail-tags {
@@ -1580,6 +1630,10 @@ body {
   font-size: 11px;
   padding: 1px 6px;
   border-radius: var(--radius-sm);
+  min-width: 0;
+  max-width: 100%;
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .path-exists {
@@ -2230,6 +2284,13 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.detail-header-left > div {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .detail-header-left .app-avatar {
@@ -3363,6 +3424,54 @@ button.plan-entry {
 .btn-pipeline-toggle:hover {
   background: var(--color-surface-alt);
   color: var(--color-text-secondary);
+}
+
+.btn-pipeline-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.run-start-error {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--color-danger-soft);
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-danger-strong);
+}
+
+.run-start-error-body {
+  min-width: 0;
+  flex: 1 1 260px;
+  word-break: break-word;
+}
+
+.run-start-error-body strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.run-start-error-body p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 4px 0 0;
+  color: var(--color-danger);
+}
+
+.run-start-error-detail {
+  font-family: var(--font-mono);
+  opacity: 0.75;
+}
+
+.run-start-error-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 /* Labeled, numbered stepper (always visible, no tooltip-dependency) */
