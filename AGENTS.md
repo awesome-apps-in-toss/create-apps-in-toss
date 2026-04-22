@@ -8,6 +8,7 @@
 |------|------|------|
 | 새 앱 전체 플로우 | `docs/launch-flow/00-overview.md` | `/ait-launch` |
 | 아이디어 → PRD | `docs/launch-flow/01-planning-guide.md` | `/ait-plan` |
+| 사전 환경 점검 | — | `/ait-preflight` |
 | 리소스 준비 | `docs/launch-flow/02-resource-checklist.md` | `/ait-assets` |
 | 스캐폴딩 | `docs/launch-flow/03-scaffold-guide.md` | `/ait-scaffold` |
 | TDS 세팅 | `docs/launch-flow/04-tds-setup-guide.md` | `/ait-tds-setup` |
@@ -60,9 +61,10 @@ barreleye/
 ├── .claude/
 │   ├── agents/
 │   │   └── graphic-designer.md
-│   └── skills/             # Claude 스킬 (10개)
+│   └── skills/             # Claude 스킬 (11개)
 │       ├── ait-plan/           # 아이디어→정책검토→PRD
 │       ├── ait-meta/           # .meta-dashboard.json 자동 생성
+│       ├── ait-preflight/      # 사전 환경 체크 (MCP·도구·env)
 │       ├── ait-assets/         # 이미지/텍스트 리소스 생성
 │       ├── ait-scaffold/       # 스캐폴딩
 │       ├── ait-tds-setup/      # TDS 환경 세팅
@@ -71,7 +73,7 @@ barreleye/
 │       ├── ait-build/          # 빌드 & 배포
 │       ├── ait-launch/         # 전체 플로우 오케스트레이터
 │       └── ait-ut/             # UT 시뮬레이션
-└── scripts/                # 유틸리티 스크립트 (create-app.js)
+└── scripts/                # 유틸리티 스크립트 (create-app.js, preflight.js)
 ```
 
 ## Dependency Flow (엄격)
@@ -110,6 +112,7 @@ pnpm typecheck    # 타입 검사
 pnpm lint         # 린트
 pnpm format       # 포맷팅
 pnpm new-app X    # 새 앱 생성
+pnpm preflight    # Claude 스킬·에이전트 동작 환경 사전 체크 (MCP·도구·env)
 ```
 
 ---
@@ -131,11 +134,11 @@ pnpm new-app X    # 새 앱 생성
 
 | 이름 | 역할 |
 |------|------|
-| `graphic-designer` 에이전트 | 앱 에셋 생성 (로고, 썸네일, 스크린샷) |
-| `puppeteer` MCP | HTML → PNG 캡처 |
-| `openai-image` MCP | DALL-E 이미지 생성 |
+| `graphic-designer` 에이전트 | 앱 에셋 생성 (로고, 썸네일, 스크린샷, DALL-E 캐릭터) |
+| `puppeteer` MCP | HTML → PNG 캡처, dev 서버 스크린샷 |
 
 설정 파일: `.mcp.json` (프로젝트 루트)
+DALL-E는 MCP 미사용, bash + curl로 OpenAI Images API 직접 호출 (그래픽 디자이너 에이전트 Section 4 참고)
 
 ---
 
