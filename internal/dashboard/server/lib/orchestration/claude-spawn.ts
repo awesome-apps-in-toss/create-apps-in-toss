@@ -24,23 +24,17 @@ export interface SpawnClaudeOptions {
  * 에러로 닫아버리지만, 대시보드는 그 질문을 사용자에게 전달하고 실제 답변을
  * 다음 user 메시지로 전송한다. 이 사실을 모르면 Claude 가 "질문이 취소됐다"
  * 같은 반응을 내거나 같은 질문을 반복한다.
+ *
+ * 주의: 이 문자열은 CLI argv 로 들어가며, Windows 에서 `shell: true` 로 spawn 할 때
+ * cmd.exe 가 LF 를 만나면 명령을 조기 종료시켜 뒤 인자(`--verbose` 등)를 잃는다.
+ * 따라서 반드시 single-line 으로 유지할 것.
  */
 const DASHBOARD_SYSTEM_NOTE = [
-  '⚙️ Dashboard session contract',
-  '',
+  '[Dashboard session contract]',
   '이 세션은 대시보드(React UI) 안에서 돌고 있고, AskUserQuestion 은 그 UI 로 라우팅된다.',
-  '',
-  'CLI 관측 동작:',
-  '- AskUserQuestion 을 호출하면 즉시 `{ type: "tool_result", is_error: true, content: "Answer questions?" }` 가 반환된다.',
-  '- 이건 stream-json 모드의 transport artifact 일 뿐이며, 사용자 취소/거부 신호가 아니다.',
-  '- 대시보드는 질문을 사용자에게 보여주고, 실제 답변은 다음 user 메시지로 전달한다.',
-  '',
-  '따라서 반드시 지켜야 할 것:',
-  '1. "Answer questions?" tool_result 를 "질문이 취소됐다"/"사용자가 거부했다" 로 해석하지 말 것.',
-  '2. 사과하거나 "질문이 취소됐네요" 같은 문구를 출력하지 말 것.',
-  '3. 같은 AskUserQuestion 을 재호출해서 재질문하지 말 것. 답변이 모호하면 자유 텍스트로 한 번만 되묻는다.',
-  '4. 다음 user 메시지를 방금 던진 질문의 답변으로 그대로 받아들여서 진행할 것.',
-].join('\n');
+  'CLI 관측 동작: AskUserQuestion 을 호출하면 즉시 `{ type: "tool_result", is_error: true, content: "Answer questions?" }` 가 반환되지만, 이건 stream-json 모드의 transport artifact 일 뿐 사용자 취소/거부 신호가 아니다. 대시보드는 질문을 사용자에게 보여주고 실제 답변은 다음 user 메시지로 전달한다.',
+  '반드시 지켜야 할 것: (1) "Answer questions?" tool_result 를 "질문이 취소됐다"/"사용자가 거부했다" 로 해석하지 말 것. (2) 사과하거나 "질문이 취소됐네요" 같은 문구를 출력하지 말 것. (3) 같은 AskUserQuestion 을 재호출해서 재질문하지 말 것 — 답변이 모호하면 자유 텍스트로 한 번만 되묻는다. (4) 다음 user 메시지를 방금 던진 질문의 답변으로 그대로 받아들여서 진행할 것.',
+].join(' ');
 
 /**
  * Claude CLI 를 양방향 stream-json 모드로 spawn.
