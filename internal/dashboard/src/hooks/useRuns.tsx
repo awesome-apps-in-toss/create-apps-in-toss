@@ -56,6 +56,9 @@ export interface RunQuestion {
   multiSelect?: boolean;
   /** Claude 의 tool_use_id (디버깅용). */
   toolUseId?: string;
+  /** 사용자가 이미 답변한 질문인지. user_input 이벤트 수신 시 questions 배열에서
+   *  순서대로 가장 오래된 미답변 항목을 true 로 마킹한다. */
+  answered: boolean;
   raw: unknown;
 }
 
@@ -121,22 +124,37 @@ export function useRuns(appName: string | null): {
   return { runs, loading, error, refetch };
 }
 
+/** 로그 엔트리 — tool use / 시스템 메시지 ('tool') 는 plaintext, Claude 의 생각은 'text' (markdown). */
+export type RunLogKind = 'text' | 'tool';
+export interface RunLogEntry {
+  kind: RunLogKind;
+  text: string;
+}
+
 /**
  * runId의 SSE 스트림을 구독한다. live 로그/질문/산출물 표시와 상태 반영에 사용한다.
  *   - 연결 끊김 시 exponential backoff 로 자동 재연결 (최대 10s).
  *   - 재연결 시 fromSeq 쿼리로 이미 받은 이벤트 중복 수신을 스킵.
  *   - 터미널 상태(COMPLETED/FAILED/CANCELED) 도달 시 재연결 중단.
+ *   - text_start/delta/stop 이벤트로 Claude 텍스트를 증분 스트리밍한다. delta 가 도착할 때마다
+ *     `streamingText` 가 갱신되고, text_stop 에서 `logs` 로 commit 된다.
  */
 export function useRunStream(runId: string | null): {
   state: RunState | null;
-  logs: string[];
+  logs: RunLogEntry[];
+  /** 현재 스트리밍 중인 Claude 텍스트 (아직 text_stop 안 옴). 없으면 null. */
+  streamingText: string | null;
   artifacts: Array<{ path?: string; preview?: string }>;
   questions: RunQuestion[];
   error: string | null;
   connected: boolean;
+  /** optimistic 마킹 — sendRunInput 성공 직후 호출해 서버 user_input SSE 도착 전에 질문 카드를 닫는다.
+   *  중복 호출돼도 이미 모두 answered 면 no-op. */
+  markLatestQuestionAnswered: () => void;
 } {
   const [state, setState] = useState<RunState | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<RunLogEntry[]>([]);
+  const [streamingText, setStreamingText] = useState<string | null>(null);
   const [artifacts, setArtifacts] = useState<Array<{ path?: string; preview?: string }>>([]);
   const [questions, setQuestions] = useState<RunQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +164,7 @@ export function useRunStream(runId: string | null): {
     if (!runId || IS_STATIC) return;
     setState(null);
     setLogs([]);
+    setStreamingText(null);
     setArtifacts([]);
     setQuestions([]);
     setError(null);
@@ -156,6 +175,9 @@ export function useRunStream(runId: string | null): {
     let retryCount = 0;
     let lastSeq = -1;
     let stateRef: RunState | null = null;
+    // streaming 버퍼. setState 가 비동기라 delta 가 빠르게 연속으로 와도 누락 없이
+    // 쌓이도록 로컬 변수로 관리한다. text_stop 에서 logs 로 commit 한 뒤 비운다.
+    let streamingBuf = '';
 
     const connect = () => {
       if (cancelled) return;
@@ -174,6 +196,9 @@ export function useRunStream(runId: string | null): {
         }
       };
       const trackSeq = (p: { seq?: number }) => {
+        // 첫 메시지(정상 replay/state 이벤트) 를 받으면 재연결 성공으로 보고 backoff 를 리셋.
+        // 일시 장애 후 다시 연결됐는데 retryCount 가 누적된 채로 다음 장애 시 delay 가 과도해지는 걸 막는다.
+        if (retryCount > 0) retryCount = 0;
         if (typeof p.seq === 'number' && p.seq > lastSeq) lastSeq = p.seq;
       };
 
@@ -191,8 +216,36 @@ export function useRunStream(runId: string | null): {
         trackSeq(payload);
         const line = (payload.data as { line?: string } | undefined)?.line;
         if (typeof line === 'string' && line.length > 0) {
-          setLogs((prev) => [...prev, line].slice(-500));
+          setLogs((prev) => [...prev, { kind: 'tool' as const, text: line }].slice(-500));
         }
+      });
+      es.addEventListener('text_start', (e) => {
+        trackSeq(parseData((e as MessageEvent).data));
+        streamingBuf = '';
+        setStreamingText('');
+      });
+      es.addEventListener('text_delta', (e) => {
+        const payload = parseData((e as MessageEvent).data);
+        trackSeq(payload);
+        const text = (payload.data as { text?: string } | undefined)?.text;
+        if (typeof text === 'string' && text.length > 0) {
+          streamingBuf += text;
+          setStreamingText(streamingBuf);
+        }
+      });
+      es.addEventListener('text_stop', (e) => {
+        const payload = parseData((e as MessageEvent).data);
+        trackSeq(payload);
+        // 라이브 스트림에서는 streamingBuf 가 delta 들을 누적해놓은 상태.
+        // 리플레이로 구 이벤트를 복원할 때는 text_delta 가 영속화되지 않아 streamingBuf 가 비어있을 수 있으므로,
+        // 서버가 event.data.text 에 넣어준 완성본을 폴백으로 사용한다.
+        const fallback = (payload.data as { text?: string } | undefined)?.text;
+        const commit = streamingBuf.length > 0 ? streamingBuf : (fallback ?? '');
+        streamingBuf = '';
+        if (commit.length > 0) {
+          setLogs((prev) => [...prev, { kind: 'text' as const, text: commit }].slice(-500));
+        }
+        setStreamingText(null);
       });
       es.addEventListener('artifact', (e) => {
         const payload = parseData((e as MessageEvent).data);
@@ -205,6 +258,18 @@ export function useRunStream(runId: string | null): {
         if (payload.data !== undefined) {
           setQuestions((prev) => [...prev, toRunQuestion(payload.data)]);
         }
+      });
+      es.addEventListener('user_input', (e) => {
+        trackSeq(parseData((e as MessageEvent).data));
+        // 서버가 sendInput 성공 시 emit. 순서상 "가장 오래된 미답변" 질문의 답변이다.
+        // optimistic 으로 이미 answered 처리됐다면 모두 true 라 no-op.
+        setQuestions((prev) => {
+          const idx = prev.findIndex((q) => !q.answered);
+          if (idx === -1) return prev;
+          const next = prev.slice();
+          next[idx] = { ...prev[idx]!, answered: true };
+          return next;
+        });
       });
       es.addEventListener('done', (e) => {
         trackSeq(parseData((e as MessageEvent).data));
@@ -239,7 +304,26 @@ export function useRunStream(runId: string | null): {
     };
   }, [runId]);
 
-  return { state, logs, artifacts, questions, error, connected };
+  const markLatestQuestionAnswered = useCallback(() => {
+    setQuestions((prev) => {
+      const idx = prev.findIndex((q) => !q.answered);
+      if (idx === -1) return prev;
+      const next = prev.slice();
+      next[idx] = { ...prev[idx]!, answered: true };
+      return next;
+    });
+  }, []);
+
+  return {
+    state,
+    logs,
+    streamingText,
+    artifacts,
+    questions,
+    error,
+    connected,
+    markLatestQuestionAnswered,
+  };
 }
 
 /**
@@ -255,7 +339,7 @@ function toRunQuestion(data: unknown): RunQuestion {
     const obj = data as Record<string, unknown>;
     // 서버 포맷 우선.
     if (typeof obj['text'] === 'string') {
-      const q: RunQuestion = { prompt: obj['text'], raw: data };
+      const q: RunQuestion = { prompt: obj['text'], answered: false, raw: data };
       if (typeof obj['header'] === 'string') q.header = obj['header'];
       if (Array.isArray(obj['options'])) {
         q.options = obj['options']
@@ -274,6 +358,7 @@ function toRunQuestion(data: unknown): RunQuestion {
   }
   return {
     prompt: extractQuestionPrompt(data),
+    answered: false,
     raw: data,
   };
 }

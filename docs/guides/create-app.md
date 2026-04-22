@@ -8,16 +8,12 @@ pnpm install
 pnpm --filter @barreleye/my-app dev
 ```
 
-## 생성되는 구조
+## 생성되는 구조 (최소 스캐폴딩)
 
 ```
 apps/my-app/
 ├── src/
-│   ├── pages/
-│   │   └── HomePage.tsx
-│   ├── providers/
-│   │   └── QueryProvider.tsx
-│   ├── App.tsx
+│   ├── App.tsx            # "/ait-add-* 스킬 안내" 가 적힌 단일 화면
 │   ├── main.tsx
 │   └── index.css
 ├── granite.config.ts      # 앱인토스 설정
@@ -27,6 +23,15 @@ apps/my-app/
 ├── index.html
 └── package.json
 ```
+
+> `src/pages/` · `providers/QueryProvider.tsx` 는 기본 포함되지 않는다.
+> 필요한 기능은 아래 스킬로 추가:
+>
+> - `/ait-add-routing` — React Router + `src/pages/HomePage.tsx` 생성
+> - `/ait-add-query` — TanStack Query + `src/providers/QueryProvider.tsx` 생성
+> - `/ait-tds-setup` — 토스 스타일 UI (비게임 필수)
+>
+> `/ait-scaffold` 를 쓰면 이 단계를 대화형으로 한 번에 처리한다.
 
 ## 설정 수정
 
@@ -64,6 +69,8 @@ export default defineConfig({
 ```
 
 ### 새 페이지 추가
+
+`/ait-add-routing` 을 먼저 실행해 React Router 가 설치돼 있어야 한다.
 
 ```typescript
 // src/pages/SettingsPage.tsx

@@ -22,7 +22,7 @@ const FEATURES: { Icon: LucideIcon; title: string; desc: string }[] = [
   {
     Icon: Terminal,
     title: '새 앱, 명령어 하나로',
-    desc: 'pnpm new-app으로 미니앱 스캐폴딩. tsconfig·ESLint·TDS 설정이 자동 적용',
+    desc: 'pnpm new-app 으로 최소 스캐폴딩 → /ait-add-routing · query · tds-setup 으로 필요한 것만 추가',
   },
   {
     Icon: Layers,

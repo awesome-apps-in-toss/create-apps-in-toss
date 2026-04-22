@@ -94,6 +94,10 @@ async function attachStore(session: RunSession): Promise<void> {
   session.addListener(
     (event: HistoricRunEvent) => {
       try {
+        // text_delta 는 매 턴마다 수십~수백 건 나오는 고빈도 이벤트.
+        // 완성 텍스트는 text_stop 이벤트 data.text 에 실리므로 리플레이 복원에도 충분하다.
+        // SQLite 용량과 insert I/O 를 아끼기 위해 영속화에서 스킵한다.
+        if (event.kind === 'text_delta') return;
         store.appendEvent(session.runId, event);
         if (event.kind === 'state' || event.kind === 'done') {
           store.updateState(

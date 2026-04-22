@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   AlertCircle,
   CheckCircle2,
@@ -20,6 +21,7 @@ import {
   TERMINAL_RUN_STATES,
   useRuns,
   useRunStream,
+  type RunLogEntry,
   type RunQuestion,
   type RunState,
   type RunSummary,
@@ -362,7 +364,8 @@ export function RunLivePanel({
   /** true 면 viewport 전체가 아니라 부모 카드 안에 박힌 스타일로. */
   embedded?: boolean;
 }) {
-  const { state, logs, artifacts, questions, error } = useRunStream(runId);
+  const { state, logs, streamingText, artifacts, questions, error, markLatestQuestionAnswered } =
+    useRunStream(runId);
   const logBodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const shouldStickToBottomRef = useRef(true);
@@ -401,7 +404,7 @@ export function RunLivePanel({
       top: container.scrollHeight,
       behavior: 'auto',
     });
-  }, [logs]);
+  }, [logs, streamingText]);
 
   useEffect(() => {
     if (state && TERMINAL_RUN_STATES.has(state) && !doneFiredRef.current) {
@@ -411,21 +414,35 @@ export function RunLivePanel({
   }, [state, onDone]);
 
   const waitingInput = state === 'WAITING_USER_INPUT';
-  const latestQuestion = questions.at(-1) ?? null;
-  const hasOptions = !!latestQuestion?.options && latestQuestion.options.length > 0;
-  const isMultiSelect = hasOptions && latestQuestion?.multiSelect === true;
+
+  // 아직 답변되지 않은 최신 질문만 active 로 취급. question.answered 는 useRunStream 이
+  // 서버 user_input 이벤트와 submitAnswer 성공 시 optimistic 마킹으로 관리한다.
+  const activeQuestion = useMemo<RunQuestion | null>(() => {
+    for (let i = questions.length - 1; i >= 0; i--) {
+      const q = questions[i];
+      if (!q) continue;
+      if (!q.answered) return q;
+    }
+    return null;
+  }, [questions]);
+
+  const hasOptions = !!activeQuestion?.options && activeQuestion.options.length > 0;
+  const isMultiSelect = hasOptions && activeQuestion?.multiSelect === true;
+  // 스트리밍 중이거나 RUNNING 이면 "Claude 가 작업 중" 힌트.
+  const isThinking =
+    streamingText !== null || (!waitingInput && state === 'RUNNING' && !activeQuestion);
 
   // 질문이 바뀌면 이전 multi-select 선택 초기화.
   useEffect(() => {
     setMultiSelections(new Set());
-  }, [latestQuestion?.toolUseId, latestQuestion?.prompt]);
+  }, [activeQuestion?.toolUseId, activeQuestion?.prompt]);
 
   useEffect(() => {
     if (!waitingInput) return;
     // 선택지 질문일 때는 textarea 포커스 생략 (버튼 탐색이 자연스럽게).
     if (hasOptions) return;
     inputRef.current?.focus({ preventScroll: true });
-  }, [waitingInput, latestQuestion, hasOptions]);
+  }, [waitingInput, activeQuestion, hasOptions]);
 
   async function submitAnswer(text: string) {
     const trimmed = text.trim();
@@ -434,6 +451,9 @@ export function RunLivePanel({
     setSendError(null);
     try {
       await sendRunInput(runId, trimmed);
+      // optimistic: 서버 user_input SSE 도착 전에 질문 카드를 닫아 UX 지연 제거.
+      // 중복 호출돼도 markLatestQuestionAnswered 는 모두 answered 면 no-op.
+      markLatestQuestionAnswered();
       setInputText('');
       setMultiSelections(new Set());
     } catch (e) {
@@ -473,7 +493,7 @@ export function RunLivePanel({
   }
 
   const describedBy = [
-    latestQuestion ? questionId : null,
+    activeQuestion ? questionId : null,
     inputHintId,
     sendError ? inputErrorId : null,
   ]
@@ -509,14 +529,26 @@ export function RunLivePanel({
         aria-live="polite"
         aria-label="실행 로그"
       >
-        {logs.length === 0 ? (
+        {logs.length === 0 && !streamingText ? (
           <div className="run-live-panel-empty">아직 출력된 로그가 없습니다.</div>
         ) : (
-          logs.map((line, index) => (
-            <div key={`${index}-${line.slice(0, 24)}`} className="run-live-panel-line">
-              {line}
-            </div>
-          ))
+          <>
+            {logs.map((entry, index) => (
+              <LogEntry key={`${index}-${entry.text.slice(0, 24)}`} entry={entry} />
+            ))}
+            {streamingText !== null && (
+              <div className="run-live-panel-line run-live-panel-line--streaming">
+                <MarkdownText text={streamingText || '…'} />
+                <span className="run-live-panel-caret" aria-hidden="true" />
+              </div>
+            )}
+          </>
+        )}
+        {isThinking && !streamingText && (
+          <div className="run-live-panel-thinking" aria-live="polite">
+            <Loader2 size={14} strokeWidth={2} className="run-live-panel-thinking-spin" />
+            Claude 가 작업 중이에요…
+          </div>
         )}
       </div>
       {waitingInput && (
@@ -526,17 +558,17 @@ export function RunLivePanel({
           aria-labelledby={inputLabelId}
           aria-describedby={describedBy || undefined}
         >
-          {latestQuestion ? (
-            <QuestionCard question={latestQuestion} id={questionId} />
+          {activeQuestion ? (
+            <QuestionCard question={activeQuestion} id={questionId} />
           ) : (
             <div id={inputLabelId} className="run-live-panel-input-label">
               Claude 응답 입력
             </div>
           )}
 
-          {hasOptions && latestQuestion && (
+          {hasOptions && activeQuestion && (
             <OptionChoices
-              options={latestQuestion.options!}
+              options={activeQuestion.options!}
               multiSelect={isMultiSelect}
               selected={multiSelections}
               onPick={(label) => void handlePickOption(label)}
@@ -604,6 +636,37 @@ export function RunLivePanel({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function LogEntry({ entry }: { entry: RunLogEntry }) {
+  if (entry.kind === 'text') {
+    return (
+      <div className="run-live-panel-line run-live-panel-line--text">
+        <MarkdownText text={entry.text} />
+      </div>
+    );
+  }
+  // tool / 시스템 메시지는 plaintext 로 간결하게.
+  return <div className="run-live-panel-line run-live-panel-line--tool">{entry.text}</div>;
+}
+
+function MarkdownText({ text }: { text: string }) {
+  return (
+    <div className="run-live-panel-md">
+      <ReactMarkdown
+        components={{
+          // 코드블록은 그대로 렌더하되, 인라인 code 는 tds 스타일링 hook.
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noreferrer noopener">
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {text}
+      </ReactMarkdown>
     </div>
   );
 }

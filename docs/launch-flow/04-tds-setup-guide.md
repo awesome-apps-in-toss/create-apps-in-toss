@@ -40,9 +40,10 @@ Toss Design System(TDS)을 설치하고 정상 동작을 검증한다.
 | `@emotion/react`       | TDS 스타일 엔진 의존성                            | 필수 |
 | `@toss/tds-colors`     | adaptive 색상 시스템 (라이트/다크 모드 자동 대응) | 권장 |
 
-> `pnpm new-app`으로 생성하면 필수 3개는 자동 포함됨. `@toss/tds-colors`만 추가 설치 필요.
+> `pnpm new-app` 은 최소 스캐폴딩만 만든다 (TDS 포함 X). 이 스킬이 **유일한 TDS 설치 경로**다.
+> `/ait-scaffold` 대화형 단계에서 "토스 스타일 UI" 를 승인했다면 이미 설치되어 있을 수 있으니, `package.json` 을 먼저 확인하고 누락된 것만 추가한다.
 
-없다면 추가:
+설치 커맨드:
 
 ```bash
 pnpm --filter @barreleye/<app-name> add @toss/tds-mobile @toss/tds-mobile-ait @emotion/react @toss/tds-colors
@@ -74,7 +75,7 @@ export function App() {
 }
 ```
 
-> `pnpm new-app`으로 생성하면 자동으로 포함됨
+> `/ait-tds-setup` 스킬이 `App.tsx` 를 자동으로 Provider 래핑한다. 수동 설치했다면 직접 추가 필요.
 
 ## TDS 컴포넌트 사용법
 

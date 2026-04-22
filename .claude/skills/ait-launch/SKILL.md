@@ -50,7 +50,7 @@ idempotencyKey: ait-launch
 
 - STEP 1 → appName 후보, 앱 유형, 수익화 모델
 - STEP 2 → appName 확정, 브랜드 컬러, 한국어 이름
-- STEP 3 → 프로젝트 경로, granite.config.ts 설정값
+- STEP 3 → 프로젝트 경로, granite.config.ts 설정값, 설치된 추가 스킬 목록(routing/query/TDS)
 
 ## 실행 플로우
 
@@ -65,13 +65,23 @@ PRD가 필요하면 `/ait-plan` 스킬의 대화형 프로세스를 활용.
 
 `docs/launch-flow/02-resource-checklist.md`를 읽고 이미지/텍스트 리소스 점검, appName 최종 확정. 상세는 `/ait-assets` 스킬 참고.
 
-### STEP 3: 스캐폴딩
+### STEP 3: 스캐폴딩 (+ 필요한 추가 기능 선택)
 
-`docs/launch-flow/03-scaffold-guide.md`를 읽고 `pnpm new-app` + granite.config.ts 설정 + **git commit**. 상세는 `/ait-scaffold` 스킬 참고.
+`docs/launch-flow/03-scaffold-guide.md`를 읽고 `/ait-scaffold` 실행.
 
-### STEP 4: TDS 세팅
+`/ait-scaffold` 는 다음을 순서대로 수행합니다:
 
-`docs/launch-flow/04-tds-setup-guide.md`를 읽고 TDS 패키지/Provider 확인 + 타입체크. 상세는 `/ait-tds-setup` 스킬 참고.
+1. `pnpm new-app` 으로 **최소 앱 구조** 생성 (React + Vite + granite)
+2. granite.config.ts 브랜드 정보 세팅
+3. PRD 기반으로 **라우팅(`/ait-add-routing`) · 서버 데이터(`/ait-add-query`) · TDS(`/ait-tds-setup`)** 를 AskUserQuestion 으로 각각 제안하고, 승인된 것만 연쇄 실행
+
+비게임(`partner`) 앱이라면 STEP 3 안에서 TDS 설치까지 끝나는 경우가 대부분입니다. 완료 후 **git commit**.
+
+### STEP 4: TDS 세팅 (STEP 3 에서 누락됐을 때만)
+
+STEP 3 에서 TDS 설치를 스킵했거나 건너뛴 경우에만 `/ait-tds-setup` 을 직접 실행합니다.
+`apps/<appName>/package.json` 에 `@toss/tds-mobile` 이 이미 있으면 이 단계는 **스킵**합니다.
+상세는 `docs/launch-flow/04-tds-setup-guide.md` · `/ait-tds-setup` 참고.
 
 ### STEP 5: 구현
 

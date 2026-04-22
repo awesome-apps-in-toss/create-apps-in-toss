@@ -20,7 +20,16 @@ export type RunEventKind =
   | 'question'
   | 'artifact'
   | 'done'
-  | 'error';
+  | 'error'
+  /** 어시스턴트가 새 text 블록을 시작했다. 클라이언트는 streaming 버퍼를 연다. */
+  | 'text_start'
+  /** text 블록 증분 — 클라이언트는 현재 streaming 버퍼에 append 한다. */
+  | 'text_delta'
+  /** text 블록이 끝났다. 클라이언트는 버퍼 내용을 log 처럼 확정시킨다. */
+  | 'text_stop'
+  /** 사용자가 대시보드에서 보낸 입력이 CLI stdin 에 기록됐다. 재연결/replay 시
+   *  "이 질문은 이미 답변됐다" 를 복원하기 위한 마커. */
+  | 'user_input';
 
 export interface RunEvent {
   kind: RunEventKind;
@@ -75,6 +84,11 @@ export class RunSession {
   private eventHistory: HistoricRunEvent[] = [];
   private nextSeq = 0;
   private listeners: Set<(event: HistoricRunEvent) => void> = new Set();
+  /** 현재 증분 중인 text 블록 누적 버퍼. text_stop 시 event data 에 실어서 보내고 초기화. */
+  private textStreamBuffer = '';
+  /** 현재 열려있는 text content block 인덱스. null 이면 스트리밍 중인 텍스트 블록 없음.
+   *  비-text 블록(tool_use) 의 content_block_stop 을 걸러내는 데 쓴다. */
+  private activeTextBlockIndex: number | null = null;
 
   constructor(init: RunSessionInit) {
     this.runId = init.runId ?? randomUUID();
@@ -163,6 +177,10 @@ export class RunSession {
     }
     try {
       this.child.stdin.write(encodeUserInput(text));
+      const now = new Date().toISOString();
+      // user_input 이벤트는 SSE 재연결 시 "이 질문은 이미 답변됨" 상태 복원에 쓰인다.
+      // 질문 이벤트 뒤의 첫 user_input 이 그 질문의 답변임을 순서로 매칭.
+      this.emit({ kind: 'user_input', data: { text }, at: now });
       if (this.state === 'WAITING_USER_INPUT') this.transition('RUNNING');
       return { ok: true };
     } catch (err) {
@@ -291,6 +309,52 @@ export class RunSession {
           this.transition('WAITING_USER_INPUT');
           this.emit({ kind: 'question', data: parsed.question ?? parsed.raw, at });
           break;
+        case 'text_start': {
+          // content_block_start 는 text 블록일 때만 stream-parser 에서 emit 된다.
+          const idx = typeof parsed.blockIndex === 'number' ? parsed.blockIndex : 0;
+          this.activeTextBlockIndex = idx;
+          this.textStreamBuffer = '';
+          this.emit({ kind: 'text_start', data: { blockIndex: idx }, at });
+          break;
+        }
+        case 'text_delta': {
+          // 활성 text 블록에 속하는 delta 만 받아들인다. (partial_json 등은 stream-parser 에서 이미 필터)
+          if (
+            parsed.blockIndex !== undefined &&
+            this.activeTextBlockIndex !== null &&
+            parsed.blockIndex !== this.activeTextBlockIndex
+          ) {
+            break;
+          }
+          if (typeof parsed.deltaText === 'string' && parsed.deltaText.length > 0) {
+            this.textStreamBuffer += parsed.deltaText;
+            this.emit({
+              kind: 'text_delta',
+              data: { text: parsed.deltaText, blockIndex: this.activeTextBlockIndex },
+              at,
+            });
+          }
+          break;
+        }
+        case 'text_stop': {
+          // tool_use 등 비-text 블록의 content_block_stop 은 activeTextBlockIndex 가 없거나
+          // 인덱스가 다르므로 이 분기에서 걸러진다.
+          if (this.activeTextBlockIndex === null) break;
+          if (
+            parsed.blockIndex !== undefined &&
+            parsed.blockIndex !== this.activeTextBlockIndex
+          ) {
+            break;
+          }
+          const fullText = this.textStreamBuffer;
+          const closedIdx = this.activeTextBlockIndex;
+          this.textStreamBuffer = '';
+          this.activeTextBlockIndex = null;
+          // 누적 버퍼를 event data 에 실어서 보낸다. text_delta 는 히스토리에 저장하지 않으므로
+          // 재연결/SQLite 리플레이 시 완성 텍스트를 이걸로 복원한다.
+          this.emit({ kind: 'text_stop', data: { text: fullText, blockIndex: closedIdx }, at });
+          break;
+        }
         case 'log':
         default:
           if (parsed.message) {
@@ -307,7 +371,12 @@ export class RunSession {
 
   private emit(event: RunEvent): void {
     const historic: HistoricRunEvent = { ...event, seq: this.nextSeq++ };
-    this.eventHistory.push(historic);
+    // text_delta 는 턴 당 수십~수백 건 나오는 고빈도 이벤트이고, 완성 텍스트는
+    // text_stop.data.text 에 이미 실려있다. 메모리(eventHistory)·DB·SSE replay 에 넣지 않는다.
+    // 라이브 클라이언트와 listeners 에게는 그대로 전달해 스트리밍 UX 를 유지한다.
+    if (event.kind !== 'text_delta') {
+      this.eventHistory.push(historic);
+    }
     for (const listener of this.listeners) {
       try { listener(historic); } catch { /* ignore listener errors */ }
     }
