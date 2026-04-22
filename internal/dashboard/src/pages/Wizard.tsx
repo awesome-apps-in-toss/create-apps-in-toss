@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, Rocket, Loader2 } from 'lucide-react';
+import { ArrowLeft, Rocket, Loader2, Sparkles } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
 import { useSkills } from '@/hooks/useSkills';
 import { useRuns, startRun, TERMINAL_RUN_STATES } from '@/hooks/useRuns';
@@ -11,6 +11,48 @@ import SkillInputForm from '@/components/SkillInputForm';
 import type { SkillInputState } from '@/components/SkillInputForm';
 import type { PipelineStep } from '@/hooks/useSkills';
 import type { RunSummary } from '@/hooks/useRuns';
+import type { AppInfo } from '@/types';
+
+const DEFAULT_PRIMARY_COLOR = '#3182F6';
+
+/**
+ * 위저드 단계별로 app 메타데이터에서 뽑아 쓸 수 있는 기본값.
+ * 사용자 경험: "위저드에 도착하자마자 이미 알고 있는 값은 미리 채워져 있다"
+ */
+function computeInitialInputs(skillId: string, app: AppInfo): Record<string, string> {
+  const displayName = app.granite?.displayName ?? app.console.nameKo ?? '';
+  const description = app.console.description || app.description || '';
+  const primaryColor = app.granite?.primaryColor ?? '';
+  const hasCustomColor =
+    !!primaryColor && primaryColor.toLowerCase() !== DEFAULT_PRIMARY_COLOR.toLowerCase();
+
+  switch (skillId) {
+    case 'ait-plan': {
+      // 앱 이름 + 한 줄 설명을 합쳐 초안 아이디어로 사용.
+      const idea = [displayName, description].filter(Boolean).join(' — ');
+      return {
+        ...(idea ? { idea } : {}),
+        ...(hasCustomColor ? { brandColor: primaryColor } : {}),
+        ...(app.console.prdPath ? { planningDoc: app.console.prdPath } : {}),
+      };
+    }
+    case 'ait-scaffold':
+      return {
+        appName: app.folderName,
+        ...(displayName ? { displayName } : {}),
+        ...(hasCustomColor ? { primaryColor } : {}),
+      };
+    case 'ait-tds-setup':
+      return { appName: app.folderName };
+    case 'ait-implement':
+      return {
+        appName: app.folderName,
+        ...(app.console.prdPath ? { prdPath: app.console.prdPath } : {}),
+      };
+    default:
+      return {};
+  }
+}
 
 /**
  * 선형 위저드 모드.
@@ -137,7 +179,7 @@ export default function Wizard() {
         <ActiveStepCard
           key={nextStep.skill}
           step={nextStep}
-          appName={app.folderName}
+          app={app}
           isDemo={isDemo}
           latestRun={latestBySkill.get(nextStep.skill) ?? null}
           onStarted={() => {
@@ -177,28 +219,43 @@ export default function Wizard() {
 
 function ActiveStepCard({
   step,
-  appName,
+  app,
   isDemo,
   latestRun,
   onStarted,
   onRunComplete,
 }: {
   step: PipelineStep;
-  appName: string;
+  app: AppInfo;
   isDemo: boolean;
   latestRun: RunSummary | null;
   onStarted: () => void;
   onRunComplete: () => void;
 }) {
+  const appName = app.folderName;
   const { raw } = useSkills();
   const meta = raw.find((s) => s.id === step.skill);
+  const initialValues = useMemo(
+    () => computeInitialInputs(step.skill, app),
+    [step.skill, app],
+  );
   const [inputState, setInputState] = useState<SkillInputState>({
-    values: {},
+    values: initialValues,
     prompt: '',
     missingRequired: false,
   });
+  // 사용자가 아직 수정하지 않은 자동채움 키를 추적해, "✨ 자동 채움" 뱃지 노출용으로 사용.
+  const [autoFilledKeys, setAutoFilledKeys] = useState<Set<string>>(
+    () => new Set(Object.keys(initialValues)),
+  );
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // step 이 바뀔 때마다 초기값으로 재설정 (다음 단계로 넘어갔을 때 이전 값 잔상 제거).
+  useEffect(() => {
+    setInputState({ values: initialValues, prompt: '', missingRequired: false });
+    setAutoFilledKeys(new Set(Object.keys(initialValues)));
+  }, [step.skill, initialValues]);
 
   const hasInputs = (meta?.inputs ?? []).length > 0;
   // ait-plan 은 아이디어가 없어도 CLI가 대화로 받을 수 있지만, 위저드 UX 상 5자 이상 권장.
@@ -268,10 +325,32 @@ function ActiveStepCard({
         <>
           {hasInputs && (
             <div className="wizard-inputs">
+              {autoFilledKeys.size > 0 && (
+                <p className="wizard-autofill-hint">
+                  <Sparkles size={12} strokeWidth={1.75} />
+                  <span>앱 정보에서 {autoFilledKeys.size}개 항목을 자동으로 채웠어요. 필요하면 직접 수정하세요.</span>
+                </p>
+              )}
               <SkillInputForm
                 skillId={step.skill}
                 value={inputState}
-                onChange={setInputState}
+                onChange={(next) => {
+                  // 사용자가 직접 건드린 키는 자동채움 뱃지에서 제거.
+                  if (autoFilledKeys.size > 0) {
+                    setAutoFilledKeys((prev) => {
+                      let changed = false;
+                      const copy = new Set(prev);
+                      for (const key of prev) {
+                        if ((next.values[key] ?? '') !== (initialValues[key] ?? '')) {
+                          copy.delete(key);
+                          changed = true;
+                        }
+                      }
+                      return changed ? copy : prev;
+                    });
+                  }
+                  setInputState(next);
+                }}
                 disabled={isDemo || starting}
               />
             </div>

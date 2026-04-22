@@ -2090,6 +2090,66 @@ body {
   background: var(--color-accent-hover);
 }
 
+.new-app-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.new-app-mode-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+}
+
+.new-app-mode-option:hover {
+  border-color: var(--color-border-strong);
+}
+
+.new-app-mode-option--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.new-app-mode-option input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--color-accent);
+}
+
+.new-app-mode-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.new-app-mode-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.new-app-mode-desc {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+}
+
+.new-app-mode-desc code {
+  font-size: 11px;
+  background: var(--color-surface-alt);
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+}
+
 /* ========================
    Completion Checklist
    ======================== */
@@ -2323,6 +2383,116 @@ body {
 .plan-entry--coming {
   opacity: 0.5;
   pointer-events: none;
+}
+
+button.plan-entry {
+  font: inherit;
+  color: inherit;
+}
+
+.plan-entry--clickable {
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, transform 0.12s;
+}
+
+.plan-entry--clickable:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.plan-entry--clickable:active {
+  transform: translateY(1px);
+}
+
+.plan-entry--clickable:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.plan-review-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-warning-border);
+  background: var(--color-warning-bg);
+  border-radius: var(--radius-lg);
+  margin-bottom: 12px;
+}
+
+.plan-review-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-warning);
+}
+
+.plan-review-banner-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.plan-review-banner-desc {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+}
+
+.plan-review-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plan-review-banner-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.plan-review-banner-btn:hover:not(:disabled) {
+  background: var(--color-surface-alt);
+}
+
+.plan-review-banner-btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-invert);
+}
+
+.plan-review-banner-btn--primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.plan-review-banner-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.plan-review-banner-error {
+  font-size: 11px;
+  color: var(--color-danger);
+}
+
+.wizard-autofill-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  width: fit-content;
 }
 
 .plan-entry-icon {

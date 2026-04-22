@@ -33,6 +33,8 @@ export const MOCK_APPS: AppInfo[] = [
       screenshotPaths: ['.meta/assets/screenshot-1.png', '.meta/assets/screenshot-2.png'],
       prdPath: 'docs/PRD.md',
       utPath: 'docs/user-test/report.md',
+      prdReviewedAt: '2026-04-01T09:00:00Z',
+      prdSource: 'generated',
       pipelineProgress: {
         1: { completedAt: '2026-04-01T09:00:00Z', artifacts: { prd: 'docs/PRD.md' } },
         2: { completedAt: '2026-04-01T10:30:00Z' },
@@ -82,6 +84,8 @@ export const MOCK_APPS: AppInfo[] = [
       screenshotPaths: [],
       prdPath: 'docs/PRD.md',
       utPath: null,
+      prdReviewedAt: null,
+      prdSource: 'uploaded',
       pipelineProgress: {
         1: { completedAt: '2026-04-10T09:00:00Z', artifacts: { prd: 'docs/PRD.md' } },
         3: { completedAt: '2026-04-10T09:30:00Z' },
@@ -121,6 +125,8 @@ export const MOCK_APPS: AppInfo[] = [
       screenshotPaths: [],
       prdPath: null,
       utPath: null,
+      prdReviewedAt: null,
+      prdSource: null,
       pipelineProgress: {},
       updatedAt: '',
     },

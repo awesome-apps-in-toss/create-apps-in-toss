@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import ReactMarkdown from 'react-markdown';
-import { Monitor, MessageSquare, FileText, Loader2 } from 'lucide-react';
+import { Monitor, MessageSquare, FileText, Loader2, ShieldCheck } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
 import { useSkills } from '@/hooks/useSkills';
 import type { PipelineStep } from '@/hooks/useSkills';
@@ -141,6 +141,24 @@ export default function AppDetail() {
     setTimeout(() => setCopiedCmd(null), 2000);
   }
 
+  // 앱 직후 생성 시 SSE refresh 가 살짝 늦게 오는 경우가 있어,
+  // 목록에 아직 없으면 짧게 재시도 해서 "불러오는 중..." 이 멈춰 있지 않도록 한다.
+  useEffect(() => {
+    if (app || !appId) return;
+    let cancelled = false;
+    let attempts = 0;
+    const timer = setInterval(() => {
+      if (cancelled) return;
+      attempts += 1;
+      void refetch();
+      if (attempts >= 5) clearInterval(timer);
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [app, appId, refetch]);
+
   if (!app) {
     return (
       <main className="main">
@@ -259,16 +277,6 @@ export default function AppDetail() {
         <div className="detail-header-completion">
           <span className="completion-label">완성도</span>
           <span className="completion-value">{app.completion}%</span>
-          {!isDemo && (
-            <button
-              type="button"
-              className="wizard-link"
-              onClick={() => void navigate(`/wizard/${app.folderName}`)}
-              title="선형 위저드 모드로 이동"
-            >
-              위저드 모드 →
-            </button>
-          )}
         </div>
       </div>
 
@@ -347,6 +355,13 @@ export default function AppDetail() {
         {app.docs.prd.exists ? (
           /* PRD가 있을 때: 경로 + 뷰어 */
           <div className="plan-existing">
+            {app.console.prdSource === 'uploaded' && !app.console.prdReviewedAt && !isDemo && (
+              <PlanReviewBanner
+                appId={app.folderName}
+                onMarkedReviewed={() => void refetch()}
+                onOpenWizard={() => void navigate(`/wizard/${app.folderName}`)}
+              />
+            )}
             <div className="doc-path-row">
               <PathField
                 label="PRD 경로"
@@ -390,16 +405,19 @@ export default function AppDetail() {
                   {copiedCmd === 'ait-plan' ? '복사됨' : 'claude -p /ait-plan'}
                 </button>
               </div>
-              <div className="plan-entry plan-entry--coming">
+              <button
+                type="button"
+                className="plan-entry plan-entry--clickable"
+                onClick={() => void navigate(`/wizard/${app.folderName}`)}
+                disabled={isDemo}
+                title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : '웹 위저드로 이동'}
+              >
                 <div className="plan-entry-icon"><MessageSquare size={20} strokeWidth={1.75} /></div>
-                <div className="plan-entry-title">
-                  웹에서 기획
-                  <span className="plan-entry-badge">준비 중</span>
-                </div>
+                <div className="plan-entry-title">웹에서 기획</div>
                 <p className="plan-entry-desc">
-                  브라우저에서 AI와 대화하며 PRD를 완성합니다.
+                  브라우저 위저드에서 AI와 대화하며 기획 · 스캐폴딩 · TDS 를 이어서 진행합니다.
                 </p>
-              </div>
+              </button>
             </div>
           </div>
         )}
@@ -981,6 +999,69 @@ function PrdDropZone({
             : '기획서 파일(.md)을 드래그하거나 클릭하세요'}
       </p>
       {error && <p className="plan-entry-error">{error}</p>}
+    </div>
+  );
+}
+
+function PlanReviewBanner({
+  appId,
+  onMarkedReviewed,
+  onOpenWizard,
+}: {
+  appId: string;
+  onMarkedReviewed: () => void;
+  onOpenWizard: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function markReviewed() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/apps/${appId}/console`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prdReviewedAt: new Date().toISOString() }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      onMarkedReviewed();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '처리 실패');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="plan-review-banner" role="status">
+      <div className="plan-review-banner-head">
+        <ShieldCheck size={16} strokeWidth={1.75} />
+        <span className="plan-review-banner-title">외부에서 가져온 기획서예요</span>
+      </div>
+      <p className="plan-review-banner-desc">
+        앱인토스 정책 · 플랫폼 적합성을 위저드에서 먼저 검토해보세요.
+        이미 검토했다면 "검토 완료" 로 배지만 제거할 수 있어요.
+      </p>
+      <div className="plan-review-banner-actions">
+        <button
+          type="button"
+          className="plan-review-banner-btn plan-review-banner-btn--primary"
+          onClick={onOpenWizard}
+          disabled={saving}
+        >
+          정책 검토 받기 →
+        </button>
+        <button
+          type="button"
+          className="plan-review-banner-btn"
+          onClick={() => void markReviewed()}
+          disabled={saving}
+        >
+          {saving ? '처리 중…' : '검토 완료로 표시'}
+        </button>
+      </div>
+      {error && <div className="plan-review-banner-error" role="alert">{error}</div>}
     </div>
   );
 }

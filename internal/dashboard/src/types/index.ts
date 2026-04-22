@@ -34,6 +34,14 @@ export interface AppConsoleConfig {
   // 문서 경로 (앱 폴더 기준 상대경로)
   prdPath: string | null;
   utPath: string | null;
+  /**
+   * 외부에서 업로드된 PRD 의 정책 검토 완료 시각.
+   * 업로드 직후엔 null 로 남아 "검토 필요" UI 가 뜬다.
+   * /ait-plan 재실행으로 검토를 마치면 타임스탬프가 세팅된다.
+   */
+  prdReviewedAt: string | null;
+  /** PRD 가 어떻게 들어왔는지. 'uploaded' 만 검토 배너 대상. */
+  prdSource: 'uploaded' | 'generated' | null;
   // 파이프라인 진행 상태 (step 번호 → 상태)
   pipelineProgress: Record<number, PipelineStepStatus>;
   updatedAt: string;
@@ -62,6 +70,8 @@ export const DEFAULT_CONSOLE_CONFIG: AppConsoleConfig = {
   screenshotPaths: [],
   prdPath: null,
   utPath: null,
+  prdReviewedAt: null,
+  prdSource: null,
   pipelineProgress: {},
   updatedAt: '',
 };

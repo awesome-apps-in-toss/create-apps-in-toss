@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import type { AppConsoleConfig } from '../../src/types/index.js';
 import { DEFAULT_CONSOLE_CONFIG } from '../../src/types/index.js';
+import { broadcast } from '../sse.js';
 
 const router: Router = Router();
 const REPO_ROOT = path.resolve(process.cwd(), '../../');
@@ -85,12 +86,13 @@ async function writeMeta(
 }
 
 // POST /api/apps/create
-// Body: { appName: string, displayName?: string, description?: string }
+// Body: { appName: string, displayName?: string, description?: string, mode?: 'full' | 'planning-first' }
 router.post('/', async (req, res) => {
   const body = req.body as {
     appName?: unknown;
     displayName?: unknown;
     description?: unknown;
+    mode?: unknown;
   };
   const appName = body.appName;
   const displayName =
@@ -101,6 +103,7 @@ router.post('/', async (req, res) => {
     typeof body.description === 'string' && body.description.trim()
       ? body.description.trim()
       : undefined;
+  const mode = body.mode === 'planning-first' ? 'planning-first' : 'full';
 
   if (!validateAppName(appName)) {
     res.status(400).json({
@@ -115,27 +118,56 @@ router.post('/', async (req, res) => {
     return;
   }
 
-  const { code, logs } = await runCreateScript(appName);
-  if (code !== 0) {
-    res.status(500).json({
-      error: `스캐폴딩 실패 (exit code: ${code})`,
-      logs,
-    });
+  // full:          pnpm new-app 실행 → 전체 스캐폴딩 완료
+  // planning-first: 폴더 + 최소 package.json 만 생성 → /ait-scaffold 가 나중에 채움
+  if (mode === 'full') {
+    const { code, logs } = await runCreateScript(appName);
+    if (code !== 0) {
+      res.status(500).json({
+        error: `스캐폴딩 실패 (exit code: ${code})`,
+        logs,
+      });
+      return;
+    }
+    try {
+      if (displayName) await applyDisplayName(appName, displayName);
+      await writeMeta(appName, displayName, description);
+    } catch (e) {
+      res.status(500).json({
+        error: `앱 메타 기록 실패: ${String(e)}`,
+        logs,
+      });
+      return;
+    }
+    broadcast('refresh', 'created');
+    res.status(201).json({ appName, mode, logs });
     return;
   }
 
+  // planning-first 모드: 최소 스텁만 만들어두고 스캐폴딩은 /ait-scaffold 에게 위임
   try {
-    if (displayName) await applyDisplayName(appName, displayName);
+    await fs.mkdir(appDir, { recursive: true });
+    const stubPkg = {
+      name: `@barreleye/${appName}`,
+      version: '0.0.0',
+      private: true,
+      description: description ?? '',
+      // granite.config.ts / src 등 본체는 아직 없음을 표시
+      'barreleye:stub': true,
+    };
+    await fs.writeFile(
+      path.join(appDir, 'package.json'),
+      JSON.stringify(stubPkg, null, 2),
+      'utf-8',
+    );
     await writeMeta(appName, displayName, description);
   } catch (e) {
-    res.status(500).json({
-      error: `앱 메타 기록 실패: ${String(e)}`,
-      logs,
-    });
+    res.status(500).json({ error: `스텁 생성 실패: ${String(e)}` });
     return;
   }
 
-  res.status(201).json({ appName, logs });
+  broadcast('refresh', 'created');
+  res.status(201).json({ appName, mode, logs: [] });
 });
 
 export { router as createAppRouter };

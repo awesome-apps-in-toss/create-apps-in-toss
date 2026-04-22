@@ -35,6 +35,7 @@ const ALLOWED_CONSOLE_FIELDS = new Set([
   'subtitle', 'description', 'keywords',
   'logoPath', 'thumbnailPath', 'screenshotPaths',
   'prdPath', 'utPath',
+  'prdReviewedAt', 'prdSource',
 ]);
 
 // GET /api/apps/:id/console
@@ -145,6 +146,9 @@ router.post('/:id/upload-prd', async (req, res) => {
       ...DEFAULT_CONSOLE_CONFIG,
       ...existing,
       prdPath: relPath,
+      // 외부에서 가져온 기획서는 정책 검토가 필요한 상태로 표기.
+      prdSource: 'uploaded',
+      prdReviewedAt: null,
       updatedAt: new Date().toISOString(),
     };
     await fs.writeFile(configPath, JSON.stringify(updated, null, 2), 'utf-8');
