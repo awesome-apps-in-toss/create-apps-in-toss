@@ -107,7 +107,13 @@ memory: project
 7. [검증] 아래 4가지 자체 판정:
    a. 시각적 완성도 (도형 균형·색 조화·정렬)
    b. 제약 준수 (색≤3, 도형≤5, 텍스트 0, stroke≥2px)
-   c. 일반성 테스트 — "이 로고를 헬스/기부/소셜/쇼핑 앱에도 그대로 쓸 수 있으면 탈락"
+   c. 카테고리 식별성 테스트 (엄격)
+      - 로고만 보여주고 "이 앱의 카테고리를 추측해보세요"라고 가정
+      - 합리적으로 추측 가능한 카테고리를 에이전트 스스로 나열
+      - **3개 이상** 나오면 범용성 과다 → 탈락
+      - **1~2개**로 좁혀지면 통과
+      - 예: 단순 돋보기 → 검색·지도·아카이브·맛집·쇼핑 (5개+) → 탈락
+      - 예: 돋보기 + 아이 실루엣 → 교육·육아 (2개) → 통과
    d. 축소 테스트 — 48x48로 줄여도 실루엣이 구분되는가
 8. [반복] 탈락이면 4번(다른 후보) 또는 5번(같은 후보 디테일 수정)으로 복귀 (최대 3회)
 9. [제출] 통과하면 최종 PNG 경로만 보고
@@ -256,12 +262,65 @@ npx --yes capture-website-cli file:///absolute/path/thumbnail.html \
 
 ---
 
-## 3. 스크린샷 (실제 앱을 Puppeteer로 캡처)
+## 3. 스크린샷 (실제 앱 캡처)
 
-1. dev 서버가 실행 중인지 확인 (포트는 `granite.config.ts`에서 확인)
-2. Puppeteer MCP로 `http://localhost:{port}` 접속
-3. 뷰포트를 스펙 크기에 맞게 설정 (세로 636x1048, 가로 1504x741)
-4. 각 주요 화면을 캡처
+### 원칙
+
+- 실제 dev 서버를 띄워서 **구현된 UI를 증거물로** 캡처 (목업 아님)
+- 홈 → 핵심 인터랙션 → 결과처럼 **앱의 주요 플로우**를 3~5장 커버
+- 빈 화면·로딩 스피너·에러 상태는 금지 (실제 사용자 데이터 또는 샘플 상태)
+
+### 제약
+
+- 세로 스크린샷: 636 x 1048px (최소 3장)
+- 가로 스크린샷: 1504 x 741px (최소 1장)
+- 토스 SDK 브릿지(navigationBar 등)가 정상 렌더링된 상태여야 함
+- 개인정보·테스트 전화번호·실제 계좌번호 등 민감 정보 노출 금지
+
+### 자율 워크플로
+
+```
+1. [dev 서버 체크] curl로 포트 확인. 포트는 `granite.config.ts`의 web.port
+   예: curl -s -o /dev/null -w "%{http_code}" http://localhost:{port}
+2. [미기동 시] 사용자에게 기동 요청 후 중단:
+   "dev 서버를 먼저 실행해 주세요: pnpm --filter @barreleye/<app-name> dev"
+3. [읽기] src/pages/*.tsx · src/App.tsx로 라우트와 주요 화면 파악
+4. [선정] 3~5장을 PRD의 플로우 순서대로 결정 (홈 → 핵심 상호작용 → 결과)
+5. [캡처] Puppeteer MCP로 뷰포트 설정 → 네비게이션 → 스크린샷
+6. [검증] 각 PNG를 Read로 확인: 실제 컨텐츠가 렌더링됐는지, 텍스트 깨짐·레이아웃 이상 없는지
+7. [반복] 문제 있으면 상태 세팅(인풋 입력·버튼 클릭) 후 재캡처 (최대 3회)
+```
+
+### 기본: Puppeteer MCP
+
+```
+mcp__puppeteer__puppeteer_navigate({ url: "http://localhost:5173/" })
+mcp__puppeteer__puppeteer_screenshot({
+  name: "01-home",
+  width: 636,
+  height: 1048
+})
+```
+
+여러 화면을 캡처할 때는 `puppeteer_click` / `puppeteer_fill` 로 상태를 세팅한 뒤 `puppeteer_screenshot` 호출.
+
+### Fallback: `capture-website-cli` (bash)
+
+MCP가 동작하지 않을 때:
+
+```bash
+npx --yes capture-website-cli http://localhost:5173/ \
+  --output=apps/<app-name>/assets/screenshots/01-home.png \
+  --width=636 --height=1048 --scale-factor=1
+```
+
+> URL에 query string(`?state=result`)을 붙여 앱이 특정 상태로 렌더링되게 할 수 있으면, 여러 화면 캡처 시 매우 편리합니다.
+
+### 예외 처리 (사용자 개입 허용)
+
+1. **dev 서버 미기동 + 기동 권한 없음** → 기동 명령을 사용자에게 전달하고 중단
+2. **캡처 3회 반복에도 빈 화면/에러 지속** → 어떤 화면·어떤 증상인지 보고 후 방향성 상담
+3. **민감 정보가 노출되는 시드 데이터**가 있으면 스크린샷 전에 샘플 데이터 치환을 사용자에게 요청
 
 ---
 
