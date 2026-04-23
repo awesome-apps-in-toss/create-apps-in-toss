@@ -37,7 +37,9 @@ idempotencyKey: ait-assets
    - 에이전트가 자율적으로 로고·썸네일을 생성하고 결과 경로를 보고
    - 결과를 사용자에게 전달, 수정 요청이 있으면 에이전트에 재위임
 
-5. 체크리스트 결과를 표로 정리하여 보고합니다:
+5. **콘솔 등록용 텍스트 필드를 `.meta-dashboard.json`에 반영**합니다 (아래 "콘솔 텍스트 필드 반영" 섹션 참고).
+
+6. 체크리스트 결과를 표로 정리하여 보고합니다:
    - 준비 완료 / 미비 / 이미지 생성됨 / 해당 없음
 
 ---
@@ -122,10 +124,45 @@ apps/<app-name>/assets/
 - **PRD 부족**으로 서비스 본질 추론 불가 → 에이전트가 필요 정보를 구체적으로 질문
 - **3회 반복해도 일반성 검증 통과 실패** → 시도한 후보와 탈락 이유를 받아 방향성 상담
 
+## 콘솔 텍스트 필드 반영
+
+대시보드의 **스토어 등록 자료** 카드는 `apps/<app-name>/.meta-dashboard.json` 의 필드를 읽어 표시합니다.
+이미지 경로(`logoPath`, `thumbnailPath`, `screenshotPaths`)는 `assets/` 파일 존재로 서버가 자동 감지하지만,
+**텍스트 필드는 자동 감지 대상이 아니므로 이 스킬이 직접 써줘야 합니다.**
+
+### 써야 하는 필드
+
+`console-text.md` 확정 직후, 동일한 값을 `.meta-dashboard.json` 에 반영합니다.
+
+| 필드 | 출처 | 비고 |
+|---|---|---|
+| `nameEn` | console-text.md §1 영어 앱 이름 | 문자열 |
+| `aitCategory` | console-text.md §2 카테고리 1차 후보 | 예: `교육·자기계발 > 자격증·시험 > 운전·교통` |
+| `subtitle` | console-text.md §3 부제 | 문자열 |
+| `keywords` | console-text.md §5 키워드 | 쉼표 분리 → 문자열 배열 |
+| `isGame` | §2 결정 결과 | 비게임이면 `false` |
+
+> 그 외 필드(`nameKo`, `description`, `logoPath`, `thumbnailPath`, `screenshotPaths`, `prdPath`, `prdReviewedAt`, `prdSource`, `pipelineProgress`, `updatedAt`)는 **건드리지 않습니다.**
+> 각각 다른 주체(ait-plan, 대시보드 서버, wizard)가 소유합니다.
+
+### 반영 방법
+
+`Read` → 기존 JSON 로드 → 위 필드만 치환 → `Write` 로 덮어쓰기.
+
+```
+1. apps/<app-name>/.meta-dashboard.json 을 Read
+2. 파싱한 객체에 nameEn/aitCategory/subtitle/keywords/isGame 만 머지
+3. updatedAt 필드를 새 ISO 타임스탬프로 갱신 (new Date().toISOString() 상당 값)
+4. Write 로 들여쓰기 2칸 JSON 으로 저장 (기존 포맷 유지)
+```
+
+파일이 없거나 JSON 파싱 실패 시엔 스킬을 중단하고 사용자에게 보고합니다 — `.meta-dashboard.json` 초기 생성은 `ait-meta` 스킬의 책임입니다.
+
 ## 결과물
 
 미비 항목이 있으면 필요한 규격과 가이드라인을 상세히 안내합니다.
 이미지 생성 요청 시 `apps/<app-name>/assets/` 디렉토리에 PNG + 원본 파일이 생성됩니다.
+콘솔 텍스트 필드가 확정되면 `.meta-dashboard.json` 의 `nameEn/aitCategory/subtitle/keywords/isGame` 이 갱신됩니다.
 
 ## 종료
 
@@ -143,5 +180,5 @@ apps/<app-name>/assets/
 - 추가 AskUserQuestion 호출 금지. 사용자가 수정 요청을 보내기 전까지 새 질문을 던지지 않는다.
 - 다음 단계로 **어떤 슬래시 커맨드도** 권유하지 말 것 — `/ait-*`, 다른 스킬명, 존재하지 않는 단계 조어("Phase C", "Step 8") 모두 금지. 대시보드가 파이프라인 카드로 다음 단계를 자동 안내한다.
 - 스크린샷처럼 "다음에 할 수 있는 작업" 은 스킬 이름을 부르지 말고 "앱이 구현된 뒤 dev 서버를 띄워 캡처" 같은 일반 문장으로만 기술.
-- `.meta-dashboard.json` 을 직접 편집하지 말 것. `apps/<app>/assets/` 에 파일을 저장하면 대시보드 서버가 자동 감지·반영한다.
+- `.meta-dashboard.json` 에서 **이미지 경로는 건드리지 말 것** — `apps/<app>/assets/` 에 파일만 저장하면 대시보드 서버가 자동 감지·반영한다. **콘솔 텍스트 필드 5개**(`nameEn`, `aitCategory`, `subtitle`, `keywords`, `isGame`)는 자동 감지 대상이 아니므로 "콘솔 텍스트 필드 반영" 섹션의 절차대로 직접 머지한다.
 - 사과/추임새 최소화, 본론만.
