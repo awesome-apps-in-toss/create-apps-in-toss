@@ -1,4 +1,4 @@
-# Barreleye
+# Create Apps in Toss
 
 **토스 미니앱 개발의 모든 것, 한 곳에서.**
 
