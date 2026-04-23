@@ -47,22 +47,22 @@ export interface SpawnClaudeOptions {
  * 뒤 argv 를 잃으므로 줄바꿈 금지.)
  */
 function buildDashboardSystemNote(mode: 'interactive' | 'automated'): string {
-  const parts: string[] = ['[Dashboard session] React UI 안에서 실행되는 단발성 스킬 세션.'];
+  const parts: string[] = ['[Dashboard session] React UI 안 단발성 스킬 세션.'];
 
   if (mode === 'interactive') {
     parts.push(
-      '[Interactive] AskUserQuestion 은 UI 로 라우팅된다. 호출 직후 돌아오는 `tool_result: "Answer questions?"` 는 stream-json transport artifact 일 뿐 취소/거부 신호가 아니다 — 사과·재호출·"질문이 취소됐네요" 금지. 다음 user 메시지가 그 답변이니 그대로 받아 진행한다. 답이 모호하면 자유 텍스트로 한 번만 되묻는다.',
+      '[Interactive] AskUserQuestion 은 UI 로 라우팅된다. 직후 오는 `tool_result: "Answer questions?"` 는 stream-json transport artifact 일 뿐 취소 신호가 아니다 — 사과·재호출 금지. 다음 user 메시지가 답변이니 그대로 진행. 모호하면 1회 되묻기 허용.',
     );
   } else {
     parts.push(
-      '[Automated] stdin 이 초기 프롬프트 직후 닫혀있어 추가 user 메시지를 받을 수 없다. AskUserQuestion 호출·질문형 턴 종료 금지 — 불확실하면 합리적 기본값을 스스로 골라 산출물(frontmatter 의 produces)을 끝까지 만들고, 선택 근거·대안은 최종 요약에 "선택: X (이유, 대안)" 한 줄로 남긴다. 정보가 모자라도 멈추지 말고 TODO 로 표시. 권한·의존성 등 환경적 불능일 때만 이유 명시하고 실패 종료.',
+      '[Automated] stdin 이 닫혀 추가 user 메시지를 받을 수 없다. AskUserQuestion·질문형 턴 종료 금지 — 불확실하면 합리적 기본값으로 produces 를 끝까지 만들고, 요약에 "선택: X (이유, 대안)" 한 줄 + 부족분은 TODO 로 남긴다. 권한·의존성 등 환경적 불능일 때만 실패 종료.',
     );
   }
 
   parts.push(
-    '[Termination] 산출물 저장 후엔 파일 경로 한두 줄 요약만 출력하고 턴을 끝낸다. 추가 질문·사과/추임새·다음 단계 슬래시 커맨드 권유(`/ait-*`, `/<skill>`, "Phase/Step N" 조어 포함) 금지 — 다음 단계는 대시보드가 안내한다. 남은 작업은 "dev 서버에서 확인해 보세요" 같은 일반 문장으로만.',
-    '[Status signal] 턴을 끝내기 직전, 반드시 환경변수 `AIT_RUN_STATUS_PATH` 가 가리키는 파일에 `Write` 툴로 `{"status":"success"}` 또는 `{"status":"failure","reason":"<한 줄 원인>"}` 을 기록한다. 이 파일이 대시보드의 COMPLETED/FAILED 판정의 유일한 구조화 신호다. 파일이 없으면 실패로 간주된다. 종료 직전 Write 를 반드시 수행하고, tool_result 로 성공 확인 후 턴을 마무리하라. 사용자에게 보여주는 ✅/❌ 텍스트는 보조 UX 일 뿐이며 판정에는 쓰이지 않는다.',
-    '[Metadata] 산출물을 관례 경로에 저장만 하면 서버가 자동 감지한다 — 에셋 `apps/<app>/assets/*`, PRD `apps/<app>/docs/prd/*.md` 또는 `docs/PRD.md`, UT 리포트 `apps/<app>/docs/user-test/*.md`, 스캐폴딩 `granite.config.ts`, 빌드 `.ait`. `.meta-dashboard.json` 은 대시보드 SSOT 이므로 직접 편집 금지 (ait-meta 초기 생성만 예외).',
+    '[Termination] 산출물 저장 후엔 경로 한두 줄 요약만 출력하고 종료. 추가 질문·사과·다음 단계 슬래시 커맨드 권유 금지 — 다음 단계는 대시보드가 안내한다.',
+    '[Status signal] 턴 종료 직전, 환경변수 `AIT_RUN_STATUS_PATH` 가 가리키는 파일에 `Write` 로 `{"status":"success"}` 또는 `{"status":"failure","reason":"<한 줄>"}` 을 반드시 기록한다. 이 파일이 COMPLETED/FAILED 판정의 유일한 신호다. 파일이 없으면 FAILED 로 간주된다.',
+    '[Metadata] `.meta-dashboard.json` 은 대시보드 SSOT — 직접 편집 금지 (ait-meta 초기 생성만 예외).',
   );
 
   return parts.join(' ');

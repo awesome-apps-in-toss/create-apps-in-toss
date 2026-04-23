@@ -12,31 +12,24 @@ idempotencyKey: ait-meta
 
 # .meta-dashboard.json 초기화
 
-앱 소스코드와 PRD를 분석해 `.meta-dashboard.json`을 자동으로 생성합니다.
+앱 소스코드와 PRD를 분석해 `.meta-dashboard.json`을 자동 생성합니다.
 
 ## 호출 형식
 
-```
-/ait-meta                         # 특정 앱 폴더에서 실행
-/ait-meta                         # 레포 루트에서 실행 (앱 선택 필요)
-```
-
----
+`/ait-meta` — 앱 폴더 또는 레포 루트에서 실행
 
 ## 진행 순서
 
 ### STEP 0: 컨텍스트 파악
 
-현재 작업 디렉터리를 확인한다.
+현재 cwd 확인:
 
-- **`apps/{appName}/` 내부인 경우** → `appDir = apps/{appName}/` 로 설정하고 STEP 1 진행
-- **그 외(레포 루트 등)** → automated 모드에서는 stdin 으로 답을 받을 수 없으므로 즉시 ❌ 실패 보고 (reason: `"appDir unresolved — cwd must be apps/<appName>"`)
-
----
+- **`apps/{appName}/` 내부인 경우** → `appDir = apps/{appName}/` 설정 후 STEP 1
+- **그 외** → automated 모드에서는 stdin 불가이므로 즉시 ❌ 실패 보고 (reason: `"appDir unresolved — cwd must be apps/<appName>"`)
 
 ### STEP 1: PRD 파일 탐색
 
-`appDir` 내에서 PRD 파일을 찾는다. 아래 패턴으로 순서대로 탐색:
+`appDir` 내에서 아래 패턴으로 순서대로 탐색:
 
 1. `docs/PRD.md`
 2. `docs/prd.md`
@@ -44,45 +37,34 @@ idempotencyKey: ait-meta
 4. `docs/**/*prd*.md` (glob)
 5. `docs/**/*.md` 중 내용에 "문제 정의" 또는 "Problem Statement" 포함된 파일
 
-PRD를 찾으면 STEP 2로 진행.  
-**못 찾으면** → 즉시 ❌ 실패 보고 (STEP 2/3 생략). "다음 단계 안내" 가 아닌 이분법 실패 처리:
+PRD를 찾으면 STEP 2로 진행. **못 찾으면** 즉시 ❌ 실패 보고 (STEP 2/3 생략):
 
 ```
 ❌ .meta-dashboard.json 생성 실패
 원인: PRD 파일을 찾지 못했습니다. 해당 앱의 `docs/` 에 PRD 를 준비한 뒤 다시 실행해 주세요. (appDir=<경로>, 탐색 패턴: docs/PRD.md · docs/prd.md · docs/**/*PRD*.md 등)
 ```
 
----
-
 ### STEP 2: 소스코드 분석
 
-다음 파일들을 읽어 앱 정보를 수집한다:
+읽을 파일과 수집 정보:
 
-| 파일                                                   | 수집 정보                                                         |
-| ------------------------------------------------------ | ----------------------------------------------------------------- |
-| `package.json`                                         | `name`, `description`, `version`                                  |
-| `granite.config.ts` 또는 `granite.config.js`           | `appName`, `displayName`, `primaryColor`                          |
-| `src/` 최상위 파일들 (index.tsx, App.tsx, main.tsx 등) | 앱의 핵심 기능 파악                                               |
-| PRD 파일 (STEP 1에서 발견)                             | nameKo, nameEn, subtitle, description, keywords, aitCategory 추론 |
+- `package.json` → `name`, `description`, `version`
+- `granite.config.ts|js` → `appName`, `displayName`, `primaryColor`
+- `src/` 최상위 (index.tsx, App.tsx, main.tsx 등) → 앱의 핵심 기능 파악
+- PRD 파일 (STEP 1에서 발견) → nameKo, nameEn, subtitle, description, keywords, aitCategory 추론
 
 PRD에서 추론할 정보:
 
-- **nameKo**: 앱의 한국어 이름 (PRD 제목 또는 첫 문단에서 추출)
-- **nameEn**: 앱의 영문 이름 (PRD 슬로건 또는 package.json name에서 추출)
-- **subtitle**: 한 줄 소개 (PRD의 핵심 가치 제안에서 10자 내외로 요약)
-- **description**: 앱 설명 (PRD 문제 정의 + 가치 제안을 2-3문장으로 요약)
-- **keywords**: 핵심 키워드 5개 내외 (PRD 기능/타깃 유저 기반)
-- **aitCategory**: 앱인토스 카테고리 (PRD 내용 기반으로 추론, 예: "생활 > 콘텐츠 > 테스트")
-
----
+- **nameKo**: PRD 제목/첫 문단
+- **nameEn**: PRD 슬로건 또는 package.json name
+- **subtitle**: 핵심 가치 제안 10자 내외
+- **description**: 문제 정의 + 가치 제안 2-3문장
+- **keywords**: 기능/타깃 유저 기반 5개 내외
+- **aitCategory**: PRD 내용 기반 추론 (예: "생활 > 콘텐츠 > 테스트")
 
 ### STEP 3: .meta-dashboard.json 생성
 
-분석 결과를 바탕으로 아래 스키마에 맞게 파일을 생성한다.
-
-**저장 경로**: `{appDir}/.meta-dashboard.json`
-
-**파일 형식**:
+저장 경로 `{appDir}/.meta-dashboard.json`, 아래 스키마로 생성:
 
 ```json
 {
@@ -105,23 +87,18 @@ PRD에서 추론할 정보:
 
 규칙:
 
-- `logoPath`, `thumbnailPath`, `screenshotPaths`, `utPath` 는 항상 null / 빈 배열
 - `prdPath` 는 STEP 1에서 발견한 파일의 `appDir` 기준 상대경로
-- `isGame` 은 기본값 `false` (PRD에서 게임임이 명시된 경우만 `true`)
-- `aitCategory` 는 추론 어려우면 `"생활 > 콘텐츠"` 로 기본값 사용
-- `updatedAt` 은 현재 시각의 ISO 8601 full datetime (예: `"2026-04-24T10:00:00.000Z"`) — `new Date().toISOString()` 상당 값
+- `isGame` 기본값 `false` (PRD에서 게임임이 명시된 경우만 `true`)
+- `aitCategory` 추론 어려우면 `"생활 > 콘텐츠"` 기본값
+- `updatedAt` 예: `"2026-04-24T10:00:00.000Z"`
 
-파일 생성 후 생성된 내용을 간단히 요약해서 보여준다.
-
----
+생성 후 내용을 간단히 요약해서 보여준다.
 
 ## 주의사항
 
-- 질문 없이 한 번에 생성한다. 어짜피 대시보드에서 수정 가능하다.
-- 이미 `.meta-dashboard.json` 이 존재해도 automated 모드에서는 덮어쓰지 않고 ❌ 실패 보고 (reason: `"file already exists — run delete first"`). automated 에서 answer 를 못 받으므로 hang 을 방지하기 위한 명시적 실패가 더 안전.
-- 모든 경로는 `appDir` 기준 상대경로로 작성한다 (절대경로 금지).
-
----
+- 질문 없이 한 번에 생성 (대시보드에서 수정 가능)
+- 이미 `.meta-dashboard.json` 존재 시 automated 모드에서는 덮어쓰지 않고 ❌ 실패 보고 (reason: `"file already exists — run delete first"`). answer 못 받는 automated 에서 hang 방지를 위한 명시적 실패.
+- 모든 경로는 `appDir` 기준 상대경로 (절대경로 금지)
 
 ## 종료
 
