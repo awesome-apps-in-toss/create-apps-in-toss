@@ -108,8 +108,8 @@ export default function Sidebar({ apps, mobileOpen, onMobileClose }: SidebarProp
           src="https://static.toss.im/logos/png/4x/logo-apps-in-toss.png"
           alt="토스 미니앱"
           className="sidebar-logo-img"
-          loading="lazy"
           decoding="async"
+          width={92}
           height={20}
         />
         <div className="sidebar-subtitle">미니앱 관리 대시보드</div>

@@ -100,14 +100,14 @@ export function useRuns(appName: string | null): {
     setLoading(true);
     try {
       const res = await fetch(`/api/orchestrations?app=${encodeURIComponent(appName)}&limit=200`);
-      if (!res.ok) throw new Error(`Failed to fetch runs: ${res.status}`);
+      if (!res.ok) throw new Error(`실행 기록을 불러오지 못했어요. (HTTP ${res.status})`);
       const data = (await res.json()) as { runs: RunSummary[] };
       if (!cancelRef.current) {
         setRuns(data.runs ?? []);
         setError(null);
       }
     } catch (e) {
-      if (!cancelRef.current) setError(e instanceof Error ? e.message : 'Unknown error');
+      if (!cancelRef.current) setError(e instanceof Error ? e.message : '알 수 없는 오류가 발생했어요.');
     } finally {
       if (!cancelRef.current) setLoading(false);
     }

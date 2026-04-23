@@ -122,12 +122,12 @@ export function SkillsProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const res = await fetch('/api/skills');
-        if (!res.ok) throw new Error(`Failed to fetch skills: ${res.status}`);
+        if (!res.ok) throw new Error(`스킬 목록을 불러오지 못했어요. (HTTP ${res.status})`);
         const data = (await res.json()) as { skills: SkillMeta[] };
         if (!cancelled) setRaw(data.skills ?? []);
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Unknown error');
+          setError(e instanceof Error ? e.message : '알 수 없는 오류가 발생했어요.');
           // 서버 API 실패 시에도 UI가 완전히 비지 않도록 demo shape로 폴백
           setRaw(DEMO_SKILLS);
         }

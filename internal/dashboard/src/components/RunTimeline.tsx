@@ -40,6 +40,8 @@ interface RunTimelineProps {
   /** true 면 각 step 아이템 내부의 RunLivePanel 을 숨긴다.
    *  Wizard 처럼 부모가 별도로 RunLivePanel 을 렌더할 때 중복 SSE 연결을 막는 용도. */
   suppressLivePanel?: boolean;
+  /** 외부에서 aria-controls 등으로 가리킬 수 있도록 root id 를 주입. */
+  id?: string;
 }
 
 export default function RunTimeline({
@@ -52,6 +54,7 @@ export default function RunTimeline({
   showArtifacts = false,
   app,
   suppressLivePanel = false,
+  id,
 }: RunTimelineProps) {
   const { runs, loading, error, refetch } = useRuns(appName);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -103,7 +106,7 @@ export default function RunTimeline({
       setActiveRunId(resp.runId);
       await refetch();
     } catch (e) {
-      setStartError(e instanceof Error ? e.message : 'Failed to start');
+      setStartError(e instanceof Error ? e.message : '실행을 시작하지 못했어요.');
     } finally {
       setStartingSkill(null);
     }
@@ -121,7 +124,7 @@ export default function RunTimeline({
 
   if (isDemo) {
     return (
-      <div className="run-timeline run-timeline--demo">
+      <div id={id} className="run-timeline run-timeline--demo">
         <p>
           데모 화면에서는 실제 실행을 시작할 수 없어요. 내 PC에서 대시보드를 설치·실행한 뒤 다시 시도해 주세요.
         </p>
@@ -130,7 +133,7 @@ export default function RunTimeline({
   }
 
   return (
-    <div className="run-timeline">
+    <div id={id} className="run-timeline">
       {error && <div className="run-timeline-error">{error}</div>}
       {startError && <div className="run-timeline-error">실행 시작 실패: {startError}</div>}
       {loading && runs.length === 0 && (
@@ -474,7 +477,7 @@ export function RunLivePanel({
       setInputText('');
       setMultiSelections(new Set());
     } catch (e) {
-      setSendError(e instanceof Error ? e.message : 'Failed to send');
+      setSendError(e instanceof Error ? e.message : '메시지를 전송하지 못했어요.');
     } finally {
       setSending(false);
     }
@@ -500,7 +503,7 @@ export function RunLivePanel({
 
   async function handleSendMulti() {
     if (multiSelections.size === 0) {
-      setSendError('최소 1개 이상 선택해주세요.');
+      setSendError('1개 이상 선택해 주세요.');
       return;
     }
     // AskUserQuestion 스펙: 여러 label 을 ", " 로 이어서 응답.
@@ -517,7 +520,7 @@ export function RunLivePanel({
       await finishRun(runId);
       // 서버에서 stdin 을 닫으면 CLI 가 턴을 마무리하고 exit → state 전이 → onDone 자동 발화.
     } catch (e) {
-      setFinishError(e instanceof Error ? e.message : 'Failed to finish');
+      setFinishError(e instanceof Error ? e.message : '실행을 마치지 못했어요.');
       setFinishing(false);
     }
   }

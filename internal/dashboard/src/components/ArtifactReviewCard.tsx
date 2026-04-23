@@ -85,7 +85,7 @@ function PrdReview({ app, expanded }: { app: AppInfo; expanded: boolean }) {
         if (!cancelled) setContent(text);
       })
       .catch(() => {
-        if (!cancelled) setError('PRD 파일을 불러올 수 없습니다.');
+        if (!cancelled) setError('PRD 파일을 불러올 수 없어요.');
       });
     return () => {
       cancelled = true;

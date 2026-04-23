@@ -177,6 +177,13 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  /* 데모 배너 높이. .layout--demo 가 켜질 때 40px 로 덮어쓰며,
+     자식 (.layout-body, .sidebar, .hamburger-btn) 이 모두 이 변수로 자기 높이/위치를 보정한다. */
+  --banner-height: 0px;
+}
+
+.layout--demo {
+  --banner-height: 40px;
 }
 
 .layout-body {
@@ -186,7 +193,7 @@ body {
 }
 
 .layout-body--demo {
-  height: calc(100vh - 40px);
+  height: calc(100vh - var(--banner-height));
 }
 
 .layout-content {
@@ -244,7 +251,7 @@ body {
   flex-direction: column;
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: calc(100vh - var(--banner-height, 0px));
   overflow-y: auto;
 }
 
@@ -1055,7 +1062,7 @@ body {
 .apps-empty-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   margin: 0;
 }
 
@@ -3845,13 +3852,12 @@ button.plan-entry {
 }
 
 .btn-cli-chip-feedback {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--color-text-muted);
   letter-spacing: 0.01em;
-  padding-left: 2px;
+  padding-left: 8px;
   border-left: 1px solid var(--color-border-subtle);
   margin-left: 2px;
-  padding-left: 8px;
 }
 
 .btn-cli-chip--copied {
@@ -3904,7 +3910,8 @@ button.plan-entry {
     align-items: center;
     justify-content: center;
     position: fixed;
-    top: 12px;
+    /* 데모 배너(40px) 가 켜진 상태에선 그 아래로 내려간다. */
+    top: calc(12px + var(--banner-height, 0px));
     left: 12px;
     z-index: 50;
     width: 44px;
@@ -4023,6 +4030,18 @@ button.plan-entry {
     transform: translateY(-50%) scaleY(1);
   }
   .sidebar-overlay {
+    animation: none !important;
+  }
+
+  /* hover lift 도 제거 — transition-duration 만 0 으로 가면 transform 자체는 그대로 튀므로 명시적으로 끈다. */
+  .btn-cta--primary:hover,
+  .next-action:hover,
+  .app-card.clickable:hover {
+    transform: none;
+  }
+
+  /* 무한 펄스도 정지 */
+  .pipeline-stepper-node--next {
     animation: none !important;
   }
 }
@@ -4602,9 +4621,8 @@ textarea.skill-input-control {
 }
 .run-live-panel-input-ta {
   width: 100%;
-  min-height: 56px;
-  resize: vertical;
   min-height: 88px;
+  resize: vertical;
   padding: 10px 12px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-strong);
@@ -5256,9 +5274,11 @@ textarea.skill-input-control {
 .run-live-panel-md a {
   color: var(--color-accent-subtle-strong);
   text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: opacity var(--ease, 0.15s ease);
 }
 .run-live-panel-md a:hover {
-  color: var(--color-accent-subtle-strong);
+  opacity: 0.75;
 }
 .run-live-panel-md strong {
   color: var(--color-code-text);

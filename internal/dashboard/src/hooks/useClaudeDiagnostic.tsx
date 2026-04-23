@@ -40,14 +40,14 @@ export function useClaudeDiagnostic(): {
     (async () => {
       try {
         const res = await fetch('/api/diagnostics/claude');
-        if (!res.ok) throw new Error(`Failed to fetch diagnostic: ${res.status}`);
+        if (!res.ok) throw new Error(`Claude 진단 정보를 불러오지 못했어요. (HTTP ${res.status})`);
         const data = (await res.json()) as ClaudeDiagnostic;
         if (!cancelled) {
           setDiag(data);
           setError(null);
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Unknown error');
+        if (!cancelled) setError(e instanceof Error ? e.message : '알 수 없는 오류가 발생했어요.');
       } finally {
         if (!cancelled) setLoading(false);
       }

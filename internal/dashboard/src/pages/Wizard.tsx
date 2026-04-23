@@ -140,13 +140,13 @@ export default function Wizard() {
     return (
       <main className="main">
         <div className="breadcrumb">
-          <button className="breadcrumb-back" onClick={() => void navigate('/')}>
+          <button type="button" className="breadcrumb-back" onClick={() => void navigate('/')}>
             <ArrowLeft size={14} strokeWidth={1.75} /> 홈
           </button>
         </div>
-        <div className="error-box">
-          <strong>앱을 찾을 수 없습니다</strong>
-          <p>존재하지 않거나 이름이 다른 앱입니다. 홈에서 선택하거나 새 앱을 만들어주세요.</p>
+        <div className="error-box" role="alert">
+          <strong>앱을 찾을 수 없어요</strong>
+          <p>존재하지 않거나 이름이 다른 앱이에요. 홈에서 선택하거나 새 앱을 만들어 주세요.</p>
         </div>
       </main>
     );
@@ -158,11 +158,12 @@ export default function Wizard() {
   return (
     <main className="main wizard">
       <div className="breadcrumb">
-        <button className="breadcrumb-back" onClick={() => void navigate('/')}>
+        <button type="button" className="breadcrumb-back" onClick={() => void navigate('/')}>
           <ArrowLeft size={14} strokeWidth={1.75} /> 홈
         </button>
         <span className="breadcrumb-sep">/</span>
         <button
+          type="button"
           className="breadcrumb-link"
           onClick={() => void navigate(`/apps/${app.folderName}`)}
         >
@@ -369,7 +370,7 @@ function ActiveStepCard({
       });
       onStarted();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to start');
+      setError(e instanceof Error ? e.message : '실행을 시작하지 못했어요.');
     } finally {
       setStarting(false);
     }

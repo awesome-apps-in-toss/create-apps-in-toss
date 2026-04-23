@@ -67,11 +67,16 @@ export default function NewApp() {
   return (
     <div className="new-app-page">
       <div className="new-app-header">
-        <button className="new-app-back-btn" onClick={() => void navigate('/')} disabled={submitting}>
+        <button
+          type="button"
+          className="new-app-back-btn"
+          onClick={() => void navigate('/')}
+          disabled={submitting}
+        >
           ← 돌아가기
         </button>
         <h1 className="new-app-title">새 앱 만들기</h1>
-        <p className="new-app-subtitle">토스 미니앱을 추가합니다.</p>
+        <p className="new-app-subtitle">토스 미니앱을 추가해요.</p>
       </div>
 
       <form className="new-app-form" onSubmit={(e) => void handleSubmit(e)}>

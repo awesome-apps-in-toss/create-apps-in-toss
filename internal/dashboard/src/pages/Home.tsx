@@ -40,7 +40,7 @@ export default function Home() {
       <main className="main">
         <div className="loading">
           <Loader2 size={16} className="spin" aria-hidden="true" />
-          <span>앱 목록 불러오는 중...</span>
+          <span>앱 목록 불러오는 중…</span>
         </div>
       </main>
     );
@@ -109,7 +109,7 @@ export default function Home() {
           </h1>
           <p className="hero-desc">
             여러 미니앱을 모노레포로 관리하고, 각 앱의 출시 준비 상태를 UI에서 확인하세요.
-            공유 설정·에셋은 한 번만 관리하면 모든 앱에 적용됩니다.
+            공유 설정·에셋은 한 번만 관리하면 모든 앱에 적용돼요.
           </p>
           <div className="hero-cta">
             <a
@@ -172,8 +172,10 @@ export default function Home() {
       )}
 
       {/* ── 필터 + 앱 목록 ── */}
-      <div className="section-title">앱 {filteredApps.length}개</div>
-      <div className="filter-row" role="toolbar" aria-label="앱 필터">
+      {apps.length > 0 && (
+        <div className="section-title">앱 {filteredApps.length}개</div>
+      )}
+      <div className="filter-row" role="group" aria-label="앱 필터">
         {(
           [
             ['all', '전체'],

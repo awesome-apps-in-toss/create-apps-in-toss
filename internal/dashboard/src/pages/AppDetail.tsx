@@ -246,12 +246,12 @@ export default function AppDetail() {
     return (
       <main className="main">
         {lookupFailed ? (
-          <div className="error-box">
+          <div className="error-box" role="alert">
             <strong>앱을 찾을 수 없어요</strong>
             <p>
               <code>{appId}</code> 라는 이름의 앱을 찾지 못했어요. 주소가 맞는지 다시 확인하거나 홈에서 앱을 골라 주세요.
             </p>
-            <div style={{ marginTop: 12 }}>
+            <div className="error-box-actions">
               <button type="button" className="btn-cta btn-cta--primary" onClick={() => void navigate('/')}>
                 홈으로 돌아가기
               </button>
@@ -307,14 +307,14 @@ export default function AppDetail() {
           // ignore JSON parse failure
         }
         throw new Error(
-          `저장에 실패했습니다 (상태 코드: ${res.status}). ${serverMsg ?? '잠시 후 다시 시도해주세요.'}`,
+          `저장에 실패했어요 (상태 코드: ${res.status}). ${serverMsg ?? '잠시 후 다시 시도해 주세요.'}`,
         );
       }
       setSaveError(null);
       setEdit({ field: null, value: '' });
       await refetch();
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : '저장에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      setSaveError(e instanceof Error ? e.message : '저장에 실패했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       setSaving(false);
     }
@@ -408,6 +408,7 @@ export default function AppDetail() {
               className="btn-pipeline-toggle"
               onClick={() => setPipelineExpanded((v) => !v)}
               aria-expanded={pipelineExpanded}
+              aria-controls="pipeline-timeline"
             >
               {pipelineExpanded ? '간단히 보기' : '자세히 보기'}
             </button>
@@ -532,6 +533,7 @@ export default function AppDetail() {
         {/* 실행 기록/현재 진행 (오케스트레이션 API 기반) */}
         {pipelineExpanded && (
           <RunTimeline
+            id="pipeline-timeline"
             appName={app.folderName}
             pipeline={pipeline}
             isDemo={isDemo}
@@ -587,7 +589,7 @@ export default function AppDetail() {
         ) : (
           /* PRD가 없을 때: 3가지 진입점 */
           <div className="plan-empty">
-            <p className="plan-empty-desc">기획서(PRD)가 아직 없습니다. 아래 방법 중 하나로 시작하세요.</p>
+            <p className="plan-empty-desc">기획서(PRD)가 아직 없어요. 아래 방법 중 하나로 시작해 보세요.</p>
             <div className="plan-entries">
               <PrdDropZone
                 appId={app.folderName}
@@ -624,7 +626,7 @@ export default function AppDetail() {
                 <div className="plan-entry-icon"><MessageSquare size={20} strokeWidth={1.75} /></div>
                 <div className="plan-entry-title">웹에서 기획</div>
                 <p className="plan-entry-desc">
-                  브라우저 위저드에서 AI와 대화하며 기획 · 스캐폴딩 · TDS 를 이어서 진행합니다.
+                  브라우저 위저드에서 AI와 대화하며 기획 · 스캐폴딩 · TDS 를 이어서 진행해요.
                 </p>
               </button>
             </div>
@@ -699,7 +701,7 @@ export default function AppDetail() {
               <div className="meta-row">
                 <div className="meta-label">.ait 파일</div>
                 <div className="meta-value">
-                  <span>{app.completionDetail.layer1 >= 10 ? '있음' : '없음'}</span>
+                  <span>{app.completionDetail.layer1 >= 10 ? '준비됐어요' : '아직 없어요'}</span>
                 </div>
               </div>
             </div>
@@ -814,7 +816,7 @@ export default function AppDetail() {
                           onClick={() => void saveField()}
                           disabled={saving}
                         >
-                          {saving ? '저장 중...' : '저장'}
+                          {saving ? '저장 중…' : '저장'}
                         </button>
                         <button type="button" className="btn-cancel" onClick={cancelEdit}>
                           취소
@@ -1012,7 +1014,7 @@ function PathField({
             }}
           />
           <button type="button" className="btn-save" onClick={onSave} disabled={saving}>
-            {saving ? '저장 중...' : '저장'}
+            {saving ? '저장 중…' : '저장'}
           </button>
           <button type="button" className="btn-cancel" onClick={onCancel}>
             취소
@@ -1149,7 +1151,7 @@ function MarkdownViewer({
     };
   }, [modal]);
 
-  if (content === null) return <div className="md-loading">불러오는 중...</div>;
+  if (content === null) return <div className="md-loading">불러오는 중…</div>;
 
   return (
     <>
@@ -1219,7 +1221,7 @@ function PrdDropZone({
     async (file: File) => {
       if (isDemo) return;
       if (!file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
-        setError('.md 또는 .txt 파일만 업로드할 수 있습니다.');
+        setError('.md 또는 .txt 파일만 업로드할 수 있어요.');
         return;
       }
       setError(null);
@@ -1233,11 +1235,11 @@ function PrdDropZone({
         });
         if (!res.ok) {
           const data = (await res.json()) as { error?: string };
-          throw new Error(data.error ?? 'Upload failed');
+          throw new Error(data.error ?? '업로드에 실패했어요.');
         }
         onUploaded();
       } catch (e) {
-        setError(e instanceof Error ? e.message : '업로드 실패');
+        setError(e instanceof Error ? e.message : '업로드에 실패했어요.');
       } finally {
         setUploading(false);
       }
@@ -1298,7 +1300,7 @@ function PrdDropZone({
       <div className="plan-entry-title">PRD 업로드</div>
       <p className="plan-entry-desc">
         {uploading
-          ? '업로드 중...'
+          ? '업로드 중…'
           : dragOver
             ? '여기에 놓으세요'
             : '기획서 파일(.md)을 드래그하거나 클릭하세요'}

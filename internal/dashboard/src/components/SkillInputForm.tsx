@@ -152,7 +152,7 @@ function SkillInputField({
             id={inputId}
             type="color"
             className="skill-input-color"
-            value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#3b82f6'}
+            value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#3182F6'}
             disabled={disabled}
             aria-required={input.required}
             aria-describedby={hintId}
@@ -227,7 +227,7 @@ function describeInput(input: SkillInputDescriptor): InputDescription {
     case 'brandColor':
       return {
         label: '브랜드 컬러',
-        placeholder: '#3b82f6',
+        placeholder: '#3182F6',
         icon: <Palette size={14} strokeWidth={1.75} />,
       };
     case 'references':

@@ -95,7 +95,7 @@ export default function RunErrorCard({
       if (mountedRef.current) onRetry?.();
     } catch (error) {
       if (mountedRef.current) {
-        setRetryError(error instanceof Error ? error.message : 'Failed to retry');
+        setRetryError(error instanceof Error ? error.message : '다시 시도하지 못했어요.');
       }
     } finally {
       if (mountedRef.current) setRetrying(false);

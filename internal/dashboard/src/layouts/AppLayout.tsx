@@ -27,15 +27,15 @@ export default function AppLayout() {
   }, [mobileOpen]);
 
   return (
-    <div className="layout">
+    <div className={`layout${isDemo ? ' layout--demo' : ''}`}>
       {isDemo && (
         <div className="demo-banner" role="status">
           <span className="demo-banner-icon" aria-hidden="true">
             <Info size={16} strokeWidth={2} />
           </span>
           <span>
-            데모 모드입니다. 실제 앱 데이터와 편집 기능은 로컬에서{' '}
-            <code>pnpm dev</code> 실행 후 사용 가능합니다.
+            데모 모드예요. 실제 앱 데이터와 편집 기능은 로컬에서{' '}
+            <code>pnpm dev</code> 를 실행하면 사용할 수 있어요.
           </span>
         </div>
       )}
