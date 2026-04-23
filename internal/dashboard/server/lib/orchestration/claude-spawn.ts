@@ -109,16 +109,21 @@ export function spawnClaudeForSkill(opts: SpawnClaudeOptions): ChildProcessWitho
   // cwd 가 이미 루트면 중복이라 건너뛴다.
   const gitRoot = findGitRoot(opts.cwd);
   if (gitRoot && path.resolve(gitRoot) !== path.resolve(opts.cwd)) {
-    // Windows 에서는 `shell: true` 로 cmd.exe 가 재파싱하기 때문에 공백·메타문자가 있는
-    // 경로가 argv 에서 쪼개질 수 있다. 따옴표로 감싸서 하나의 토큰으로 유지한다.
-    // 경로에 `"` 가 있는 경우는 없다고 가정 (NTFS 에서 `"` 는 파일/디렉터리 이름에 금지).
-    args.push('--add-dir', process.platform === 'win32' ? `"${gitRoot}"` : gitRoot);
+    args.push('--add-dir', gitRoot);
   }
+
+  // Windows: claude 바이너리가 .exe 면 CreateProcess 로 직접 spawn 한다 (shell: false).
+  // cmd.exe (shell: true) 를 거치면 argv 가 한 줄로 합쳐지면서 시스템 프롬프트 안의
+  // `<other-skill>`, `&`, `|` 같은 문자가 cmd 메타캐릭터(리다이렉션/파이프)로 해석돼
+  // "The system cannot find the file specified." 로 즉시 실패한다.
+  // .cmd/.bat 설치(npm 글로벌 등)만 shell 래핑이 필요하므로 확장자로 분기.
+  const useShell =
+    process.platform === 'win32' && /\.(cmd|bat)$/i.test(claudePath);
 
   return spawn(claudePath, args, {
     cwd: opts.cwd,
     env: { ...process.env },
-    shell: process.platform === 'win32',
+    shell: useShell,
   });
 }
 
