@@ -71,9 +71,9 @@ PRD가 필요하면 `/ait-plan` 스킬의 대화형 프로세스를 활용.
 
 `/ait-scaffold` 는 다음을 순서대로 수행합니다:
 
-1. `pnpm new-app` 으로 **최소 앱 구조** 생성 (React + Vite + granite)
+1. `pnpm new-app` 으로 **최소 앱 구조** 생성 (React + Vite + granite) — 이미 스캐폴딩 된 상태면 스킵
 2. granite.config.ts 브랜드 정보 세팅
-3. PRD 기반으로 **라우팅(`/ait-add-routing`) · 서버 데이터(`/ait-add-query`) · TDS(`/ait-tds-setup`)** 를 AskUserQuestion 으로 각각 제안하고, 승인된 것만 연쇄 실행
+3. PRD 기반으로 **라우팅 · 서버 데이터 · TDS** 설치 여부를 자동 판단해 필요한 것만 설치 (질문 없이 규칙 기반)
 
 비게임(`partner`) 앱이라면 STEP 3 안에서 TDS 설치까지 끝나는 경우가 대부분입니다. 완료 후 **git commit**.
 

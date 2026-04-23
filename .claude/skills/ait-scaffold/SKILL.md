@@ -70,17 +70,18 @@ PRD 가 없거나 비어있으면: 라우팅·쿼리는 스킵, TDS 는 appType 
 
 ```bash
 pnpm --filter @barreleye/<app-name> typecheck
-pnpm --filter @barreleye/<app-name> dev
 ```
 
-개발 서버가 정상적으로 뜨고 홈 화면이 렌더링되는지 확인.
+typecheck 가 통과하는지, `granite.config.ts` · `package.json` 이 의도한 값으로 쓰였는지 확인.
+**dev 서버는 띄우지 않는다** — automated 모드는 장시간 실행 프로세스를 기다리지 못한다.
+사용자가 직접 `pnpm --filter @barreleye/<app-name> dev` 로 확인한다.
 
 ## 결과물
 
 - `apps/<app-name>/` 최소 앱 구조
 - granite.config.ts 브랜드 세팅 완료
-- 사용자가 선택한 추가 기능이 붙은 상태
-- 개발 서버 정상 실행 확인
+- 결정된 추가 기능이 붙은 상태
+- typecheck 통과
 
 ---
 
@@ -93,7 +94,7 @@ pnpm --filter @barreleye/<app-name> dev
 ```
 ✅ 스캐폴딩 완료: apps/<app-name>/
 설치된 기능: <선택한 기능 리스트>
-typecheck / dev 서버 OK
+typecheck OK
 ```
 
 **반드시 지킬 것**:

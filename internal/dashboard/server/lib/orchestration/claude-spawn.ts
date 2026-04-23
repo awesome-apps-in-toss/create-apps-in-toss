@@ -109,7 +109,10 @@ export function spawnClaudeForSkill(opts: SpawnClaudeOptions): ChildProcessWitho
   // cwd 가 이미 루트면 중복이라 건너뛴다.
   const gitRoot = findGitRoot(opts.cwd);
   if (gitRoot && path.resolve(gitRoot) !== path.resolve(opts.cwd)) {
-    args.push('--add-dir', gitRoot);
+    // Windows 에서는 `shell: true` 로 cmd.exe 가 재파싱하기 때문에 공백·메타문자가 있는
+    // 경로가 argv 에서 쪼개질 수 있다. 따옴표로 감싸서 하나의 토큰으로 유지한다.
+    // 경로에 `"` 가 있는 경우는 없다고 가정 (NTFS 에서 `"` 는 파일/디렉터리 이름에 금지).
+    args.push('--add-dir', process.platform === 'win32' ? `"${gitRoot}"` : gitRoot);
   }
 
   return spawn(claudePath, args, {

@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node:*)",
+      "Bash(node scripts/preflight.js:*)",
+      "Bash(node scripts/create-app.js:*)",
+      "Bash(pnpm new-app:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm preflight:*)",
+      "Bash(pnpm --filter:*)",
       "Bash(npx --yes capture-website-cli:*)",
       "Bash(npx -y capture-website-cli:*)",
       "Bash(npx capture-website-cli:*)",
@@ -13,13 +18,11 @@
       "Bash(npm run typecheck:*)",
       "Bash(npm run lint:*)",
       "Bash(npm run test:*)",
-      "Bash(npm run dev:*)",
       "Bash(pnpm run build:*)",
       "Bash(pnpm run typecheck:*)",
       "Bash(pnpm run lint:*)",
       "Bash(ait build:*)",
       "Bash(ait upload:*)",
-      "Bash(ait:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",

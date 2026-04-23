@@ -51,8 +51,12 @@ export function AppsProvider({ children }: { children: ReactNode }) {
     const connect = () => {
       if (cancelled) return;
       es = new EventSource('/api/events');
-      es.addEventListener('refresh', () => {
+      // 연결이 열리면 backoff 카운터 리셋. refresh 이벤트 기반으로만 리셋하면
+      // 장시간 idle 후 간헐 끊김이 누적돼 6회 초과 시 영구 중단된다.
+      es.addEventListener('open', () => {
         retryCount = 0;
+      });
+      es.addEventListener('refresh', () => {
         void fetchApps();
       });
       es.addEventListener('error', () => {

@@ -134,8 +134,12 @@ export function useRuns(appName: string | null): {
     const connect = () => {
       if (cancelled) return;
       es = new EventSource('/api/events');
-      es.addEventListener('refresh', () => {
+      // 연결이 열리면 backoff 카운터 리셋. refresh 이벤트는 드물게 오므로
+      // 여기서 리셋하지 않으면 오래 켜 둔 탭이 간헐적 끊김으로 누적돼 영구 중단된다.
+      es.addEventListener('open', () => {
         retryCount = 0;
+      });
+      es.addEventListener('refresh', () => {
         void refetch();
       });
       es.addEventListener('error', () => {
