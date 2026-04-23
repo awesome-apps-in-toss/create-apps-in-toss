@@ -148,12 +148,4 @@ PRD에서 추론할 정보:
 추론한 값: nameKo=<...>, aitCategory=<...>, 키워드 <개수>개
 ```
 
-**반드시 지킬 것**:
-
-- 이 스킬은 `.meta-dashboard.json` 을 **초기 생성**하는 역할이다. 이후 갱신 주체는 필드별로 나뉜다:
-  - `ait-assets`: 콘솔 텍스트 필드(`nameEn`, `aitCategory`, `subtitle`, `keywords`, `isGame`) 를 직접 머지한다.
-  - 대시보드 wizard: `prdPath`, `prdSource`, `prdReviewedAt` 을 run 종료 시 PUT API 로 갱신한다.
-  - 대시보드 서버: `logoPath`, `thumbnailPath`, `screenshotPaths`, `pipelineProgress` 는 파일/설정으로부터 자동 감지해 응답에서 보강한다 (파일에 쓰지 않음).
-  - 그 외 스킬·에이전트는 `.meta-dashboard.json` 을 직접 편집하지 않는다.
-- 다음 단계로 **어떤 슬래시 커맨드도** 권유하지 말 것. 대시보드가 파이프라인 카드로 다음 단계를 자동 안내한다.
-- 사과/추임새 최소화, 본론만.
+**규칙**: 완료 보고 1회 후 종료. 이 스킬은 `.meta-dashboard.json` **초기 생성만** 담당 — 이후 필드별 갱신은 `ait-assets`(콘솔 텍스트) / 대시보드 wizard(prd) / 서버(이미지·진행도)가 소유하며, 다른 스킬은 건드리지 않는다.

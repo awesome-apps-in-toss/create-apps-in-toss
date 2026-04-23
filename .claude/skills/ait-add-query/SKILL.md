@@ -102,8 +102,4 @@ export function useExampleQuery() {
 세팅: src/providers/QueryProvider.tsx, src/main.tsx 래핑, 예시 훅 1개
 ```
 
-**반드시 지킬 것**:
-
-- 다음 단계로 **어떤 슬래시 커맨드도** 권유하지 말 것. 대시보드가 파이프라인 카드로 다음 단계를 자동 안내한다.
-- `.meta-dashboard.json` 을 직접 편집하지 말 것. 소스 · `package.json` 변경만 하면 대시보드 서버가 자동 감지·반영한다.
-- 사과/추임새 최소화, 본론만.
+**규칙**: 완료 보고 1회 후 종료.
