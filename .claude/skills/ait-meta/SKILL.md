@@ -29,21 +29,8 @@ idempotencyKey: ait-meta
 
 현재 작업 디렉터리를 확인한다.
 
-- **`apps/{appName}/` 내부인 경우** → 해당 앱을 대상으로 STEP 1 진행
-- **레포 루트(`barreleye/`)인 경우** → `apps/` 폴더를 읽어 앱 목록을 출력하고, 어떤 앱을 초기화할지 질문한다
-
-앱 목록 출력 예시:
-
-```
-apps/ 폴더에서 발견된 앱:
-- ideal-person-report
-- coupon-wallet
-- quiz-app
-
-어떤 앱의 .meta-dashboard.json을 생성할까요?
-```
-
-대상 앱이 결정되면 `appDir = apps/{appName}/` 로 설정하고 STEP 1 진행.
+- **`apps/{appName}/` 내부인 경우** → `appDir = apps/{appName}/` 로 설정하고 STEP 1 진행
+- **그 외(레포 루트 등)** → automated 모드에서는 stdin 으로 답을 받을 수 없으므로 즉시 ❌ 실패 보고 (reason: `"appDir unresolved — cwd must be apps/<appName>"`)
 
 ---
 
@@ -58,12 +45,11 @@ apps/ 폴더에서 발견된 앱:
 5. `docs/**/*.md` 중 내용에 "문제 정의" 또는 "Problem Statement" 포함된 파일
 
 PRD를 찾으면 STEP 2로 진행.  
-**못 찾으면** → `/ait-plan` 스킬을 먼저 실행하도록 안내:
+**못 찾으면** → 즉시 ❌ 실패 보고 (STEP 2/3 생략). "다음 단계 안내" 가 아닌 이분법 실패 처리:
 
 ```
-PRD 파일을 찾지 못했습니다.
-먼저 /ait-plan 으로 PRD를 작성해주세요.
-PRD가 docs/ 폴더에 저장된 후 다시 이 스킬을 실행하면 됩니다.
+❌ .meta-dashboard.json 생성 실패
+원인: PRD 파일을 찾지 못했습니다. 해당 앱의 `docs/` 에 PRD 를 준비한 뒤 다시 실행해 주세요. (appDir=<경로>, 탐색 패턴: docs/PRD.md · docs/prd.md · docs/**/*PRD*.md 등)
 ```
 
 ---
@@ -113,7 +99,7 @@ PRD에서 추론할 정보:
   "screenshotPaths": [],
   "prdPath": "docs/PRD.md",
   "utPath": null,
-  "updatedAt": "현재 날짜 (ISO 8601, 날짜만)"
+  "updatedAt": "현재 시각 (ISO 8601 full datetime, new Date().toISOString() 상당)"
 }
 ```
 
@@ -123,7 +109,7 @@ PRD에서 추론할 정보:
 - `prdPath` 는 STEP 1에서 발견한 파일의 `appDir` 기준 상대경로
 - `isGame` 은 기본값 `false` (PRD에서 게임임이 명시된 경우만 `true`)
 - `aitCategory` 는 추론 어려우면 `"생활 > 콘텐츠"` 로 기본값 사용
-- `updatedAt` 은 오늘 날짜 (예: `"2026-04-12"`)
+- `updatedAt` 은 현재 시각의 ISO 8601 full datetime (예: `"2026-04-24T10:00:00.000Z"`) — `new Date().toISOString()` 상당 값
 
 파일 생성 후 생성된 내용을 간단히 요약해서 보여준다.
 
@@ -132,20 +118,36 @@ PRD에서 추론할 정보:
 ## 주의사항
 
 - 질문 없이 한 번에 생성한다. 어짜피 대시보드에서 수정 가능하다.
-- 이미 `.meta-dashboard.json`이 존재하면 덮어쓰기 전에 확인을 구한다.
+- 이미 `.meta-dashboard.json` 이 존재해도 automated 모드에서는 덮어쓰지 않고 ❌ 실패 보고 (reason: `"file already exists — run delete first"`). automated 에서 answer 를 못 받으므로 hang 을 방지하기 위한 명시적 실패가 더 안전.
 - 모든 경로는 `appDir` 기준 상대경로로 작성한다 (절대경로 금지).
 
 ---
 
 ## 종료
 
-파일 생성이 끝나면 **짧은 완료 보고 한 번**만 출력하고 세션을 마무리한다.
+**성공/실패를 이분법으로 한 번만 처리**하고 세션을 마무리한다.
 
-**형식**:
+### 구조화 상태 신호 (NON-NEGOTIABLE)
+
+대시보드 세션으로 실행될 때 환경변수 `AIT_RUN_STATUS_PATH` 로 per-run JSON 파일 경로가 전달된다. **텍스트로 ✅/❌ 를 찍기 전에 반드시** 이 경로에 `Write` 로 기록한다.
+
+성공: `{"status":"success"}`
+실패: `{"status":"failure","reason":"<한 줄 원인>"}`
+
+대시보드 밖에서는 환경변수가 비어있을 수 있으니 있을 때만 기록한다.
+
+### ✅ 성공 사용자 보고
 
 ```
 ✅ .meta-dashboard.json 생성: <파일 경로>
 추론한 값: nameKo=<...>, aitCategory=<...>, 키워드 <개수>개
 ```
 
-**규칙**: 완료 보고 1회 후 종료. 이 스킬은 `.meta-dashboard.json` **초기 생성만** 담당 — 이후 필드별 갱신은 `ait-assets`(콘솔 텍스트) / 대시보드 wizard(prd) / 서버(이미지·진행도)가 소유하며, 다른 스킬은 건드리지 않는다.
+### ❌ 실패 사용자 보고
+
+```
+❌ .meta-dashboard.json 생성 실패
+원인: <PRD 미존재 / 대상 앱 식별 불가 / Write 실패 등>
+```
+
+**규칙**: 상태 파일 1회 기록 + 보고 1회 후 종료. 이 스킬은 `.meta-dashboard.json` **초기 생성만** 담당 — 이후 필드별 갱신은 `ait-assets`(콘솔 텍스트) / 대시보드 wizard(prd) / 서버(이미지·진행도)가 소유하며, 다른 스킬은 건드리지 않는다.

@@ -35,6 +35,10 @@ export interface SpawnClaudeOptions {
   /** 스킬의 실행 모드. automated 는 stdin 이 즉시 닫혀 사용자 응답을 받을 수 없으므로
    *  시스템 프롬프트에서 질문 금지 + 강제 완료 계약을 심어야 한다. */
   mode: 'interactive' | 'automated';
+  /** 스킬이 종료 직전 `{"status":"success"|"failure","reason"?:string}` 을 기록할
+   *  per-run 파일 절대경로. 환경변수 `AIT_RUN_STATUS_PATH` 로 주입되어 스킬이 읽는다.
+   *  run-session 이 child close 시 이 파일을 읽어 COMPLETED/FAILED 를 결정한다. */
+  statusPath: string;
 }
 
 /**
@@ -57,6 +61,7 @@ function buildDashboardSystemNote(mode: 'interactive' | 'automated'): string {
 
   parts.push(
     '[Termination] 산출물 저장 후엔 파일 경로 한두 줄 요약만 출력하고 턴을 끝낸다. 추가 질문·사과/추임새·다음 단계 슬래시 커맨드 권유(`/ait-*`, `/<skill>`, "Phase/Step N" 조어 포함) 금지 — 다음 단계는 대시보드가 안내한다. 남은 작업은 "dev 서버에서 확인해 보세요" 같은 일반 문장으로만.',
+    '[Status signal] 턴을 끝내기 직전, 반드시 환경변수 `AIT_RUN_STATUS_PATH` 가 가리키는 파일에 `Write` 툴로 `{"status":"success"}` 또는 `{"status":"failure","reason":"<한 줄 원인>"}` 을 기록한다. 이 파일이 대시보드의 COMPLETED/FAILED 판정의 유일한 구조화 신호다. 파일이 없으면 실패로 간주된다. 종료 직전 Write 를 반드시 수행하고, tool_result 로 성공 확인 후 턴을 마무리하라. 사용자에게 보여주는 ✅/❌ 텍스트는 보조 UX 일 뿐이며 판정에는 쓰이지 않는다.',
     '[Metadata] 산출물을 관례 경로에 저장만 하면 서버가 자동 감지한다 — 에셋 `apps/<app>/assets/*`, PRD `apps/<app>/docs/prd/*.md` 또는 `docs/PRD.md`, UT 리포트 `apps/<app>/docs/user-test/*.md`, 스캐폴딩 `granite.config.ts`, 빌드 `.ait`. `.meta-dashboard.json` 은 대시보드 SSOT 이므로 직접 편집 금지 (ait-meta 초기 생성만 예외).',
   );
 
@@ -109,7 +114,7 @@ export function spawnClaudeForSkill(opts: SpawnClaudeOptions): ChildProcessWitho
 
   return spawn(claudePath, args, {
     cwd: opts.cwd,
-    env: { ...process.env },
+    env: { ...process.env, AIT_RUN_STATUS_PATH: opts.statusPath },
     shell: useShell,
   });
 }

@@ -376,8 +376,16 @@ export function RunLivePanel({
    *  automated 스킬은 어차피 한 턴 뒤 CLI 가 자연 exit 하므로 버튼 불필요. */
   interactive?: boolean;
 }) {
-  const { state, logs, streamingText, artifacts, questions, error, markLatestQuestionAnswered } =
-    useRunStream(runId);
+  const {
+    state,
+    logs,
+    streamingText,
+    artifacts,
+    questions,
+    error,
+    failureReason,
+    markLatestQuestionAnswered,
+  } = useRunStream(runId);
   const logBodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const shouldStickToBottomRef = useRef(true);
@@ -546,6 +554,11 @@ export function RunLivePanel({
         )}
       </div>
       {error && <div className="run-live-panel-error">연결 오류: {error}</div>}
+      {failureReason && (
+        <div className="run-live-panel-error" role="alert">
+          실행 실패: {failureReason}
+        </div>
+      )}
       {artifacts.length > 0 && (
         <div className="run-live-panel-artifacts">
           {artifacts.map((artifact, index) => (

@@ -1,4 +1,7 @@
 import { randomUUID } from 'crypto';
+import { readFileSync, unlinkSync } from 'fs';
+import os from 'os';
+import path from 'path';
 import type { ChildProcessWithoutNullStreams } from 'child_process';
 import type { Response } from 'express';
 import { spawnClaudeForSkill, encodeUserInput, buildInitialPrompt } from './claude-spawn.js';
@@ -20,7 +23,14 @@ export type RunEventKind =
   | 'question'
   | 'artifact'
   | 'done'
+  /** 프로세스/IO 레벨 오류 — child process crash, stdin write/end 실패 등.
+   *  클라이언트는 재연결·복원 맥락 신호로 해석한다 (EventSource 의 네이티브
+   *  `error` 이벤트와 의미적으로 같은 층위). 실패 reason UI 용도로 쓰지 말 것. */
   | 'error'
+  /** 스킬 도메인 실패 이유 — 상태 파일 누락 / `{status:"failure",reason}` 기록 등.
+   *  클라이언트는 data.message 를 run 실패 UI 의 reason 으로 표시한다.
+   *  `error` 와 달리 재연결 트리거가 아니라 실패 원인 전달용. */
+  | 'run_error'
   /** 어시스턴트가 새 text 블록을 시작했다. 클라이언트는 streaming 버퍼를 연다. */
   | 'text_start'
   /** text 블록 증분 — 클라이언트는 현재 streaming 버퍼에 append 한다. */
@@ -44,6 +54,56 @@ export const TERMINAL_STATES: ReadonlySet<RunState> = new Set([
 ]);
 
 const RETENTION_AFTER_TERMINAL_MS = 60 * 1000;
+
+export interface RunStatusReport {
+  status: 'success' | 'failure';
+  reason?: string;
+}
+
+/**
+ * 스킬이 종료 직전 `Write` 로 기록하는 상태 파일을 읽는다.
+ *
+ * 대시보드는 Claude CLI exit code 만으로는 스킬의 "의미적 실패"(예:
+ * `.meta-dashboard.json` 파싱 실패, PRD 미존재, Write 실패, 스킬 누락,
+ * 질문 대기 중 타임아웃 등)를 구분할 수 없다. CLI 자체는 이런 경우에도
+ * exit 0 으로 끝나므로 exit 0 = 성공 으로 간주하면 silent success 가 발생한다.
+ *
+ * 이를 막기 위해 각 스킬 spawn 에 per-run 파일 경로를 `AIT_RUN_STATUS_PATH`
+ * 환경변수로 전달하고, 스킬이 종료 직전 거기에 구조화된 JSON 을 기록하도록
+ * 계약화한다. 파일의 **존재 자체**가 "스킬이 의식적으로 종료했다" 는 신호다.
+ *
+ * 규약:
+ * - 파일 없음 → FAILED (status missing — 스킬이 기록을 누락했거나 Write 실패)
+ * - `{"status":"success"}` → COMPLETED
+ * - `{"status":"failure","reason":"..."}` → FAILED (+ reason 을 error 이벤트로 방송)
+ * - JSON 파싱 실패·스키마 위반 → FAILED (신호 자체가 깨졌으므로 실패로 간주)
+ */
+export function readRunStatusFile(statusPath: string): RunStatusReport | null {
+  let raw: string;
+  try {
+    raw = readFileSync(statusPath, 'utf-8');
+  } catch {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as { status?: unknown; reason?: unknown };
+    if (parsed.status === 'success') return { status: 'success' };
+    if (parsed.status === 'failure') {
+      return {
+        status: 'failure',
+        ...(typeof parsed.reason === 'string' && parsed.reason.trim()
+          ? { reason: parsed.reason.trim() }
+          : {}),
+      };
+    }
+    return { status: 'failure', reason: `invalid status field: ${String(parsed.status)}` };
+  } catch (err) {
+    return {
+      status: 'failure',
+      reason: `status file JSON parse error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
 
 export interface RunSessionInit {
   skill: string;
@@ -89,6 +149,10 @@ export class RunSession {
   /** 현재 열려있는 text content block 인덱스. null 이면 스트리밍 중인 텍스트 블록 없음.
    *  비-text 블록(tool_use) 의 content_block_stop 을 걸러내는 데 쓴다. */
   private activeTextBlockIndex: number | null = null;
+  /** 스킬이 종료 직전 JSON 상태 리포트를 기록하는 per-run 파일 경로.
+   *  `AIT_RUN_STATUS_PATH` 환경변수로 스킬에 전달된다. child close 시 이 파일을 읽어
+   *  COMPLETED/FAILED 를 결정하고, 읽은 직후 삭제해 다음 run 에 영향이 없게 한다. */
+  readonly statusPath: string;
 
   constructor(init: RunSessionInit) {
     this.runId = init.runId ?? randomUUID();
@@ -100,11 +164,16 @@ export class RunSession {
     this.mode = init.mode;
     this.startedAt = new Date().toISOString();
     this.state = 'DRAFT';
+    this.statusPath = path.join(os.tmpdir(), `ait-run-status-${this.runId}.json`);
 
     this.transition('VALIDATING_INPUT');
     this.transition('READY');
 
-    this.child = spawnClaudeForSkill({ cwd: init.cwd, mode: init.mode });
+    this.child = spawnClaudeForSkill({
+      cwd: init.cwd,
+      mode: init.mode,
+      statusPath: this.statusPath,
+    });
     this.transition('RUNNING');
     this.wireChild();
 
@@ -282,7 +351,42 @@ export class RunSession {
     });
     this.child.on('close', (code) => {
       this.exitCode = code ?? 0;
-      this.transition(code === 0 ? 'COMPLETED' : 'FAILED');
+      // CLI 종료 코드(크래시 등) + 스킬이 기록한 상태 파일 두 신호를 모두 본다.
+      // 상태 파일은 스킬이 "의미적 실패"(CLI 자체는 exit 0 이지만 도메인 로직 실패)
+      // 를 구조화된 JSON 으로 전달하는 유일한 통로. 파일이 없으면 스킬이 의식적
+      // 종료 계약을 어긴 것이므로 exit code 와 무관하게 실패로 간주한다.
+      // 읽은 즉시 파일은 삭제한다.
+      const report = readRunStatusFile(this.statusPath);
+      try {
+        unlinkSync(this.statusPath);
+      } catch {
+        // 파일이 원래 없었거나 이미 삭제됨 — 무시. (없음은 위에서 실패로 처리)
+      }
+      const nonZeroExit = code !== 0;
+      // 파일 없음(null) 도 실패로 취급. silent success 차단.
+      const reportedFailure = report === null || report.status === 'failure';
+      if (report === null) {
+        // 상태 파일 자체가 없으면 원인을 UI 에 명시해 디버깅 단서를 남긴다.
+        // 도메인 실패 채널(run_error) 로 보내 클라이언트가 재연결이 아닌
+        // "실패 reason" 으로 처리하게 한다.
+        this.emit({
+          kind: 'run_error',
+          data: {
+            message:
+              'status file missing — 스킬이 AIT_RUN_STATUS_PATH 기록을 누락했습니다',
+          },
+          at: new Date().toISOString(),
+        });
+      } else if (report.status === 'failure' && report.reason) {
+        // 실패 이유를 UI 에 전달. 상태 전이(emit kind: 'state') 보다 먼저 보내
+        // 클라이언트가 FAILED 상태와 함께 표시할 수 있게 한다.
+        this.emit({
+          kind: 'run_error',
+          data: { message: report.reason },
+          at: new Date().toISOString(),
+        });
+      }
+      this.transition(nonZeroExit || reportedFailure ? 'FAILED' : 'COMPLETED');
       this.emit({
         kind: 'done',
         data: { exitCode: this.exitCode, finalState: this.state },

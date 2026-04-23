@@ -5,3 +5,10 @@ dist
 .claude/settings.local.json
 .turbo
 /logs/
+
+# dashboard 상태 (per-app, 로컬 전용)
+apps/*/.meta-dashboard.json
+!apps/sample/.meta-dashboard.json
+
+# 대시보드 per-run status 신호 (os.tmpdir 에 쓰지만 안전망)
+ait-run-status-*.json

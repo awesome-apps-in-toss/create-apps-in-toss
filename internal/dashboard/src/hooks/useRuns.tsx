@@ -185,7 +185,12 @@ export function useRunStream(runId: string | null): {
   streamingText: string | null;
   artifacts: Array<{ path?: string; preview?: string }>;
   questions: RunQuestion[];
+  /** 연결/재연결 상태 메시지. 네이티브 EventSource error(네트워크 끊김) 로 세팅됨.
+   *  도메인 실패 reason 은 여기가 아니라 `failureReason` 으로 전달된다. */
   error: string | null;
+  /** 스킬 도메인 실패 reason — 서버 `run_error` SSE 이벤트로 수신.
+   *  `error` (재연결 맥락) 와 달리 FAILED 상태 UI 에 그대로 노출할 메시지. */
+  failureReason: string | null;
   connected: boolean;
   /** optimistic 마킹 — sendRunInput 성공 직후 호출해 서버 user_input SSE 도착 전에 질문 카드를 닫는다.
    *  toolUseId 가 주어지면 해당 질문을, 없으면 "가장 오래된 미답변" 을 마킹. */
@@ -197,6 +202,7 @@ export function useRunStream(runId: string | null): {
   const [artifacts, setArtifacts] = useState<Array<{ path?: string; preview?: string }>>([]);
   const [questions, setQuestions] = useState<RunQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [failureReason, setFailureReason] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
@@ -207,6 +213,7 @@ export function useRunStream(runId: string | null): {
     setArtifacts([]);
     setQuestions([]);
     setError(null);
+    setFailureReason(null);
 
     let cancelled = false;
     let es: EventSource | null = null;
@@ -321,6 +328,16 @@ export function useRunStream(runId: string | null): {
           return next;
         });
       });
+      es.addEventListener('run_error', (e) => {
+        // 스킬 도메인 실패 reason. EventSource 네이티브 `error` (네트워크/재연결)
+        // 와는 별개 채널 — UI 에서 FAILED 상태의 원인 메시지로 표시한다.
+        const payload = parseData((e as MessageEvent).data);
+        trackSeq(payload);
+        const message = (payload.data as { message?: string } | undefined)?.message;
+        if (typeof message === 'string' && message.length > 0) {
+          setFailureReason(message);
+        }
+      });
       es.addEventListener('done', (e) => {
         trackSeq(parseData((e as MessageEvent).data));
         setConnected(false);
@@ -373,6 +390,7 @@ export function useRunStream(runId: string | null): {
     artifacts,
     questions,
     error,
+    failureReason,
     connected,
     markLatestQuestionAnswered,
   };

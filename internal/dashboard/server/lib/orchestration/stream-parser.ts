@@ -1,3 +1,5 @@
+import path from 'path';
+
 // Claude CLI --output-format stream-json 파서.
 // 한 줄의 JSON이 여러 파생 이벤트를 낼 수 있으므로 배열을 반환한다.
 //
@@ -178,6 +180,11 @@ function parseAssistantBlocks(blocks: AssistantBlock[]): ParsedEvent[] {
       if (block.name === 'Write' || block.name === 'Edit' || block.name === 'NotebookEdit') {
         const p = block.input?.file_path ?? block.input?.path;
         if (typeof p === 'string') {
+          // 대시보드 per-run status 파일은 artifact 가 아니므로 UI 노출 제외.
+          const base = path.basename(p);
+          if (base.startsWith('ait-run-status-') && base.endsWith('.json')) {
+            continue;
+          }
           events.push({ kind: 'artifact', artifact: { path: p }, raw: block });
           continue;
         }

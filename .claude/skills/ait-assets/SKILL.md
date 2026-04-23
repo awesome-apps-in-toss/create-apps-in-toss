@@ -93,7 +93,7 @@ prompt:
     - 가로형 썸네일: 1932x828 PNG + HTML 원본
 
   브랜드: granite.config.ts의 brand.primaryColor 사용
-  PRD: apps/<app-name>/docs/planning.md 참고
+  PRD: apps/<app-name>/docs/PRD.md 참고
 
   작업 완료 후 생성된 파일 경로와 디자인 컨셉 1줄 요약을 보고해 주세요.
 ```
@@ -139,8 +139,8 @@ apps/<app-name>/assets/
 | `nameEn` | console-text.md §1 영어 앱 이름 | 문자열 |
 | `aitCategory` | console-text.md §2 카테고리 1차 후보 | 예: `교육·자기계발 > 자격증·시험 > 운전·교통` |
 | `subtitle` | console-text.md §3 부제 | 문자열 |
-| `keywords` | console-text.md §5 키워드 | 쉼표 분리 → 문자열 배열 |
-| `isGame` | §2 결정 결과 | 비게임이면 `false` |
+| `keywords` | console-text.md §5 키워드 | `console-text.md §5` 의 키워드는 **쉼표 단독 구분자**(`,`) 로 분리. 키워드 내부에 쉼표 사용 금지 (한글 쉼표 포함). 각 토큰은 앞뒤 공백 제거 후 빈 문자열 제외. 예: `"퀴즈, 성향, 재미"` → `["퀴즈","성향","재미"]`. |
+| `isGame` | §2 결정 결과 | `console-text.md §2` 에 **명시적으로** `게임` / `비게임` 결정이 적혀있을 때만 덮어쓴다. 명시 없으면 기존 값을 유지 (특히 기존이 `true` 인 게임 앱을 false 로 덮을 위험 방지). |
 
 > 그 외 필드(`nameKo`, `description`, `logoPath`, `thumbnailPath`, `screenshotPaths`, `prdPath`, `prdReviewedAt`, `prdSource`, `pipelineProgress`, `updatedAt`)는 **건드리지 않습니다.**
 > 각각 다른 주체(ait-plan, 대시보드 서버, wizard)가 소유합니다.
@@ -154,9 +154,70 @@ apps/<app-name>/assets/
 2. 파싱한 객체에 nameEn/aitCategory/subtitle/keywords/isGame 만 머지
 3. updatedAt 필드를 새 ISO 타임스탬프로 갱신 (new Date().toISOString() 상당 값)
 4. Write 로 들여쓰기 2칸 JSON 으로 저장 (기존 포맷 유지)
+
+- `isGame` 은 console-text.md 에 명시가 있을 때만 치환. 없으면 기존 객체의 값을 그대로 두고 머지 대상에서 제외.
 ```
 
-파일이 없거나 JSON 파싱 실패 시엔 스킬을 중단하고 사용자에게 보고합니다 — `.meta-dashboard.json` 초기 생성은 `ait-meta` 스킬의 책임입니다.
+### 파일 상태별 처리 (이분법)
+
+| 상태 | 처리 |
+|---|---|
+| 파일 정상 | 위 4단계로 머지 후 저장 → ✅ 성공 |
+| **파일 없음** | 아래 ".meta-dashboard.json 신규 생성" 절차를 직접 수행 후 4단계 머지 이어서 → ✅ 성공. PRD 를 찾지 못하면 즉시 ❌ 실패 |
+| JSON 파싱 실패 | 즉시 중단 → ❌ 실패 (파일 경로 + 파싱 오류 메시지 포함) |
+| Write 실패 | ❌ 실패 (권한/경로 문제 원인 보고) |
+
+"그 다음엔 `/ait-meta` 를 실행해 주세요" 같은 후속 단계 안내는 금지 — 스킬이 직접 호출하거나 실패로 보고.
+
+### .meta-dashboard.json 신규 생성
+
+cwd 가 이미 `apps/<app-name>/` 로 고정된 interactive 세션이라는 전제로, 파일이 없을 때 이 스킬이 직접 초기 파일을 만든 뒤 곧장 위 4단계 머지로 이어간다.
+
+1. **PRD 탐색**: 아래 패턴을 순서대로 탐색.
+   1. `docs/PRD.md`
+   2. `docs/prd.md`
+   3. `docs/**/*PRD*.md` (glob)
+   4. `docs/**/*prd*.md` (glob)
+   5. `docs/**/*.md` 중 내용에 "문제 정의" 또는 "Problem Statement" 포함된 파일
+
+   못 찾으면 즉시 ❌ 실패 보고 (reason: `"PRD not found"`). 이후 단계 진행 금지.
+
+2. **소스코드 분석**: `package.json`, `granite.config.ts` 또는 `granite.config.js`, `src/` 최상위 파일(index.tsx, App.tsx, main.tsx 등), 그리고 PRD 를 읽어 아래 값을 추론.
+   - **nameKo**: 앱의 한국어 이름 (PRD 제목 또는 첫 문단에서 추출)
+   - **nameEn**: 앱의 영문 이름 (PRD 슬로건 또는 package.json name 에서 추출)
+   - **subtitle**: 한 줄 소개 (PRD 의 핵심 가치 제안에서 10자 내외로 요약)
+   - **description**: 앱 설명 (PRD 문제 정의 + 가치 제안을 2-3문장으로 요약)
+   - **keywords**: 핵심 키워드 5개 내외 (PRD 기능/타깃 유저 기반)
+   - **aitCategory**: 앱인토스 카테고리 (추론 어려우면 `"생활 > 콘텐츠"` 기본값)
+   - **isGame**: 기본값 `false` (PRD 에서 게임임이 명시된 경우만 `true`)
+
+3. **초기 파일 Write**: 아래 스키마로 `.meta-dashboard.json` 을 생성한다.
+
+   ```json
+   {
+     "version": 1,
+     "nameKo": "추론된 한국어 이름",
+     "nameEn": "Inferred English Name",
+     "isGame": false,
+     "aitCategory": "추론된 카테고리",
+     "subtitle": "한 줄 소개",
+     "description": "앱 설명 2-3문장",
+     "keywords": ["키워드1", "키워드2", "키워드3"],
+     "logoPath": null,
+     "thumbnailPath": null,
+     "screenshotPaths": [],
+     "prdPath": "docs/PRD.md",
+     "utPath": null,
+     "updatedAt": "2026-04-24T10:00:00.000Z"
+   }
+   ```
+
+   - `prdPath` 는 STEP 1 에서 발견한 파일의 `appDir` 기준 상대경로
+   - `logoPath`, `thumbnailPath`, `screenshotPaths`, `utPath` 는 항상 null / 빈 배열
+   - `updatedAt` 은 `new Date().toISOString()` 상당 값 (ISO 8601 full datetime)
+   - 모든 경로는 `appDir` 기준 상대경로 (절대경로 금지)
+
+4. 생성 직후 곧장 "반영 방법" 의 4단계 머지로 이어가 `nameEn/aitCategory/subtitle/keywords/isGame` 을 console-text.md 확정값으로 치환 후 다시 Write 한다.
 
 ## 결과물
 
@@ -166,13 +227,40 @@ apps/<app-name>/assets/
 
 ## 종료
 
-산출물이 확정되면 **짧은 완료 보고 한 번**만 출력하고 세션을 마무리한다.
+**성공/실패를 이분법으로 한 번만 처리**하고 세션을 마무리한다. 후속 단계 안내 금지.
 
-**형식**:
+### 구조화 상태 신호 (NON-NEGOTIABLE)
+
+대시보드 세션으로 실행될 때 환경변수 `AIT_RUN_STATUS_PATH` 로 per-run JSON 파일 경로가 전달된다. **텍스트로 ✅/❌ 를 찍기 전에 반드시** 이 경로에 `Write` 로 기록한다. 대시보드는 이 파일만 보고 COMPLETED/FAILED 를 결정한다.
+
+성공:
+```json
+{"status":"success"}
+```
+
+실패:
+```json
+{"status":"failure","reason":"<한 줄 원인 — 예: `.meta-dashboard.json` JSON 파싱 실패>"}
+```
+
+대시보드 밖(터미널 직접 호출)에서는 환경변수가 비어있을 수 있으니 있을 때만 기록한다.
+
+### ✅ 성공 사용자 보고 (상태 파일 기록 이후)
 
 ```
 ✅ 에셋 점검 완료
 생성/확인된 파일: <경로 리스트>
+.meta-dashboard.json 머지 필드: nameEn/aitCategory/subtitle/keywords/isGame
 ```
 
-**규칙**: 완료 보고 1회 후 종료. `.meta-dashboard.json` 이미지 경로는 건드리지 말고(서버 자동 감지), 콘솔 텍스트 5개 필드(`nameEn`/`aitCategory`/`subtitle`/`keywords`/`isGame`)만 "콘솔 텍스트 필드 반영" 절차로 머지.
+### ❌ 실패 사용자 보고 (상태 파일 기록 이후)
+
+실패 시 원인과 (이미 수행된 경우) graphic-designer 에이전트의 정리 결과를 함께 보고한다.
+
+```
+❌ 에셋 점검 실패
+원인: <구체적 사유 — 예: `.meta-dashboard.json` JSON 파싱 실패 / PRD 미존재 / graphic-designer 이미지 생성 3회 실패>
+정리된 임시 파일: <있으면 목록, 없으면 "없음">
+```
+
+**규칙**: 상태 파일 1회 기록 + 보고 1회 후 종료. `.meta-dashboard.json` 이미지 경로는 건드리지 말고(서버 자동 감지), 콘솔 텍스트 5개 필드(`nameEn`/`aitCategory`/`subtitle`/`keywords`/`isGame`)만 "콘솔 텍스트 필드 반영" 절차로 머지.

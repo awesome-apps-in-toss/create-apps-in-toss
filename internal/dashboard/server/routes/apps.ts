@@ -10,6 +10,7 @@ import type {
   PipelineStepStatus,
 } from '../../src/types/index.js';
 import { DEFAULT_CONSOLE_CONFIG } from '../../src/types/index.js';
+import { getDefaultRunStore, type RunStore } from '../lib/orchestration/run-store.js';
 
 const router: Router = Router();
 const APPS_DIR = path.resolve(process.cwd(), '../../apps');
@@ -223,7 +224,27 @@ const ASSET_LOGO_CANDIDATES = ['assets/logo.png', 'assets/logo.svg'];
 const ASSET_THUMBNAIL_CANDIDATES = ['assets/thumbnail-wide.png', 'assets/thumbnail-wide.svg'];
 const ASSET_SCREENSHOT_CANDIDATES = ['assets/thumbnail-square.png', 'assets/thumbnail-square.svg'];
 
-async function autoDetectAssets(appDir: string, console_: AppConsoleConfig): Promise<void> {
+async function autoDetectAssets(
+  appDir: string,
+  console_: AppConsoleConfig,
+  appName: string,
+  runStore: RunStore | null,
+): Promise<void> {
+  // ait-assets 스킬이 최근 성공(COMPLETED) 으로 끝난 적이 있을 때만 감지 결과를 반영.
+  // 이렇게 하지 않으면 graphic-designer 가 로고만 생성하고 run 이 FAILED 로 끝난 경우에도
+  // 파일이 남아 있다는 이유로 메타에 반영되어 "로고는 완료된 것처럼" 오인된다.
+  const canReflect = runStore
+    ? Boolean(
+        runStore.findLatestSuccess({
+          skill: 'ait-assets',
+          appName,
+          idempotencyKey: null,
+        }),
+      )
+    : false;
+
+  if (!canReflect) return;
+
   // logoPath 자동 감지
   if (!console_.logoPath) {
     for (const candidate of ASSET_LOGO_CANDIDATES) {
@@ -260,6 +281,10 @@ async function loadAllApps(): Promise<AppInfo[]> {
     .filter((e) => e.isDirectory() && e.name !== 'dashboard')
     .map((e) => e.name);
 
+  // autoDetectAssets 의 "최근 성공 run" gate 용. runStore 가 어떤 이유로든 실패하면
+  // null 을 그대로 넘겨 "감지 무시" 쪽으로 안전하게 폴백한다.
+  const runStore = await getDefaultRunStore().catch(() => null);
+
   const results = await Promise.all(
     appFolders.map(async (folderName) => {
       const appDir = path.join(APPS_DIR, folderName);
@@ -280,8 +305,9 @@ async function loadAllApps(): Promise<AppInfo[]> {
           readConsoleConfig(appDir),
         ]);
         const docs = await readDocs(appDir, consoleConfig);
-        // 에셋 자동 감지 → config 보강 (logoPath, thumbnailPath 등)
-        await autoDetectAssets(appDir, consoleConfig);
+        // 에셋 자동 감지 → config 보강 (logoPath, thumbnailPath 등).
+        // 단, ait-assets 스킬이 성공으로 끝난 적 있을 때만 반영 (부분 산출물 오인 방지).
+        await autoDetectAssets(appDir, consoleConfig, folderName, runStore);
         const pipelineProgress = await autoDetectPipelineProgress(appDir, granite, consoleConfig, docs, deps);
         // consoleConfig에 자동 감지 결과 반영
         consoleConfig.pipelineProgress = pipelineProgress;

@@ -126,7 +126,7 @@ memory: project
 사용자 개입 없이 아래 루프를 혼자 돕니다. 브리핑 메모·후보 목록 등 중간 산출물은 외부로 노출하지 않고, **최종 PNG만 보고**합니다.
 
 ```
-1. [읽기] granite.config.ts · docs/planning.md · src/ 훑어서 서비스 파악
+1. [읽기] granite.config.ts · docs/PRD.md · src/ 훑어서 서비스 파악
 2. [브리핑] 속으로 4개 질문에 답을 작성 (문서화 X, 추론용):
    - 앱이 무엇을 해주는가 (동사)
    - 핵심 대상·공간·객체 (명사)
@@ -166,7 +166,7 @@ memory: project
       - 캐릭터 스타일이면 얼굴/특징이 **단일 실루엣**으로 보이는가? 머리와 몸이 두 덩어리로 분절되면 탈락
       - 배경 장식(별·점·꽃 등)이 노이즈 픽셀로 뭉개져 주제를 흐리는가? 흐리면 탈락 (배경 장식은 48x48 에서 거의 항상 실패)
       - **자기 편향 배제 자문**: "내가 의도한 심볼 의미를 모르는 사람"이 이 48x48 실루엣을 보고 앱 이름을 추측한다면? 그 추측이 실제 앱 이름과 같은 방향인가? 다르면 탈락
-      (통과 시 `logo-48.png` 는 검증용이므로 사용자에게 제출할 때는 삭제하거나 `_sources/` 하위로 이동)
+      (통과 시 `logo-48.png` 는 반드시 삭제 — "## 작업 후 정리" 참고)
 8. [반복] 탈락이면 4번(다른 후보) 또는 5번(같은 후보 디테일 수정)으로 복귀 (최대 3회)
 9. [제출] 통과하면 최종 PNG 경로만 보고
 ```
@@ -356,14 +356,14 @@ npx --yes sharp-cli -i logo.svg -o logo.png -f png resize 600 600
 
 **Fallback: `capture-website-cli` (bash)**
 
-MCP가 동작하지 않는 환경에서는 bash로 대체:
+MCP가 동작하지 않는 환경에서는 bash로 대체. `npx --yes` 는 전역·로컬 설치 없이 npm 캐시에서만 실행되므로 허용 — 별도 `npm install` / `pnpm add puppeteer` 는 "## 작업 후 정리" 의 **금지 사항** 참고:
 
 ```bash
 npx --yes capture-website-cli file:///absolute/path/thumbnail.html \
   --output=thumbnail.png --width=1000 --height=1000 --scale-factor=1
 ```
 
-> Node.js 스크립트로 puppeteer를 직접 실행할 때, 앱의 `package.json`에 `"type": "module"`이 설정돼 있으면 스크립트 확장자를 **`.cjs`** 로 저장해야 require 기반 코드가 동작합니다.
+> 임시 `.cjs` / `.js` 스크립트를 작성해 puppeteer 를 직접 부르는 방식은 최후의 수단이다. 사용했다면 작업 종료 직전 반드시 삭제("## 작업 후 정리"). 앱의 `package.json` 에 `"type": "module"` 이 설정돼 있으면 스크립트 확장자는 **`.cjs`** 로 저장한다.
 
 ### 썸네일 HTML 예시 (1000x1000 정방형)
 
@@ -511,15 +511,26 @@ OpenAI Images API를 bash + curl로 직접 호출합니다 (MCP 미사용).
 
 `.env`에서 키를 로드한 뒤 OpenAI Images API에 POST → 반환된 b64 이미지를 PNG로 저장합니다. URL 방식이 아닌 **`response_format: b64_json`** 을 사용해 URL 만료(1시간) 문제를 피합니다.
 
+임시 JSON 응답 덤프 경로는 크로스플랫폼 (Windows `/tmp` 없음) 으로 결정합니다:
+
+```bash
+TMP_JSON="$(node -e "console.log(require('path').join(require('os').tmpdir(),'oai-response.json'))")"
+```
+
+전체 흐름:
+
 ```bash
 # 1) 키 로드
 set -a; source .env; set +a
 
-# 2) API 호출 (dall-e-3 예시)
+# 2) 임시 응답 경로 (OS tmp)
+TMP_JSON="$(node -e "console.log(require('path').join(require('os').tmpdir(),'oai-response.json'))")"
+
+# 3) API 호출 (dall-e-3 예시)
 curl -s -X POST https://api.openai.com/v1/images/generations \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d @- <<EOF > /tmp/oai-response.json
+  -d @- <<EOF > "$TMP_JSON"
 {
   "model": "dall-e-3",
   "prompt": "<공통 스타일 키워드> + <개별 캐릭터 묘사>",
@@ -529,15 +540,16 @@ curl -s -X POST https://api.openai.com/v1/images/generations \
 }
 EOF
 
-# 3) b64 디코딩 → PNG 저장
-jq -r '.data[0].b64_json' /tmp/oai-response.json \
+# 4) b64 디코딩 → PNG 저장
+jq -r '.data[0].b64_json' "$TMP_JSON" \
   | base64 -d > apps/<app-name>/src/assets/characters/<name>.png
 
-# 4) 에러 체크 (성공 시 b64_json 존재, 실패 시 .error 존재)
-jq -e '.error' /tmp/oai-response.json && echo "API error, 프롬프트/키 확인" && exit 1
+# 5) 에러 체크 후 임시 파일 정리 ("## 작업 후 정리" 강제)
+jq -e '.error' "$TMP_JSON" >/dev/null && { rm -f "$TMP_JSON"; echo "API error, 프롬프트/키 확인"; exit 1; }
+rm -f "$TMP_JSON"
 ```
 
-> `jq` 미설치 환경에서는 `python -c "import sys,json,base64; d=json.load(open('/tmp/oai-response.json')); open('out.png','wb').write(base64.b64decode(d['data'][0]['b64_json']))"` 등으로 대체 가능.
+> `jq` 미설치 환경에서는 `python -c "import sys,json,base64,os; p=os.path.join(os.environ.get('TMP') or '/tmp','oai-response.json'); d=json.load(open(p)); open('out.png','wb').write(base64.b64decode(d['data'][0]['b64_json']))"` 등으로 대체 가능.
 
 ### 출력 경로
 
@@ -576,6 +588,40 @@ apps/<app-name>/
         └── illustrations/
             └── ...
 ```
+
+## 작업 후 정리 (NON-NEGOTIABLE)
+
+자율 워크플로가 **성공으로 종료되든 실패로 중단되든** 아래 정리 작업을 반드시 수행한다.
+
+### 금지 사항 (환경 오염 방지)
+
+- `npm install puppeteer` / `pnpm add puppeteer` / `yarn add puppeteer` **전면 금지**. 앱·루트 `package.json` 에 puppeteer 를 의존성으로 추가하지 말 것.
+- 허용 경로는 두 가지뿐:
+  1. Puppeteer MCP (`mcp__puppeteer__*`)
+  2. `npx --yes capture-website-cli ...` (npm 캐시에서만 실행, 프로젝트 의존성 추가 없음)
+- 위 두 경로 모두 실패하면 자율 실행을 중단하고 사용자에게 환경 문제로 보고. 이를 우회하기 위한 ad-hoc 설치 금지.
+
+### 정리 대상
+
+작업 종료 직전 아래 파일들이 남아 있으면 반드시 삭제한다.
+
+| 파일/경로 | 처리 | 생성 위치 |
+|---|---|---|
+| `apps/<app-name>/assets/logo-48.png` | 삭제 | Section 1-7-d 48x48 검증 |
+| `capture.cjs`, `screenshot.cjs`, `*.screenshot.js` 등 일회성 캡처 스크립트 | 삭제 | Section 2 HTML→PNG 대체 루트 |
+| OS tmp 디렉터리의 `oai-response.json` 류 API 응답 dump | 삭제 | Section 4 DALL-E |
+| `_sources/` 외부의 중간 SVG/HTML (예: `logo-draft*.svg`) | 삭제 | 반복 루프 중간 산출물 |
+
+`_sources/` 하위(`logo.svg`, `thumbnail-square.html`, `thumbnail-wide.html`) 는 **원본이므로 보존**한다.
+
+### 보고 규칙 (이분법)
+
+- 최종 PNG 생성 + 정리 완료 → ✅ 성공 보고 1회 (파일 경로 리스트 + 디자인 컨셉 1줄)
+- 제약 위반/환경 오류/3회 반복 실패 → ❌ 실패 보고 1회 (원인 + 정리한 임시 파일 목록)
+
+"다음에 /ait-meta 를 실행해주세요" 같은 후속 단계 지시는 이 에이전트의 책임이 아니다 — 호출한 스킬이 알아서 처리한다.
+
+---
 
 ## 레퍼런스
 
