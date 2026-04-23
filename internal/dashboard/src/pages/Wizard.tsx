@@ -297,6 +297,9 @@ function ActiveStepCard({
   const appName = app.folderName;
   const { raw } = useSkills();
   const meta = raw.find((s) => s.id === step.skill);
+  // 초기값은 step.skill 이 바뀔 때만 재계산한다. app 객체는 SSE refresh 로 매번 새 레퍼런스가
+  // 오는데, 여기에 의존하면 사용자가 타이핑하는 도중 입력이 리셋되는 버그가 있었다.
+  // review 모드 전환(forcedPrdPath/reviewMode 변경)은 URL 이동으로만 발생하므로 같이 의존에 포함.
   const initialValues = useMemo(() => {
     const base = computeInitialInputs(step.skill, app);
     // review 모드에서는 planningDoc 을 강제로 우선시하고, idea 필드에는 검토 요청 문구를 박아둔다.
@@ -310,7 +313,8 @@ function ActiveStepCard({
       };
     }
     return base;
-  }, [step.skill, app, reviewMode, forcedPrdPath]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.skill, reviewMode, forcedPrdPath]);
   const [inputState, setInputState] = useState<SkillInputState>({
     values: initialValues,
     prompt: '',
@@ -324,10 +328,12 @@ function ActiveStepCard({
   const [error, setError] = useState<string | null>(null);
 
   // step 이 바뀔 때마다 초기값으로 재설정 (다음 단계로 넘어갔을 때 이전 값 잔상 제거).
+  // ⚠️ initialValues 자체를 dep 에 넣으면 SSE refresh 때 사용자 입력이 초기화된다 (위 useMemo 참고).
   useEffect(() => {
     setInputState({ values: initialValues, prompt: '', missingRequired: false });
     setAutoFilledKeys(new Set(Object.keys(initialValues)));
-  }, [step.skill, initialValues]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.skill, reviewMode, forcedPrdPath]);
 
   const hasInputs = (meta?.inputs ?? []).length > 0;
   // ait-plan 은 아이디어가 없어도 CLI가 대화로 받을 수 있지만, 위저드 UX 상 5자 이상 권장.
@@ -393,9 +399,6 @@ function ActiveStepCard({
       <p className="wizard-active-produces">
         이 단계가 만드는 것 → <strong>{step.produces}</strong>
       </p>
-      {step.requires && (
-        <p className="wizard-active-requires">먼저 완료돼야 해요: {step.requires}</p>
-      )}
 
       {running && latestRun ? (
         <div className="wizard-active-running">
@@ -458,6 +461,13 @@ function ActiveStepCard({
                     ? '필수 입력 칸이 비어 있어요'
                     : undefined;
               const hintVisible = ctaDisabled && !!errorHint;
+              const ctaLabel = starting
+                ? '시작하는 중…'
+                : retryable
+                  ? '다시 시작'
+                  : reviewMode
+                    ? 'AI 검토 시작'
+                    : `${step.label} 시작하기`;
               return (
                 <>
                   <button
@@ -468,18 +478,12 @@ function ActiveStepCard({
                     title={errorHint}
                     aria-describedby={hintVisible ? 'wizard-cta-hint' : undefined}
                   >
-                    {starting
-                      ? '시작하는 중…'
-                      : retryable
-                        ? '다시 시작'
-                        : reviewMode
-                          ? 'AI 검토 시작'
-                          : '이 단계 시작'}
+                    {ctaLabel}
                   </button>
                   {hintVisible && (
-                    <span id="wizard-cta-hint" className="sr-only">
+                    <p id="wizard-cta-hint" className="wizard-cta-hint" role="status">
                       {errorHint}
-                    </span>
+                    </p>
                   )}
                 </>
               );

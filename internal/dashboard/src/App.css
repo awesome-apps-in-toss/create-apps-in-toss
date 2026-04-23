@@ -4432,9 +4432,18 @@ textarea.skill-input-control {
 }
 .wizard-active-actions {
   display: flex;
-  gap: 8px;
+  gap: 8px 12px;
   margin-top: 12px;
   flex-wrap: wrap;
+  align-items: center;
+}
+.wizard-cta-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-tertiary);
+  flex: 1 1 220px;
+  min-width: 0;
 }
 .wizard-cta {
   display: inline-flex;
@@ -5416,7 +5425,7 @@ textarea.skill-input-control {
   transition: background 0.15s ease;
 }
 .run-error-card-retry:hover:not(:disabled) {
-  background: var(--color-danger);
+  background: var(--color-danger-strong);
 }
 .run-error-card-retry:disabled {
   opacity: 0.4;

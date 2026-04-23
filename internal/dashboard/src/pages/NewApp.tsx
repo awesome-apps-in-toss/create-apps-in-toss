@@ -15,14 +15,20 @@ export default function NewApp() {
   const [mode, setMode] = useState<CreateMode>('planning-first');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 에러의 출처가 "앱 폴더 이름 형식 검증"일 때만 name input 에 aria-invalid 를 건다.
+  // 서버 실패·네트워크 오류까지 aria-invalid 로 오표시되면 스크린리더가 "잘못된 입력" 이라고
+  // 잘못된 필드를 지목하게 된다.
+  const [nameInvalid, setNameInvalid] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
     setError(null);
+    setNameInvalid(false);
 
     if (!APP_NAME_RE.test(appName)) {
       setError('앱 폴더 이름은 영문 소문자 또는 숫자로 시작하고, 하이픈(-), 점(.), 언더스코어(_)만 사용할 수 있어요.');
+      setNameInvalid(true);
       return;
     }
 
@@ -79,12 +85,18 @@ export default function NewApp() {
             type="text"
             placeholder="예: my-mini-app"
             value={appName}
-            onChange={(e) => setAppName(e.target.value)}
+            onChange={(e) => {
+              setAppName(e.target.value);
+              // 사용자가 수정을 시작하면 이전 제출 에러 메시지를 즉시 지워서
+              // "이미 고쳤는데도 빨간 에러가 남아 있는" 상태를 피한다.
+              if (error) setError(null);
+              if (nameInvalid) setNameInvalid(false);
+            }}
             disabled={submitting}
             required
             maxLength={64}
-            aria-describedby={`new-app-name-hint${error ? ' new-app-error' : ''}`}
-            aria-invalid={error ? true : undefined}
+            aria-describedby={`new-app-name-hint${nameInvalid ? ' new-app-error' : ''}`}
+            aria-invalid={nameInvalid ? true : undefined}
           />
           <p id="new-app-name-hint" className="new-app-hint">영문 소문자 또는 숫자로 시작, 하이픈(-) · 점(.) · 언더스코어(_) 사용 가능.</p>
         </div>
@@ -158,17 +170,6 @@ export default function NewApp() {
             </div>
           </label>
         </fieldset>
-
-        <div className="new-app-command-preview">
-          <p className="new-app-command-label">
-            {mode === 'full' ? '다음 동작' : '다음 단계'}
-          </p>
-          <p className="new-app-command-note">
-            {mode === 'full'
-              ? '앱 폴더와 빈 프로젝트를 만든 뒤 바로 AI 대화로 이동해 라우팅·서버 데이터·디자인 시스템을 결정해요.'
-              : '앱 폴더를 먼저 만든 뒤 웹 마법사로 이동해 AI와 함께 기획 → 프로젝트 세팅 → 디자인 시스템 순으로 안내해 드려요.'}
-          </p>
-        </div>
 
         {error && (
           <div id="new-app-error" className="new-app-error" role="alert">

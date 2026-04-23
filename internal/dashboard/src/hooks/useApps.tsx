@@ -28,6 +28,9 @@ export function AppsProvider({ children }: { children: ReactNode }) {
       if (!res.ok) throw new Error('Failed to fetch apps');
       const data = (await res.json()) as AppInfo[];
       setApps(data);
+      // 성공 시 이전 에러 상태를 반드시 해제해야 SSE 재연결 이후 "서버 연결 실패"
+      // 배너가 영구적으로 남지 않는다.
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
