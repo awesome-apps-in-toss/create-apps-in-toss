@@ -8,6 +8,10 @@ const router: Router = Router();
 const APPS_DIR = path.resolve(process.cwd(), '../../apps');
 const META_FILE = '.meta-dashboard.json';
 
+const BASE_CONSOLE_CONFIG: AppConsoleConfig = {
+  ...DEFAULT_CONSOLE_CONFIG,
+};
+
 // ── 앱 ID 검증 (경로 탈출 방지) ──
 const APP_ID_RE = /^[a-z0-9][a-z0-9._-]*$/;
 function validateAppId(id: string | undefined): id is string {
@@ -38,6 +42,44 @@ const ALLOWED_CONSOLE_FIELDS = new Set([
   'prdReviewedAt', 'prdSource',
 ]);
 
+export async function readConsoleConfigByAppId(appId: string): Promise<AppConsoleConfig> {
+  const configPath = path.join(APPS_DIR, appId, META_FILE);
+  try {
+    const raw = await fs.readFile(configPath, 'utf-8');
+    return { ...DEFAULT_CONSOLE_CONFIG, ...(JSON.parse(raw) as Partial<AppConsoleConfig>) };
+  } catch {
+    return { ...DEFAULT_CONSOLE_CONFIG };
+  }
+}
+
+export async function updateConsoleConfig(
+  appId: string,
+  patch: Partial<AppConsoleConfig>,
+): Promise<AppConsoleConfig> {
+  const appDir = path.join(APPS_DIR, appId);
+  const configPath = path.join(appDir, META_FILE);
+
+  return withWriteLock(appId, async () => {
+    let existing: Partial<AppConsoleConfig> = {};
+    try {
+      const raw = await fs.readFile(configPath, 'utf-8');
+      existing = JSON.parse(raw) as Partial<AppConsoleConfig>;
+    } catch {
+      // 파일 없으면 기본값 사용
+    }
+
+    const merged: AppConsoleConfig = {
+      ...BASE_CONSOLE_CONFIG,
+      ...existing,
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await fs.writeFile(configPath, JSON.stringify(merged, null, 2), 'utf-8');
+    return merged;
+  });
+}
+
 // GET /api/apps/:id/console
 router.get('/:id/console', async (req, res) => {
   const appId = req.params['id'];
@@ -45,13 +87,7 @@ router.get('/:id/console', async (req, res) => {
     res.status(400).json({ error: 'Invalid app id' });
     return;
   }
-  const configPath = path.join(APPS_DIR, appId, META_FILE);
-  try {
-    const raw = await fs.readFile(configPath, 'utf-8');
-    res.json(JSON.parse(raw));
-  } catch {
-    res.json({ ...DEFAULT_CONSOLE_CONFIG });
-  }
+  res.json(await readConsoleConfigByAppId(appId));
 });
 
 // PUT /api/apps/:id/console
@@ -71,28 +107,7 @@ router.put('/:id/console', async (req, res) => {
     }
   }
 
-  const appDir = path.join(APPS_DIR, appId);
-  const configPath = path.join(appDir, META_FILE);
-
-  const updated = await withWriteLock(appId, async () => {
-    let existing: Partial<AppConsoleConfig> = {};
-    try {
-      const raw = await fs.readFile(configPath, 'utf-8');
-      existing = JSON.parse(raw) as Partial<AppConsoleConfig>;
-    } catch {
-      // 파일 없으면 기본값 사용
-    }
-
-    const merged: AppConsoleConfig = {
-      ...DEFAULT_CONSOLE_CONFIG,
-      ...existing,
-      ...filtered,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await fs.writeFile(configPath, JSON.stringify(merged, null, 2), 'utf-8');
-    return merged;
-  });
+  const updated = await updateConsoleConfig(appId, filtered as Partial<AppConsoleConfig>);
 
   res.json(updated);
 });
@@ -130,28 +145,13 @@ router.post('/:id/upload-prd', async (req, res) => {
   await fs.writeFile(prdPath, content, 'utf-8');
 
   // .meta-dashboard.json에 prdPath 기록
-  const configPath = path.join(appDir, META_FILE);
   const relPath = `docs/prd/${safeName}`;
 
-  await withWriteLock(appId, async () => {
-    let existing: Partial<AppConsoleConfig> = {};
-    try {
-      const raw = await fs.readFile(configPath, 'utf-8');
-      existing = JSON.parse(raw) as Partial<AppConsoleConfig>;
-    } catch {
-      // 파일 없으면 새로 생성
-    }
-
-    const updated: AppConsoleConfig = {
-      ...DEFAULT_CONSOLE_CONFIG,
-      ...existing,
-      prdPath: relPath,
-      // 외부에서 가져온 기획서는 정책 검토가 필요한 상태로 표기.
-      prdSource: 'uploaded',
-      prdReviewedAt: null,
-      updatedAt: new Date().toISOString(),
-    };
-    await fs.writeFile(configPath, JSON.stringify(updated, null, 2), 'utf-8');
+  await updateConsoleConfig(appId, {
+    prdPath: relPath,
+    // 외부에서 가져온 기획서는 정책 검토가 필요한 상태로 표기.
+    prdSource: 'uploaded',
+    prdReviewedAt: null,
   });
 
   res.json({ path: relPath });

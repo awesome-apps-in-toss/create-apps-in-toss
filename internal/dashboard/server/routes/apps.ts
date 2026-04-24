@@ -45,12 +45,12 @@ async function readConsoleConfig(appDir: string): Promise<AppConsoleConfig> {
 
 // ── 문서 경로 자동 감지 + 확인 ──────────────────────────────────
 // prdPath / utPath 가 설정되지 않은 경우 관례적 경로에서 자동 탐색
-const PRD_SCAN_PATHS = [
+export const PRD_SCAN_PATHS = [
   'docs/PRD.md',
   'docs/prd.md',
   'docs/prd/PRD.md',
 ];
-const PRD_SCAN_GLOBS = ['docs/prd/*.md', 'docs/*PRD*.md', 'docs/*prd*.md'];
+export const PRD_SCAN_GLOBS = ['docs/prd/*.md', 'docs/*PRD*.md', 'docs/*prd*.md'];
 
 const UT_SCAN_PATHS = [
   'docs/user-test/report.md',
@@ -58,14 +58,14 @@ const UT_SCAN_PATHS = [
 ];
 const UT_SCAN_GLOBS = ['docs/ait-ut-*.md', 'docs/ut-*.md', 'docs/user-test/*.md'];
 
-async function findFirstFile(appDir: string, candidates: string[]): Promise<string | null> {
+export async function findFirstFile(appDir: string, candidates: string[]): Promise<string | null> {
   for (const rel of candidates) {
     if (await fileExists(path.join(appDir, rel))) return rel;
   }
   return null;
 }
 
-async function findByGlob(appDir: string, patterns: string[]): Promise<string | null> {
+export async function findByGlob(appDir: string, patterns: string[]): Promise<string | null> {
   for (const pattern of patterns) {
     // 간단한 glob: docs/prd/*.md → docs/prd/ 디렉토리에서 .md 파일 탐색
     const parts = pattern.split('/');
@@ -87,7 +87,7 @@ async function findByGlob(appDir: string, patterns: string[]): Promise<string | 
   return null;
 }
 
-async function autoDetectDoc(
+export async function autoDetectDoc(
   appDir: string,
   configuredPath: string | null,
   scanPaths: string[],
@@ -209,7 +209,7 @@ async function calcCompletion(
   return { total: layer1 + layer2 + layer3, layer1, layer2, layer3 };
 }
 
-async function fileExists(p: string): Promise<boolean> {
+export async function fileExists(p: string): Promise<boolean> {
   try {
     await fs.access(p);
     return true;

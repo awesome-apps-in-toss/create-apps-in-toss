@@ -153,6 +153,7 @@ export class RunSession {
    *  `AIT_RUN_STATUS_PATH` 환경변수로 스킬에 전달된다. child close 시 이 파일을 읽어
    *  COMPLETED/FAILED 를 결정하고, 읽은 직후 삭제해 다음 run 에 영향이 없게 한다. */
   readonly statusPath: string;
+  private finishedByUser = false;
 
   constructor(init: RunSessionInit) {
     this.runId = init.runId ?? randomUUID();
@@ -281,6 +282,7 @@ export class RunSession {
       return { ok: false, reason: 'finishInteractive only applies to interactive sessions' };
     }
     try {
+      this.finishedByUser = true;
       this.child.stdin.end();
       return { ok: true };
     } catch (err) {
@@ -363,20 +365,39 @@ export class RunSession {
         // 파일이 원래 없었거나 이미 삭제됨 — 무시. (없음은 위에서 실패로 처리)
       }
       const nonZeroExit = code !== 0;
-      // 파일 없음(null) 도 실패로 취급. silent success 차단.
-      const reportedFailure = report === null || report.status === 'failure';
+      const missingStatusButGracefulInteractiveFinish =
+        report === null && !nonZeroExit && this.mode === 'interactive' && this.finishedByUser;
+      // 기본 정책은 status 파일이 유일한 성공/실패 신호.
+      // 다만 interactive 세션은 사용자가 "이 단계 마치기"로 stdin 을 닫아
+      // 정상적으로 종료시키는 흐름이 있어, 스킬이 상태 기록만 누락한 경우까지
+      // 전부 FAILED 로 보면 UX가 과하게 깨진다. 따라서 exit 0 + interactive +
+      // status 파일 누락은 임시 호환 모드로 COMPLETED 처리하되 경고 로그는 남긴다.
+      const reportedFailure =
+        report === null ? !missingStatusButGracefulInteractiveFinish : report.status === 'failure';
       if (report === null) {
-        // 상태 파일 자체가 없으면 원인을 UI 에 명시해 디버깅 단서를 남긴다.
-        // 도메인 실패 채널(run_error) 로 보내 클라이언트가 재연결이 아닌
-        // "실패 reason" 으로 처리하게 한다.
-        this.emit({
-          kind: 'run_error',
-          data: {
-            message:
-              'status file missing — 스킬이 AIT_RUN_STATUS_PATH 기록을 누락했습니다',
-          },
-          at: new Date().toISOString(),
-        });
+        if (missingStatusButGracefulInteractiveFinish) {
+          this.emit({
+            kind: 'log',
+            data: {
+              stream: 'system',
+              line:
+                '⚠️ status file missing, but interactive run ended cleanly. Treating as completed for compatibility.',
+            },
+            at: new Date().toISOString(),
+          });
+        } else {
+          // 상태 파일 자체가 없으면 원인을 UI 에 명시해 디버깅 단서를 남긴다.
+          // 도메인 실패 채널(run_error) 로 보내 클라이언트가 재연결이 아닌
+          // "실패 reason" 으로 처리하게 한다.
+          this.emit({
+            kind: 'run_error',
+            data: {
+              message:
+                'status file missing — 스킬이 AIT_RUN_STATUS_PATH 기록을 누락했습니다',
+            },
+            at: new Date().toISOString(),
+          });
+        }
       } else if (report.status === 'failure' && report.reason) {
         // 실패 이유를 UI 에 전달. 상태 전이(emit kind: 'state') 보다 먼저 보내
         // 클라이언트가 FAILED 상태와 함께 표시할 수 있게 한다.
