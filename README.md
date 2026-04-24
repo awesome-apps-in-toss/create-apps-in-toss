@@ -1,4 +1,6 @@
 # Create Apps in Toss
+<img width="400" alt="meta" src="https://github.com/user-attachments/assets/a6b6ff32-380c-4f2e-8ccd-b85827b68c27" />
+
 
 **토스 미니앱 개발의 모든 것, 한 곳에서.**
 
