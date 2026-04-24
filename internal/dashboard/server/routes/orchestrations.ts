@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { promises as fs } from 'fs';
 import path from 'path';
 import {
   RunSession,
@@ -24,6 +25,13 @@ async function persistGeneratedPrdPath(session: RunSession): Promise<void> {
   const existing = await readConsoleConfigByAppId(session.appName);
   const detected = await autoDetectDoc(appDir, existing.prdPath, PRD_SCAN_PATHS, PRD_SCAN_GLOBS);
   if (!detected.exists || !detected.path) return;
+
+  const absolutePrdPath = path.resolve(appDir, detected.path);
+  try {
+    await fs.access(absolutePrdPath);
+  } catch {
+    return;
+  }
 
   await updateConsoleConfig(session.appName, {
     prdPath: detected.path,

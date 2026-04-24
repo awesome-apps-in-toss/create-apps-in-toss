@@ -44,7 +44,25 @@ idempotencyKey: ait-build
 
 ## 종료
 
-typecheck·lint·build 가 끝나면 **짧은 완료 보고 한 번**만 출력하고 세션을 마무리한다.
+typecheck·lint·build 가 끝나면 **구조화 상태 신호를 먼저 기록한 뒤**, 짧은 완료 보고 한 번만 출력하고 세션을 마무리한다.
+
+### 구조화 상태 신호 (NON-NEGOTIABLE)
+
+공통 규약: `.claude/skills/_shared/run-status-contract.md`
+
+대시보드 세션으로 실행될 때 환경변수 `AIT_RUN_STATUS_PATH` 로 per-run JSON 파일 경로가 전달된다. **텍스트로 ✅/❌ 를 찍기 전에 반드시** 이 경로에 `Write` 로 기록한다.
+
+성공:
+```json
+{"status":"success"}
+```
+
+실패:
+```json
+{"status":"failure","reason":"<한 줄 원인>"}
+```
+
+대시보드 밖에서는 환경변수가 비어있을 수 있으니 있을 때만 기록한다.
 
 **형식**:
 

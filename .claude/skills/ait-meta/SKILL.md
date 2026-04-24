@@ -106,6 +106,8 @@ PRD에서 추론할 정보:
 
 ### 구조화 상태 신호 (NON-NEGOTIABLE)
 
+공통 규약: `.claude/skills/_shared/run-status-contract.md`
+
 대시보드 세션으로 실행될 때 환경변수 `AIT_RUN_STATUS_PATH` 로 per-run JSON 파일 경로가 전달된다. **텍스트로 ✅/❌ 를 찍기 전에 반드시** 이 경로에 `Write` 로 기록한다.
 
 성공: `{"status":"success"}`
