@@ -35,6 +35,8 @@ idempotencyKey: ait-build
 
 3. 빌드 결과 검증 및 배포 절차 안내는 문서를 따른다 (번들 용량, CORS Origin, 콘솔 업로드, 테스트 절차).
 
+4. automated 모드이므로 `AskUserQuestion` 을 호출하지 않는다. 선택/확인이 필요하면 안전한 기본값으로 진행하거나 즉시 실패로 종료하고, **실패 시에도 사용자 보고 전에 `AIT_RUN_STATUS_PATH` 에 failure JSON 을 먼저 기록**한다.
+
 ## 결과물
 
 - 빌드 성공 및 `.ait` 파일 생성

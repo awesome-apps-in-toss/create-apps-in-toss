@@ -60,6 +60,10 @@ export interface RunStatusReport {
   reason?: string;
 }
 
+export function isCompatInteractiveSuccess(report: RunStatusReport | null): boolean {
+  return report === null;
+}
+
 /**
  * 스킬이 종료 직전 `Write` 로 기록하는 상태 파일을 읽는다.
  *
@@ -366,7 +370,7 @@ export class RunSession {
       }
       const nonZeroExit = code !== 0;
       const missingStatusButGracefulInteractiveFinish =
-        report === null && !nonZeroExit && this.mode === 'interactive' && this.finishedByUser;
+        isCompatInteractiveSuccess(report) && !nonZeroExit && this.mode === 'interactive' && this.finishedByUser;
       // 기본 정책은 status 파일이 유일한 성공/실패 신호.
       // 다만 interactive 세션은 사용자가 "이 단계 마치기"로 stdin 을 닫아
       // 정상적으로 종료시키는 흐름이 있어, 스킬이 상태 기록만 누락한 경우까지

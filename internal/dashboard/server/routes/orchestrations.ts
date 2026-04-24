@@ -135,7 +135,11 @@ async function attachStore(session: RunSession): Promise<void> {
             session.exitCode ?? null,
             session.endedAt ?? null
           );
-          if (TERMINAL_STATES.has(session.state) && !terminalBroadcast) {
+          if (
+            event.kind === 'done' &&
+            TERMINAL_STATES.has(session.state) &&
+            !terminalBroadcast
+          ) {
             terminalBroadcast = true;
             void (async () => {
               try {
