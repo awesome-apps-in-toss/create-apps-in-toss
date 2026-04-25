@@ -15,8 +15,9 @@
 | 서버 데이터 연결 (TanStack Query) | — | `/ait-add-query` |
 | 토스 스타일 UI (TDS) | `docs/launch-flow/04-tds-setup-guide.md` | `/ait-tds-setup` |
 | 구현 | `docs/launch-flow/05-implementation-guide.md` | `/ait-implement` |
-| 검수 | `docs/launch-flow/06-review-checklist.md` | `/ait-review` |
-| 빌드 & 배포 | `docs/launch-flow/07-build-deploy-guide.md` | `/ait-build` |
+| 세로 스크린샷 3장 | `docs/launch-flow/06-screenshots-guide.md` | `/ait-screenshots` |
+| 검수 | `docs/launch-flow/07-review-checklist.md` | `/ait-review` |
+| 빌드 & 배포 | `docs/launch-flow/08-build-deploy-guide.md` | `/ait-build` |
 | UT 시뮬레이션 | — | `/ait-ut` |
 | 앱 메타 생성 | — | `/ait-meta` |
 | 로드맵 · 설계 원칙 | `docs/roadmap.md` | — |
@@ -28,15 +29,15 @@
 
 ---
 
-## 앱인토스 출시 파이프라인 (7단계)
+## 앱인토스 출시 파이프라인 (8단계)
 
 ```
-/ait-plan → /ait-assets → /ait-scaffold → /ait-tds-setup → /ait-implement → /ait-review → /ait-build
-     ↑                                                                                              ↑
-  정책검토 포함                                                                              콘솔 업로드 안내
+/ait-plan → /ait-assets → /ait-scaffold → /ait-tds-setup → /ait-implement → /ait-screenshots → /ait-review → /ait-build
+     ↑                                                                                                                  ↑
+  정책검토 포함                                                                                                  콘솔 업로드 안내
 ```
 
-`/ait-launch` 를 사용하면 7단계를 순차적으로 실행한다.
+`/ait-launch` 를 사용하면 8단계를 순차적으로 실행한다. STEP 6 (`/ait-screenshots`) 만 dev 서버 기동이 필요하고, 오케스트레이터가 implement 종료 시점에 자동으로 띄운다.
 
 ---
 
@@ -54,7 +55,7 @@ barreleye/
 │   ├── dashboard/           # 관리 대시보드
 │   └── create-apps-in-toss/ # 스캐폴더 패키지 (upstream 전용, scaffold 시 제거됨)
 ├── docs/
-│   ├── launch-flow/        # 앱인토스 7단계 출시 플로우
+│   ├── launch-flow/        # 앱인토스 8단계 출시 플로우
 │   ├── architecture/       # 아키텍처 (overview, dependency-layers)
 │   ├── conventions/        # 코드 컨벤션 (code-style, commits)
 │   ├── guides/             # 기술 가이드 (create-app, dependencies)
@@ -63,16 +64,17 @@ barreleye/
 ├── .claude/
 │   ├── agents/
 │   │   └── graphic-designer.md
-│   └── skills/             # Claude 스킬 (ait-* 코어 13개 + impeccable 디자인 17개)
+│   └── skills/             # Claude 스킬 (ait-* 코어 14개 + impeccable 디자인 17개)
 │       ├── ait-plan/           # 아이디어→정책검토→PRD
 │       ├── ait-meta/           # .meta-dashboard.json 자동 생성
 │       ├── ait-preflight/      # 사전 환경 체크 (MCP·도구·env)
-│       ├── ait-assets/         # 이미지/텍스트 리소스 생성
+│       ├── ait-assets/         # 로고+가로 썸네일+텍스트 리소스 생성
 │       ├── ait-scaffold/       # 최소 스캐폴딩 + 추가 기능 제안
 │       ├── ait-add-routing/    # 화면 이동 설정 (React Router)
 │       ├── ait-add-query/      # 서버 데이터 연결 (TanStack Query)
 │       ├── ait-tds-setup/      # 토스 스타일 UI (TDS)
 │       ├── ait-implement/      # 기능 구현
+│       ├── ait-screenshots/    # dev 서버 기동 후 세로 스크린샷 3장 캡처
 │       ├── ait-review/         # 검수 체크리스트
 │       ├── ait-build/          # 빌드 & 배포
 │       ├── ait-launch/         # 전체 플로우 오케스트레이터
@@ -141,11 +143,11 @@ pnpm preflight    # Claude 스킬·에이전트 동작 환경 사전 체크 (MCP
 
 | 이름 | 역할 |
 |------|------|
-| `graphic-designer` 에이전트 | 앱 에셋 생성 (로고, 썸네일, 스크린샷, DALL-E 캐릭터) |
+| `graphic-designer` 에이전트 | 앱 에셋 생성 (로고, 썸네일, 스크린샷, gpt-image-1 캐릭터·일러스트) |
 | `puppeteer` MCP | HTML → PNG 캡처, dev 서버 스크린샷 |
 
 설정 파일: `.mcp.json` (프로젝트 루트)
-DALL-E는 MCP 미사용, bash + curl로 OpenAI Images API 직접 호출 (그래픽 디자이너 에이전트 Section 4 참고)
+gpt-image-1 (OpenAI 최신 이미지 모델) 은 MCP 미사용, bash + curl 로 직접 호출. 앱 화면용 일러스트는 `background: "transparent"` 가 기본 (그래픽 디자이너 에이전트 Section 4 참고)
 
 ### impeccable 디자인 스킬 관리 정책
 

@@ -134,7 +134,7 @@ async function shareContent(url: string, text: string) {
 
 ## 구현 시 필수 준수사항
 
-> 상세 UX/디자인 규칙은 `06-review-checklist.md`를 참고. 구현 중 특히 주의할 핵심 항목만 아래에 기재.
+> 상세 UX/디자인 규칙은 `07-review-checklist.md`를 참고. 구현 중 특히 주의할 핵심 항목만 아래에 기재.
 
 - Safe Area 영역 침범 금지
 - 자사 앱/서비스 설치 유도 금지

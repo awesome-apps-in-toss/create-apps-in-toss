@@ -168,11 +168,20 @@ async function autoDetectPipelineProgress(
     }
   }
 
-  // Step 7: .ait 파일 존재 → 빌드 완료
-  if (!merged[7]) {
+  // Step 6: 세로 스크린샷 3장 이상 → 스크린샷 단계 완료
+  // autoDetectAssets 가 assets/screenshots/*.png 를 스캔해 screenshotPaths 에 채워둔 상태.
+  if (!merged[6] && console_.screenshotPaths.length >= 3) {
+    merged[6] = {
+      completedAt: '',
+      artifacts: { screenshots: console_.screenshotPaths.slice(0, 3).join(',') },
+    };
+  }
+
+  // Step 8: .ait 파일 존재 → 빌드 완료
+  if (!merged[8]) {
     if (await fileExists(path.join(appDir, '.ait'))) {
       const stat = await fs.stat(path.join(appDir, '.ait')).catch(() => null);
-      merged[7] = { completedAt: stat ? stat.mtime.toISOString().slice(0, 10) : '' };
+      merged[8] = { completedAt: stat ? stat.mtime.toISOString().slice(0, 10) : '' };
     }
   }
 
@@ -222,7 +231,7 @@ async function fileExists(p: string): Promise<boolean> {
 // ait-assets 스킬이 생성한 파일을 자동으로 찾아 config에 반영
 const ASSET_LOGO_CANDIDATES = ['assets/logo.png', 'assets/logo.svg'];
 const ASSET_THUMBNAIL_CANDIDATES = ['assets/thumbnail-wide.png', 'assets/thumbnail-wide.svg'];
-const ASSET_SCREENSHOT_CANDIDATES = ['assets/thumbnail-square.png', 'assets/thumbnail-square.svg'];
+const ASSET_SCREENSHOT_DIR = 'assets/screenshots';
 
 async function autoDetectAssets(
   appDir: string,
@@ -263,13 +272,20 @@ async function autoDetectAssets(
       }
     }
   }
-  // screenshotPaths 자동 감지
+  // screenshotPaths 자동 감지 — assets/screenshots/ 디렉토리의 PNG 들을 정렬해 모두 수집
   if (console_.screenshotPaths.length === 0) {
-    for (const candidate of ASSET_SCREENSHOT_CANDIDATES) {
-      if (await fileExists(path.join(appDir, candidate))) {
-        console_.screenshotPaths = [candidate];
-        break;
+    const screenshotDir = path.join(appDir, ASSET_SCREENSHOT_DIR);
+    try {
+      const files = await fs.readdir(screenshotDir);
+      const screenshots = files
+        .filter((f) => /\.png$/i.test(f))
+        .sort()
+        .map((f) => `${ASSET_SCREENSHOT_DIR}/${f}`);
+      if (screenshots.length > 0) {
+        console_.screenshotPaths = screenshots;
       }
+    } catch {
+      // 디렉토리 없음 — 스크린샷 미생성 상태, 그대로 둔다
     }
   }
 }

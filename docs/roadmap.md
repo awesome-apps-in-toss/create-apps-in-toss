@@ -9,7 +9,7 @@
 ## 1. 목표 (North Star)
 
 1. **템플릿 단일화**: `npx create-apps-in-toss`로 생성된 모든 프로젝트가 upstream 변경(보안 패치, 앱인토스 SDK 호환성, 신규 스킬)을 **안전하게 자동 수신**한다.
-2. **비개발자 친화**: 대시보드가 `/ait-plan → /ait-build` 7단계를 GUI 위저드로 감싸서, 사용자는 “아이디어 입력 → 단계별 확인 → 콘솔 업로드”만 수행한다. 터미널/코드 편집 없음.
+2. **비개발자 친화**: 대시보드가 `/ait-plan → /ait-build` 8단계를 GUI 위저드로 감싸서, 사용자는 “아이디어 입력 → 단계별 확인 → 콘솔 업로드”만 수행한다. 터미널/코드 편집 없음.
 3. **Claude Code OAuth 전용**: 로컬 CLI가 이미 로그인된 사용자 세션으로만 동작한다. 별도 API 결제/토큰 프록시/클라우드 실행 **없음**.
 
 ## 2. 설계 원칙 / 약관 경계 (불변)
@@ -50,7 +50,7 @@
 | 7-skill 오케스트레이션 | `POST /api/orchestrations { skill, appName, input, forceRerun }` — `readSkillMeta` 로 검증, scaffold/launch 는 REPO_ROOT 나머지는 `apps/<appName>` 실행 |
 | SQLite 영속화 | `better-sqlite3` + `runs`·`events` 테이블, WAL 모드. 서버 재기동 시 고아 run 을 FAILED 로 마킹 |
 | idempotency | 동일 (skill,appName) 이 RUNNING 이면 그걸 반환, (skill,appName,idempotencyKey) 의 최근 COMPLETED 가 있으면 캐시 재사용 — `forceRerun:true` 로 우회 |
-| Run Timeline UI | `<RunTimeline>` 이 7단계 세로 카드 + 최근 run 상태/시간/exit 표시. 실행 시 인라인 SSE 라이브 로그 패널 |
+| Run Timeline UI | `<RunTimeline>` 이 8단계 세로 카드 + 최근 run 상태/시간/exit 표시. 실행 시 인라인 SSE 라이브 로그 패널 |
 | Claude CLI 진단 | `GET /api/diagnostics/claude` + `<ClaudeStatus>` 배너 — 설치/로그인/버전 요약 |
 | 에러 복구 카드 | exitCode·stderr 힌트 기반 한국어 진단 + 원샷 다시 시도 |
 | 입력 폼 템플릿 | `SKILL.md` frontmatter `inputs` 선언을 기반으로 `<SkillInputForm>` 이 동적 렌더 (text/textarea/color/select/file) |
@@ -64,7 +64,7 @@
 **목적**: 오케스트레이션 엔진 + 비개발자 대응 **최소 위저드**를 세운다.
 
 ### Week 3–4: 오케스트레이션 확장 ✅
-- [x] 7개 파이프라인 스킬 전부를 `/api/orchestrations`로 실행 가능하게 확장
+- [x] 8개 파이프라인 스킬 전부를 `/api/orchestrations`로 실행 가능하게 확장
 - [x] `RunSession` 영속화 (SQLite, `internal/dashboard/data/runs.db`)
 - [x] 재실행/이어하기 (idempotencyKey 기반 중복 스킵)
 - [x] 대시보드에 **Run Timeline** UI (현재 단계, 대기중 입력, 아티팩트 미리보기)

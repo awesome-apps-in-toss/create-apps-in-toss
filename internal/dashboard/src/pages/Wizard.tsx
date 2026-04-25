@@ -8,6 +8,7 @@ import AppAvatar from '@/components/AppAvatar';
 import ClaudeStatus from '@/components/ClaudeStatus';
 import RunTimeline, { RunLivePanel, type RunCompletionResult } from '@/components/RunTimeline';
 import SkillInputForm from '@/components/SkillInputForm';
+import DevServerControl from '@/components/DevServerControl';
 import type { SkillInputState } from '@/components/SkillInputForm';
 import type { PipelineStep } from '@/hooks/useSkills';
 import type { RunSummary } from '@/hooks/useRuns';
@@ -219,6 +220,16 @@ export default function Wizard() {
             void refetchRuns();
           }}
           onRunComplete={(result) => {
+            // ait-screenshots 가 끝나면 dashboard 가 spawn 한 dev 서버를 자동으로 종료한다.
+            //   - 사용자가 직접 띄운 외부 서버(status: external) 는 건드리지 않음 (서버에서 managed=false 로 무시).
+            //   - 이렇게 하지 않으면 vite 가 계속 떠 있어 다음 dashboard 재기동 시 포트 충돌.
+            if (nextStep.skill === 'ait-screenshots') {
+              void fetch(`/api/apps/${app.folderName}/dev-server/stop`, { method: 'POST' }).catch(
+                () => {
+                  /* best-effort: 실패해도 사용자가 dashboard 재기동 시 SIGTERM 으로 정리됨. */
+                }
+              );
+            }
             // ait-plan 이 완료됐을 때 두 가지 자동 갱신:
             //   (1) 이번 run 에서 새로 저장된 PRD (docs/prd/*.md) 가 있으면 console.prdPath 를 거기에 맞춘다.
             //       사용자가 overwrite 가 아니라 새 경로로 저장했을 때도 UI 가 최신 파일을 가리키게 함.
@@ -400,6 +411,10 @@ function ActiveStepCard({
       <p className="wizard-active-produces">
         이 단계가 만드는 것 → <strong>{step.produces}</strong>
       </p>
+
+      {step.skill === 'ait-screenshots' && (
+        <DevServerControl appName={appName} isDemo={isDemo} />
+      )}
 
       {running && latestRun ? (
         <div className="wizard-active-running">

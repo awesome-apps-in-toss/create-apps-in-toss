@@ -2769,6 +2769,52 @@ button.plan-entry {
   color: var(--color-text-primary);
 }
 
+/* dev 서버 자동 관리 배너 (ait-screenshots 단계용) */
+.dev-server-banner {
+  margin-top: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-subtle, #f7f8fa);
+  color: var(--color-text-secondary);
+}
+
+.dev-server-banner--info {
+  background: var(--color-info-bg, #eef4ff);
+  border-color: var(--color-info-border, #c7d8ff);
+}
+
+.dev-server-banner--ok {
+  background: var(--color-success-bg, #ebf9f0);
+  border-color: var(--color-success-border, #b8e6c7);
+}
+
+.dev-server-banner--warn {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+}
+
+.dev-server-banner-stop {
+  margin-left: auto;
+  padding: 3px 10px;
+  font-size: 11px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+.dev-server-banner-stop:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover, #f0f2f5);
+}
+
 .plan-entry-icon {
   font-size: 28px;
   line-height: 1;
