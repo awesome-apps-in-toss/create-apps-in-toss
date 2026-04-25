@@ -665,13 +665,13 @@ export function RunLivePanel({
             </div>
           )}
           <div className="run-live-panel-input-actions">
-            {interactive && (
+            {interactive && artifacts.length > 0 && (
               <button
                 type="button"
                 className="run-live-panel-finish"
                 onClick={() => void handleFinish()}
                 disabled={finishing || sending}
-                title="이 단계를 마치고 다음 단계로 넘어가요"
+                title="AI가 파일을 만들었고 더 물어볼 게 없을 때 이 단계를 마쳐요"
               >
                 {finishing ? '마무리 중…' : '이 단계 마치기'}
               </button>

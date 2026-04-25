@@ -174,17 +174,18 @@ PRD가 충분히 완성되면 사용자에게 저장 여부를 확인한 뒤 파
 
 **실행 컨텍스트에 따라 저장 방식이 다르다**:
 
-#### (A) 대시보드 세션 — `[Dashboard session contract]` 가 시스템 프롬프트에 주입돼 있으면
+#### (A) 대시보드 세션 — 환경변수 `AIT_RUN_STATUS_PATH` 가 있으면
 
 "기존 PRD 를 제자리에 갱신(overwrite)" 로 동작한다.
 
 1. 사용자 입력 `planningDoc` 경로(또는 `app.console.prdPath`)가 **있으면**: 그 경로에 덮어쓴다. 버전 파일 누적 금지.
-2. `planningDoc` 이 없으면 (신규 생성 케이스): `docs/prd/{appName}-prd.md` (버전 suffix 없이) 로 저장.
-3. 버전 bump 나 `-v0.2.md` 같은 새 파일 생성 금지 — 히스토리는 git 으로만 추적한다.
+2. `planningDoc` 이 없으면 (신규 생성 케이스): 반드시 `docs/prd/{appName}-prd.md` (버전 suffix 없이) 로 저장.
+3. 루트(`PRD.md`, `docs/PRD.md`) 또는 `docs/prd/` 바깥 경로에 새 PRD 생성 금지.
+4. 버전 bump 나 `-v0.2.md` 같은 새 파일 생성 금지 — 히스토리는 git 으로만 추적한다.
 
 이유: 대시보드는 `app.console.prdPath` 로 현재 PRD 를 참조하므로, 경로가 매번 바뀌면 UI 정합이 깨진다. overwrite 하면 diff 추적은 git 에 맡기고 경로는 안정적으로 유지할 수 있다.
 
-#### (B) CLI / 외부 호출 — `[Dashboard session contract]` 가 없으면
+#### (B) CLI / 외부 호출 — 환경변수 `AIT_RUN_STATUS_PATH` 가 없으면
 
 기존 방식대로 버전 파일로 저장한다.
 
@@ -196,16 +197,38 @@ PRD가 충분히 완성되면 사용자에게 저장 여부를 확인한 뒤 파
 
 ### Phase 6. 종료
 
-PRD 저장이 끝나면 **짧은 완료 보고 한 번** 출력하고 세션을 마무리한다.
+PRD 저장이 끝나면 **구조화 상태 신호를 먼저 기록한 뒤**, 짧은 완료 보고 한 번 출력하고 세션을 마무리한다.
 
-**형식**:
+### 구조화 상태 신호 (NON-NEGOTIABLE)
 
+공통 규약: `.claude/skills/_shared/run-status-contract.md`
+
+대시보드 세션으로 실행될 때 환경변수 `AIT_RUN_STATUS_PATH` 로 per-run JSON 파일 경로가 전달된다. **텍스트로 ✅/❌ 를 찍기 전에 반드시** 이 경로에 `Write` 로 기록한다.
+
+성공:
+```json
+{"status":"success"}
 ```
-✅ PRD 저장: <저장한 파일 경로>
-<한 줄 요약 — 앱명, 핵심 BM 정도>
+
+실패:
+```json
+{"status":"failure","reason":"<한 줄 원인>"}
 ```
 
-**규칙**: 완료 보고 1회 후 종료. PRD 를 관례 경로(`docs/prd/*.md` 또는 `docs/PRD.md`)에 저장하면 서버가 자동 감지·반영.
+대시보드 밖에서는 환경변수가 비어있을 수 있으니 있을 때만 기록한다.
+
+### ✅ 성공 사용자 보고
+
+```\n✅ PRD 저장: <저장한 파일 경로>\n<한 줄 요약 — 앱명, 핵심 BM 정도>\n```
+
+### ❌ 실패 사용자 보고
+
+```\n❌ PRD 저장 실패\n원인: <한 줄 원인>\n```
+
+**규칙**:
+- PRD 가 충분히 완성되어 더 이상 질문이 필요 없으면 **추가 질문 없이 바로 저장 → 상태 파일 기록 → 종료**한다.
+- 대시보드 세션에서 완료 가능한 상태인데 AskUserQuestion 으로 "저장할까요?" 같은 마지막 확인 질문을 다시 하지 않는다.
+- 완료 보고 1회 후 종료. 대시보드가 다음 단계를 안내한다.
 
 ---
 

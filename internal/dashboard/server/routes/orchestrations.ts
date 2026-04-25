@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { promises as fs } from 'fs';
 import path from 'path';
 import {
   RunSession,
@@ -10,10 +11,34 @@ import {
 import { getDefaultRunStore, type PersistedRunRow } from '../lib/orchestration/run-store.js';
 import { readSkillMeta } from '../lib/skills-meta.js';
 import { broadcast } from '../sse.js';
+import { readConsoleConfigByAppId, updateConsoleConfig } from './meta.js';
+import { autoDetectDoc, PRD_SCAN_GLOBS, PRD_SCAN_PATHS } from './apps.js';
 
 const router: Router = Router();
 const REPO_ROOT = path.resolve(process.cwd(), '../../');
 const APPS_DIR = path.join(REPO_ROOT, 'apps');
+
+async function persistGeneratedPrdPath(session: RunSession): Promise<void> {
+  if (session.skill !== 'ait-plan' || !session.appName || session.state !== 'COMPLETED') return;
+
+  const appDir = path.join(APPS_DIR, session.appName);
+  const existing = await readConsoleConfigByAppId(session.appName);
+  const detected = await autoDetectDoc(appDir, existing.prdPath, PRD_SCAN_PATHS, PRD_SCAN_GLOBS);
+  if (!detected.exists || !detected.path) return;
+
+  const absolutePrdPath = path.resolve(appDir, detected.path);
+  try {
+    await fs.access(absolutePrdPath);
+  } catch {
+    return;
+  }
+
+  await updateConsoleConfig(session.appName, {
+    prdPath: detected.path,
+    prdSource: 'generated',
+    prdReviewedAt: existing.prdReviewedAt || new Date().toISOString(),
+  });
+}
 
 // (skill, appName) 단위로 POST /api/orchestrations 호출을 순차화.
 // "이미 실행 중" 체크와 새 세션 spawn 사이에 await 가 있어서
@@ -110,13 +135,25 @@ async function attachStore(session: RunSession): Promise<void> {
             session.exitCode ?? null,
             session.endedAt ?? null
           );
-          if (TERMINAL_STATES.has(session.state) && !terminalBroadcast) {
+          if (
+            event.kind === 'done' &&
+            TERMINAL_STATES.has(session.state) &&
+            !terminalBroadcast
+          ) {
             terminalBroadcast = true;
-            // 파일 와처(.meta-dashboard.json/.ait 만 감시)가 잡지 못하는 산출물
-            // — granite.config.ts, package.json, docs/PRD.md 등 — 도 즉시 메타/콘피그
-            // UI 에 반영되도록 글로벌 refresh 를 한 번 쏜다. useApps · useRuns 가 이를 듣고
-            // /api/apps · /api/orchestrations 를 다시 조회한다.
-            broadcast('refresh', `run-terminated:${session.skill}:${session.appName ?? ''}`);
+            void (async () => {
+              try {
+                await persistGeneratedPrdPath(session);
+              } catch (err) {
+                console.warn('[orchestrations] persistGeneratedPrdPath failed', err);
+              } finally {
+                // 파일 와처(.meta-dashboard.json/.ait 만 감시)가 잡지 못하는 산출물
+                // — granite.config.ts, package.json, docs/PRD.md 등 — 도 즉시 메타/콘피그
+                // UI 에 반영되도록 글로벌 refresh 를 한 번 쏜다. useApps · useRuns 가 이를 듣고
+                // /api/apps · /api/orchestrations 를 다시 조회한다.
+                broadcast('refresh', `run-terminated:${session.skill}:${session.appName ?? ''}`);
+              }
+            })();
           }
         }
       } catch (err) {
