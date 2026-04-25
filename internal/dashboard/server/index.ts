@@ -74,10 +74,15 @@ createWatcher();
 
 // dashboard 가 spawn 한 dev 서버 자식 프로세스는 dashboard 종료 시 함께 정리한다.
 // 그렇지 않으면 cmd+C 후에도 vite 가 떠 있어 다음 실행에서 포트 충돌이 난다.
+// cleanupAllDevServers 는 자식이 SIGTERM 에 응답해 정리될 시간(최대 5초) 을 기다린다.
+let shuttingDown = false;
 function shutdownAndExit(signal: NodeJS.Signals): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log(`[server] ${signal} received — cleaning up dev servers`);
-  cleanupAllDevServers();
-  process.exit(0);
+  void cleanupAllDevServers().finally(() => {
+    process.exit(0);
+  });
 }
 process.on('SIGINT', shutdownAndExit);
 process.on('SIGTERM', shutdownAndExit);

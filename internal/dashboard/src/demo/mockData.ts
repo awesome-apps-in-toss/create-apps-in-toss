@@ -91,6 +91,8 @@ export const MOCK_APPS: AppInfo[] = [
       utPath: null,
       prdReviewedAt: null,
       prdSource: 'uploaded',
+      // 의도: "에셋(step 2) 을 건너뛴 채 코드 먼저 만들어 둔" 부분 진행 상태 데모.
+      // 위저드가 step 2 를 next-up 으로 다시 안내하는 케이스를 보여준다.
       pipelineProgress: {
         1: { completedAt: '2026-04-10T09:00:00Z', artifacts: { prd: 'docs/PRD.md' } },
         3: { completedAt: '2026-04-10T09:30:00Z' },

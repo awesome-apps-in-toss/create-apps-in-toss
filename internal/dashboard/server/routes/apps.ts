@@ -239,23 +239,21 @@ async function autoDetectAssets(
   appName: string,
   runStore: RunStore | null,
 ): Promise<void> {
-  // ait-assets 스킬이 최근 성공(COMPLETED) 으로 끝난 적이 있을 때만 감지 결과를 반영.
-  // 이렇게 하지 않으면 graphic-designer 가 로고만 생성하고 run 이 FAILED 로 끝난 경우에도
-  // 파일이 남아 있다는 이유로 메타에 반영되어 "로고는 완료된 것처럼" 오인된다.
-  const canReflect = runStore
-    ? Boolean(
-        runStore.findLatestSuccess({
-          skill: 'ait-assets',
-          appName,
-          idempotencyKey: null,
-        }),
-      )
-    : false;
+  // 산출물별로 "그 산출물을 만든 스킬" 의 최근 성공 여부를 따로 본다.
+  //   - 로고/가로 썸네일: ait-assets 가 책임 (step 2)
+  //   - 세로 스크린샷:    ait-screenshots 가 책임 (step 6)
+  // 이렇게 분리하지 않으면 사용자가 ait-screenshots 만 단독 실행했을 때 화면에 캡처된 PNG 가
+  // 있는데도 ait-assets 성공 기록이 없다는 이유로 screenshotPaths 가 비게 된다.
+  const lastSuccessOf = (skill: string): boolean =>
+    runStore
+      ? Boolean(runStore.findLatestSuccess({ skill, appName, idempotencyKey: null }))
+      : false;
 
-  if (!canReflect) return;
+  const assetsOk = lastSuccessOf('ait-assets');
+  const screenshotsOk = lastSuccessOf('ait-screenshots');
 
-  // logoPath 자동 감지
-  if (!console_.logoPath) {
+  // 로고: ait-assets 성공 시에만
+  if (assetsOk && !console_.logoPath) {
     for (const candidate of ASSET_LOGO_CANDIDATES) {
       if (await fileExists(path.join(appDir, candidate))) {
         console_.logoPath = candidate;
@@ -263,8 +261,8 @@ async function autoDetectAssets(
       }
     }
   }
-  // thumbnailPath 자동 감지
-  if (!console_.thumbnailPath) {
+  // 가로 썸네일: ait-assets 성공 시에만
+  if (assetsOk && !console_.thumbnailPath) {
     for (const candidate of ASSET_THUMBNAIL_CANDIDATES) {
       if (await fileExists(path.join(appDir, candidate))) {
         console_.thumbnailPath = candidate;
@@ -272,8 +270,8 @@ async function autoDetectAssets(
       }
     }
   }
-  // screenshotPaths 자동 감지 — assets/screenshots/ 디렉토리의 PNG 들을 정렬해 모두 수집
-  if (console_.screenshotPaths.length === 0) {
+  // 세로 스크린샷: ait-screenshots 성공 시에만 (assets/screenshots/*.png 모두 수집)
+  if (screenshotsOk && console_.screenshotPaths.length === 0) {
     const screenshotDir = path.join(appDir, ASSET_SCREENSHOT_DIR);
     try {
       const files = await fs.readdir(screenshotDir);

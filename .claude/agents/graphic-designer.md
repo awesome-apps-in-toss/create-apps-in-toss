@@ -549,7 +549,9 @@ esac
 
 `NO_ALPHA` 가 나오면 모델이 transparent 요청을 무시한 것 — 프롬프트에 "die-cut sticker style, alpha-cutout, no rectangular background, no white box, PNG with transparent background" 등 강화 표현을 더해 재생성. 3회 실패 시 사용자에게 보고하고 중단.
 
-추가로 Read 로 PNG 를 직접 열어 모서리에 흰색 픽셀이 박혀 있지 않은지 확인합니다 (alpha 채널은 있는데 모서리만 살짝 색이 묻은 케이스).
+> ⚠️ **이 검증의 한계**: xxd 는 PNG color-type 바이트(alpha 채널 존재 유무) 만 확인할 수 있다. 모델이 RGBA 포맷으로 응답해 놓고 alpha 값을 전부 255 로 채워 흰 사각형 배경을 그려 넣으면 이 검증은 통과해 버린다. 따라서 자동 검증만으로 끝내지 말고 **반드시 아래 시각 검증을 같이 수행**한다.
+
+**시각 검증 (필수)**: Read 로 PNG 를 직접 열어 모서리 4개 영역에 흰색 픽셀이 박혀 있지 않은지 확인. 흰 사각형이 보이면 alpha 채널은 있어도 transparent 요청이 무시된 것 — 위 강화 프롬프트로 재생성.
 
 ### 출력 경로
 

@@ -2769,7 +2769,12 @@ button.plan-entry {
   color: var(--color-text-primary);
 }
 
-/* dev 서버 자동 관리 배너 (ait-screenshots 단계용) */
+/* dev 서버 자동 관리 배너 (ait-screenshots 단계용)
+ * 디자인 토큰만 사용 — 폴백 색상 박지 않음. 다크모드 자동 대응.
+ *   - 기본/info: surface-muted (중립)
+ *   - ok:        success-soft (그린)
+ *   - warn:      warning-bg (이미 있음)
+ */
 .dev-server-banner {
   margin-top: 12px;
   padding: 10px 12px;
@@ -2780,18 +2785,19 @@ button.plan-entry {
   line-height: 1.5;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
-  background: var(--color-surface-subtle, #f7f8fa);
+  background: var(--color-surface-muted);
   color: var(--color-text-secondary);
 }
 
 .dev-server-banner--info {
-  background: var(--color-info-bg, #eef4ff);
-  border-color: var(--color-info-border, #c7d8ff);
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
 }
 
 .dev-server-banner--ok {
-  background: var(--color-success-bg, #ebf9f0);
-  border-color: var(--color-success-border, #b8e6c7);
+  background: var(--color-success-soft);
+  border-color: var(--color-success);
+  color: var(--color-success-strong);
 }
 
 .dev-server-banner--warn {
@@ -2812,7 +2818,7 @@ button.plan-entry {
 
 .dev-server-banner-stop:hover {
   color: var(--color-text-primary);
-  background: var(--color-surface-hover, #f0f2f5);
+  background: var(--color-surface-alt);
 }
 
 .plan-entry-icon {

@@ -71,8 +71,16 @@ export default function DevServerControl({ appName, isDemo }: Props) {
     if (isDemo) return;
     let cancelled = false;
     void (async () => {
-      const status = await fetchStatus();
+      // 첫 fetch 가 네트워크 글리치로 실패하면 한 번 더 retry — 그래도 안되면 error 배너 표시.
+      // retry 안 하면 info=null 인 상태로 영구히 "상태 확인 중…" 에 갇힌다.
+      let status = await fetchStatus();
       if (cancelled) return;
+      if (!status) {
+        await new Promise((r) => setTimeout(r, 1500));
+        if (cancelled) return;
+        status = await fetchStatus();
+        if (cancelled) return;
+      }
       if (status?.status === 'stopped' && !autoStartedRef.current) {
         autoStartedRef.current = true;
         await start();
@@ -102,6 +110,18 @@ export default function DevServerControl({ appName, isDemo }: Props) {
   }
 
   if (!info) {
+    // retry 까지 모두 실패한 케이스 — error 가 채워져 있으면 사용자에게 노출 + 수동 재시도 제공.
+    if (error) {
+      return (
+        <aside className="dev-server-banner dev-server-banner--warn">
+          <AlertCircle size={14} strokeWidth={1.75} />
+          <span>dev 서버 상태를 확인하지 못했어요. {error}</span>
+          <button type="button" className="dev-server-banner-stop" onClick={() => void fetchStatus()}>
+            다시 시도
+          </button>
+        </aside>
+      );
+    }
     return (
       <aside className="dev-server-banner">
         <Loader2 size={14} strokeWidth={1.75} className="spin" />
