@@ -1,11 +1,11 @@
 ---
 name: ait-assets
-description: 앱인토스 콘솔 등록에 필요한 이미지(로고/썸네일 SVG+PNG)/텍스트 리소스를 점검하고, 이미지 자동 생성 옵션 제공
+description: 앱인토스 콘솔 등록에 필요한 초기 이미지(로고/가로형 썸네일)/텍스트 리소스를 점검하고, 이미지 자동 생성 옵션 제공. 세로형 스크린샷은 implement 이후 /ait-screenshots 가 담당
 argument-hint: '[앱 유형: game|partner] [--generate-images]'
 mode: interactive
 step: 2
 label: 에셋
-produces: 로고, 썸네일, 스크린샷
+produces: 로고, 가로형 썸네일
 requires: []
 inputs:
   - { key: appType, type: enum, values: [game, partner], required: false }
@@ -50,22 +50,32 @@ idempotencyKey: ait-assets
 
 ## 이미지 생성 위임
 
-이미지 리소스(로고·정방형 썸네일·가로형 썸네일)는 **`graphic-designer` 에이전트**가 생성합니다. 생성 방식·스타일·제약·워크플로 등 디테일은 `.claude/agents/graphic-designer.md` 에 정의되어 있어 SKILL 에서 중복 기술하지 않습니다.
+이 단계에서 생성하는 이미지는 **로고 + 가로형 썸네일** 두 종입니다. 둘 다 PRD 와 브랜드 컬러만 있으면 만들 수 있어 스캐폴딩 전 시점에서도 동작합니다.
+**`graphic-designer` 에이전트** 가 생성합니다. 생성 방식·스타일·제약·워크플로 등 디테일은 `.claude/agents/graphic-designer.md` 에 정의되어 있어 SKILL 에서 중복 기술하지 않습니다.
+
+> **이 스킬에서 생성하지 않는 것:**
+> - **세로형 스크린샷** — 실제 동작하는 dev 서버 캡처가 필요해서 `/ait-implement` 이후 단계인 `/ait-screenshots` (step 6) 에서 별도로 생성합니다.
+> - **정방형 썸네일** — 콘솔 노출에 사용되지 않아 생성 대상에서 제외합니다.
 
 ### 에이전트 호출 (Task 툴)
 
 ```
 subagent_type: graphic-designer
-description: <app-name> 에셋 생성
+description: <app-name> 초기 에셋 생성 (로고 + 가로형 썸네일)
 prompt:
   앱: apps/<app-name>
-  생성 대상: 로고, 정방형 썸네일, 가로형 썸네일
+  생성 대상:
+    - 로고 (Section 1)
+    - 가로형 썸네일 (Section 2)
   출력 경로: apps/<app-name>/assets/
 
   규격 (에이전트 문서의 스펙 표를 따름)
     - 로고: 600x600 PNG + SVG 원본
-    - 정방형 썸네일: 1000x1000 PNG + HTML 원본
     - 가로형 썸네일: 1932x828 PNG + HTML 원본
+
+  중요: 정방형 썸네일(1000x1000) · 스크린샷은 생성하지 마세요.
+    - 정방형 썸네일은 콘솔 노출에 쓰이지 않습니다.
+    - 스크린샷은 implement 이후 /ait-screenshots 스킬이 담당합니다.
 
   브랜드: granite.config.ts의 brand.primaryColor 사용
   PRD: apps/<app-name>/docs/PRD.md 참고
@@ -79,12 +89,12 @@ prompt:
 apps/<app-name>/assets/
 ├── _sources/
 │   ├── logo.svg
-│   ├── thumbnail-square.html
 │   └── thumbnail-wide.html
-├── logo.png              # 600x600
-├── thumbnail-square.png  # 1000x1000
-└── thumbnail-wide.png    # 1932x828
+├── logo.png                  # 600x600
+└── thumbnail-wide.png        # 1932x828
 ```
+
+세로형 스크린샷(`assets/screenshots/01~03.png`) 은 별도 스킬에서 추가됩니다.
 
 ### 예외 처리
 

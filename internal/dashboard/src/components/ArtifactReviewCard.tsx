@@ -13,12 +13,13 @@ interface ArtifactReviewCardProps {
 /**
  * 각 단계가 만들어낸 주요 산출물의 리뷰 카드.
  *   - Step 1: PRD markdown
- *   - Step 2: 로고/썸네일/스크린샷 프리뷰
+ *   - Step 2: 로고/가로 썸네일 프리뷰
  *   - Step 3: granite.config.ts 요약
  *   - Step 4: @toss/* 의존성 유무
  *   - Step 5: (후속) git diff / 구현 파일 요약
- *   - Step 6: review 리포트 요약 (docs/ait-review-*.md)
- *   - Step 7: .ait 번들 존재 확인
+ *   - Step 6: 세로형 스크린샷 3장 프리뷰
+ *   - Step 7: review 리포트 요약 (docs/ait-review-*.md)
+ *   - Step 8: .ait 번들 존재 확인
  */
 export default function ArtifactReviewCard({
   step,
@@ -37,8 +38,10 @@ export default function ArtifactReviewCard({
     case 5:
       return <ImplementReview app={app} />;
     case 6:
-      return <ReviewReportReview app={app} />;
+      return <ScreenshotsReview app={app} />;
     case 7:
+      return <ReviewReportReview app={app} />;
+    case 8:
       return <BuildReview app={app} />;
     default:
       return null;
@@ -127,13 +130,12 @@ function PrdReview({ app, expanded }: { app: AppInfo; expanded: boolean }) {
 }
 
 function AssetsReview({ app }: { app: AppInfo }) {
-  const { logoPath, thumbnailPath, screenshotPaths } = app.console;
-  const count =
-    (logoPath ? 1 : 0) + (thumbnailPath ? 1 : 0) + screenshotPaths.length;
+  const { logoPath, thumbnailPath } = app.console;
+  const count = (logoPath ? 1 : 0) + (thumbnailPath ? 1 : 0);
   const tone: 'ok' | 'warn' = count > 0 ? 'ok' : 'warn';
   const appLabel = app.console.nameKo || app.granite?.displayName || app.folderName;
   return (
-    <CardShell title="이미지 자료 (로고/썸네일/스크린샷)" icon={<Image size={16} strokeWidth={1.75} />} tone={tone}>
+    <CardShell title="이미지 자료 (로고/가로 썸네일)" icon={<Image size={16} strokeWidth={1.75} />} tone={tone}>
       {count === 0 ? (
         <EmptyNote label="아직 만들어진 이미지가 없어요. 에셋 생성 단계를 실행한 뒤 다시 확인해 주세요." />
       ) : (
@@ -164,6 +166,22 @@ function AssetsReview({ app }: { app: AppInfo }) {
               <figcaption>썸네일 (가로)</figcaption>
             </figure>
           )}
+        </div>
+      )}
+    </CardShell>
+  );
+}
+
+function ScreenshotsReview({ app }: { app: AppInfo }) {
+  const { screenshotPaths } = app.console;
+  const tone: 'ok' | 'warn' = screenshotPaths.length >= 3 ? 'ok' : 'warn';
+  const appLabel = app.console.nameKo || app.granite?.displayName || app.folderName;
+  return (
+    <CardShell title="세로형 스크린샷 3장" icon={<Image size={16} strokeWidth={1.75} />} tone={tone}>
+      {screenshotPaths.length === 0 ? (
+        <EmptyNote label="아직 캡처된 스크린샷이 없어요. dev 서버를 띄운 뒤 스크린샷 단계를 실행해 주세요." />
+      ) : (
+        <div className="artifact-asset-grid">
           {screenshotPaths.slice(0, 3).map((p, i) => (
             <figure key={p} className="artifact-asset-figure">
               <img
@@ -254,7 +272,7 @@ function ImplementReview({ app }: { app: AppInfo }) {
 }
 
 function ReviewReportReview({ app }: { app: AppInfo }) {
-  // 단계 6의 산출물은 docs/ait-review-*.md. 경로만 추정해서 링크 제공.
+  // 단계 7의 산출물은 docs/ait-review-*.md. 경로만 추정해서 링크 제공.
   const hasPrd = app.docs.prd.exists;
   const tone: 'neutral' | 'warn' = hasPrd ? 'neutral' : 'warn';
   return (

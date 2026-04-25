@@ -30,7 +30,7 @@ export interface AppConsoleConfig {
   // 이미지 에셋 경로 (앱 폴더 기준 상대경로)
   logoPath: string | null; // 600×600
   thumbnailPath: string | null; // 가로형 1932×828 (assets/thumbnail-wide.png)
-  screenshotPaths: string[]; // 정사각형 1000×1000 (assets/thumbnail-square.png) 등
+  screenshotPaths: string[]; // 세로형 636×1048 (assets/screenshots/*.png) — 콘솔 등록 우선 노출 자료
   // 문서 경로 (앱 폴더 기준 상대경로)
   prdPath: string | null;
   utPath: string | null;
@@ -128,13 +128,14 @@ export type SkillMode = 'interactive' | 'automated';
 // frontmatter를 읽어 내려주며, 프론트는 useSkills() 훅으로 소비한다.
 // 여기서는 실행 허용 스킬의 **식별자(id)**만 타입 수준에서 고정한다.
 
-/** 7단계 순차 파이프라인 스킬 id */
+/** 8단계 순차 파이프라인 스킬 id */
 export type PipelineSkill =
   | 'ait-plan'
   | 'ait-assets'
   | 'ait-scaffold'
   | 'ait-tds-setup'
   | 'ait-implement'
+  | 'ait-screenshots'
   | 'ait-review'
   | 'ait-build';
 

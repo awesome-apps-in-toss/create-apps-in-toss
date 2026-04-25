@@ -1,4 +1,4 @@
-# 6단계: 검수 (Review Checklist)
+# 7단계: 검수 (Review Checklist)
 
 ## 목적
 

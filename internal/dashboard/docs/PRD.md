@@ -25,7 +25,7 @@ Barreleye 모노레포를 관리하는 개발자 (1인, 본인)
 
 - 여러 미니앱을 동시에 개발/유지보수
 - 앱인토스 콘솔 등록 시 필요한 정보를 모아야 함
-- 7단계 출시 스킬(ait-plan → ait-build)을 이미 사용 중
+- 8단계 출시 스킬(ait-plan → ait-build)을 이미 사용 중
 - 브라우저 ↔ 터미널 전환이 잦고 컨텍스트 스위칭 비용이 높음
 
 ### Secondary — 데모 방문자 (GitHub Pages)
@@ -39,7 +39,7 @@ Barreleye 프로젝트에 관심 있는 외부 개발자
 
 ## 3. 핵심 가치 제안
 
-**"아이디어에서 앱인토스 출시까지, 7단계 AI 파이프라인으로"**
+**"아이디어에서 앱인토스 출시까지, 8단계 AI 파이프라인으로"**
 
 1. **상태 파악** — 3가지 정보 레이어로 각 앱의 준비 상태를 한눈에
 2. **원클릭 실행** — 스킬 버튼 하나로 PRD·에셋·코드·검수를 AI가 처리
@@ -99,7 +99,7 @@ Barreleye 프로젝트에 관심 있는 외부 개발자
 | 상세 설명        | 텍스트 (장문)         | `ait-plan` 참고   |
 | 검색 키워드      | 쉼표 구분             | `ait-plan` 참고   |
 | 가로형 썸네일    | 이미지 1932×828       | `ait-assets`      |
-| 세로형 스크린샷  | 이미지 636×1048, 3장+ | `ait-assets`      |
+| 세로형 스크린샷  | 이미지 636×1048, 3장+ | `ait-screenshots` |
 
 대시보드 역할: **인라인 편집 + 저장**, 이미지 미리보기, 클립보드 복사
 
@@ -122,29 +122,30 @@ Barreleye 프로젝트에 관심 있는 외부 개발자
 
 ---
 
-## 6. 7단계 출시 파이프라인
+## 6. 8단계 출시 파이프라인
 
 각 앱 상세 페이지 상단에 파이프라인 섹션이 표시된다.
 
 ```
-STEP 1    STEP 2    STEP 3       STEP 4    STEP 5    STEP 6    STEP 7
-기획  ──▶ 에셋  ──▶ 스캐폴딩 ──▶ TDS  ──▶ 구현  ──▶ 검수  ──▶ 빌드
-ait-plan  ait-assets ait-scaffold ait-tds  ait-impl  ait-review ait-build
+STEP 1    STEP 2    STEP 3       STEP 4    STEP 5    STEP 6           STEP 7    STEP 8
+기획  ──▶ 에셋  ──▶ 스캐폴딩 ──▶ TDS  ──▶ 구현  ──▶ 스크린샷    ──▶ 검수  ──▶ 빌드
+ait-plan  ait-assets ait-scaffold ait-tds  ait-impl  ait-screenshots  ait-review ait-build
 ```
 
-| Step | 스킬             | 모드        | 전제 조건      | 산출물                       |
-| ---- | ---------------- | ----------- | -------------- | ---------------------------- |
-| 1    | `ait-plan`       | interactive | —              | PRD 문서                     |
-| 2    | `ait-assets`     | automated   | —              | 로고, 썸네일, 스크린샷       |
-| 3    | `ait-scaffold`   | automated   | PRD (Step 1)   | 프로젝트 구조, granite.config.ts |
-| 4    | `ait-tds-setup`  | automated   | 프로젝트 (Step 3) | TDS 패키지, Provider 설정 |
-| 5    | `ait-implement`  | automated   | PRD + TDS      | 기능 코드, 라우팅             |
-| 6    | `ait-review`     | automated   | 구현 완료      | 검수 리포트                  |
-| 7    | `ait-build`      | automated   | 검수 통과      | .ait 번들                    |
+| Step | 스킬               | 모드        | 전제 조건           | 산출물                            |
+| ---- | ------------------ | ----------- | ------------------- | --------------------------------- |
+| 1    | `ait-plan`         | interactive | —                   | PRD 문서                          |
+| 2    | `ait-assets`       | interactive | —                   | 로고, 가로형 썸네일, 콘솔 텍스트  |
+| 3    | `ait-scaffold`     | interactive | PRD (Step 1)        | 프로젝트 구조, granite.config.ts  |
+| 4    | `ait-tds-setup`    | automated   | 프로젝트 (Step 3)   | TDS 패키지, Provider 설정         |
+| 5    | `ait-implement`    | automated   | PRD + TDS           | 기능 코드, 라우팅                 |
+| 6    | `ait-screenshots`  | interactive | 구현 + dev 서버     | 세로형 스크린샷 3장 (636×1048)    |
+| 7    | `ait-review`       | automated   | 스크린샷 완료       | 검수 리포트                       |
+| 8    | `ait-build`        | automated   | 검수 통과           | .ait 번들                         |
 
 - **interactive**: CLI에서 AI와 대화형으로 진행. 대시보드에서 CLI 명령어를 클립보드에 복사 제공
 - **automated**: 대시보드 버튼 클릭 → Claude Code 자동 실행 → SSE 로그 스트리밍
-- **`/ait-launch`**: 7단계를 순차 실행하는 오케스트레이터. "claude -p /ait-launch" 복사 버튼 제공
+- **`/ait-launch`**: 8단계를 순차 실행하는 오케스트레이터. "claude -p /ait-launch" 복사 버튼 제공
 
 파이프라인 진행 상태는 `.meta-dashboard.json`의 `pipelineProgress` 필드에 저장된다.
 
@@ -176,7 +177,7 @@ Layer 3 (개발 헬퍼)   — PRD, UT 리포트: 각 15점 (30점)
 
 **랜딩 페이지가 전달해야 하는 메시지 (우선순위 순):**
 
-1. **한 줄 설명**: "AI로 토스 미니앱을 기획부터 출시까지 7단계로"
+1. **한 줄 설명**: "AI로 토스 미니앱을 기획부터 출시까지 8단계로"
 2. **핵심 차별점**: 대시보드에서 앱 상태를 보고, 버튼 하나로 AI 스킬 실행
 3. **실제 모습**: 목 데이터로 채워진 앱 카드들이 곧 데모
 
@@ -186,7 +187,7 @@ Layer 3 (개발 헬퍼)   — PRD, UT 리포트: 각 15점 (30점)
 │  🛢 Barreleye                                               │
 │                                                             │
 │  AI로 토스 미니앱을 기획부터 출시까지                        │
-│  7단계 파이프라인으로 관리하세요                             │
+│  8단계 파이프라인으로 관리하세요                             │
 │                                                             │
 │  [GitHub에서 보기]  [로컬에서 시작하기 →]                   │
 │                                                             │
@@ -210,9 +211,9 @@ Layer 3 (개발 헬퍼)   — PRD, UT 리포트: 각 15점 (30점)
 | 좌측 사이드바         | 앱 목록 퀵점프, 홈 네비게이션                               |
 | Layer 1 읽기          | granite.config.ts 파싱 (읽기 전용)                          |
 | Layer 2 편집          | `.meta-dashboard.json` 인라인 편집 + 저장                   |
-| Layer 2 이미지 미리보기 | 로고, 썸네일, 스크린샷 인라인 표시                        |
+| Layer 2 이미지 미리보기 | 로고, 가로 썸네일, 세로 스크린샷 인라인 표시              |
 | Layer 3 감지          | PRD/UT 파일 존재 여부 자동 감지 + 마크다운 뷰어             |
-| 7단계 파이프라인 UI   | 미니 스테퍼 + 개별 단계 펼침 + 진행 상태 저장              |
+| 8단계 파이프라인 UI   | 미니 스테퍼 + 개별 단계 펼침 + 진행 상태 저장              |
 | 스킬 트리거           | 버튼 클릭 → Claude Code CLI 자동 실행                       |
 | SSE 로그 스트리밍     | 스킬 실행 중 실시간 로그 출력                               |
 | 파일 변경 감지        | chokidar → 목록 자동 갱신                                   |

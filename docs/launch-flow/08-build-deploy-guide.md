@@ -1,4 +1,4 @@
-# 7단계: 빌드 & 배포 준비 (Build & Deploy Guide)
+# 8단계: 빌드 & 배포 준비 (Build & Deploy Guide)
 
 ## 목적
 

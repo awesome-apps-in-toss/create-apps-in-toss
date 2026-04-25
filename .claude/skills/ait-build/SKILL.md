@@ -3,7 +3,7 @@ name: ait-build
 description: typecheck→lint→ait build 순서로 빌드하고 .ait 번들 용량 검증 및 콘솔 업로드 절차 안내
 argument-hint: ''
 mode: automated
-step: 7
+step: 8
 label: 빌드
 produces: .ait 번들
 requires: [ait-review]
@@ -21,7 +21,7 @@ idempotencyKey: ait-build
 
 ## 실행 절차
 
-1. **`docs/launch-flow/07-build-deploy-guide.md`를 읽어서 빌드/배포 가이드를 확인**합니다.
+1. **`docs/launch-flow/08-build-deploy-guide.md`를 읽어서 빌드/배포 가이드를 확인**합니다.
 
 2. 사전 검증 + 빌드:
 

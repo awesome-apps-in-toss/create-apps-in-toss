@@ -3,10 +3,10 @@ name: ait-review
 description: 앱인토스 검수 체크리스트 기반 코드 리뷰. light(핵심만)/full(전수검사) 모드 지원
 argument-hint: '[light|full] [game|partner]'
 mode: automated
-step: 6
+step: 7
 label: 검수
 produces: 검수 리포트
-requires: [ait-implement]
+requires: [ait-screenshots]
 inputs:
   - { key: reviewMode, type: enum, values: [light, full], required: false }
   - { key: appType, type: enum, values: [game, partner], required: false }
@@ -30,7 +30,7 @@ idempotencyKey: ait-review
 
 ## 실행 절차
 
-1. **`docs/launch-flow/06-review-checklist.md`를 읽어서 전체 체크리스트를 확인**합니다.
+1. **`docs/launch-flow/07-review-checklist.md`를 읽어서 전체 체크리스트를 확인**합니다.
 
 2. 대상 앱의 소스 코드를 전체 읽습니다 (`src/`, `granite.config.ts`, `package.json`).
 

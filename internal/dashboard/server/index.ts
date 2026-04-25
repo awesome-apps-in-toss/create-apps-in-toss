@@ -7,9 +7,11 @@ import { createAppRouter } from './routes/create-app.js';
 import { skillsRouter } from './routes/skills.js';
 import { orchestrationsRouter } from './routes/orchestrations.js';
 import { diagnosticsRouter } from './routes/diagnostics.js';
+import { devServersRouter } from './routes/dev-servers.js';
 import { createWatcher } from './watcher.js';
 import { sseClients } from './sse.js';
 import { getDefaultRunStore } from './lib/orchestration/run-store.js';
+import { cleanupAllDevServers } from './lib/dev-servers.js';
 
 const app = express();
 const PORT = 3001;
@@ -66,8 +68,24 @@ app.use('/api/apps', metaRouter);
 app.use('/api/skills', skillsRouter);
 app.use('/api/orchestrations', orchestrationsRouter);
 app.use('/api/diagnostics', diagnosticsRouter);
+app.use('/api/apps', devServersRouter);
 
 createWatcher();
+
+// dashboard 가 spawn 한 dev 서버 자식 프로세스는 dashboard 종료 시 함께 정리한다.
+// 그렇지 않으면 cmd+C 후에도 vite 가 떠 있어 다음 실행에서 포트 충돌이 난다.
+// cleanupAllDevServers 는 자식이 SIGTERM 에 응답해 정리될 시간(최대 5초) 을 기다린다.
+let shuttingDown = false;
+function shutdownAndExit(signal: NodeJS.Signals): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[server] ${signal} received — cleaning up dev servers`);
+  void cleanupAllDevServers().finally(() => {
+    process.exit(0);
+  });
+}
+process.on('SIGINT', shutdownAndExit);
+process.on('SIGTERM', shutdownAndExit);
 
 // 서버 재기동 시 child 프로세스가 사라져 orphan 상태가 된 run 기록을 FAILED로 정리.
 // listen 전에 await 해서 첫 요청이 받아들여지는 시점에는 정리 완료 상태 보장.

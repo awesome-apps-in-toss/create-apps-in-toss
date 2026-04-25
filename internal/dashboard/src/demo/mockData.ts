@@ -30,7 +30,11 @@ export const MOCK_APPS: AppInfo[] = [
       keywords: ['소개팅', '이상형', '테스트', '발주서'],
       logoPath: '.meta/assets/logo.png',
       thumbnailPath: '.meta/assets/thumbnail-wide.png',
-      screenshotPaths: ['.meta/assets/screenshot-1.png', '.meta/assets/screenshot-2.png'],
+      screenshotPaths: [
+        '.meta/assets/screenshot-1.png',
+        '.meta/assets/screenshot-2.png',
+        '.meta/assets/screenshot-3.png',
+      ],
       prdPath: 'docs/PRD.md',
       utPath: 'docs/user-test/report.md',
       prdReviewedAt: '2026-04-01T09:00:00Z',
@@ -41,7 +45,8 @@ export const MOCK_APPS: AppInfo[] = [
         3: { completedAt: '2026-04-02T09:00:00Z' },
         4: { completedAt: '2026-04-02T10:00:00Z' },
         5: { completedAt: '2026-04-05T16:00:00Z' },
-        6: { completedAt: '2026-04-08T11:00:00Z' },
+        6: { completedAt: '2026-04-06T14:00:00Z' },
+        7: { completedAt: '2026-04-08T11:00:00Z' },
       },
       updatedAt: '2026-04-08T11:00:00Z',
     },
@@ -86,6 +91,8 @@ export const MOCK_APPS: AppInfo[] = [
       utPath: null,
       prdReviewedAt: null,
       prdSource: 'uploaded',
+      // 의도: "에셋(step 2) 을 건너뛴 채 코드 먼저 만들어 둔" 부분 진행 상태 데모.
+      // 위저드가 step 2 를 next-up 으로 다시 안내하는 케이스를 보여준다.
       pipelineProgress: {
         1: { completedAt: '2026-04-10T09:00:00Z', artifacts: { prd: 'docs/PRD.md' } },
         3: { completedAt: '2026-04-10T09:30:00Z' },
