@@ -107,7 +107,7 @@ packages/tsconfig → packages/eslint-config → packages/ui → apps/* ∪ inte
 | State | TanStack Query (서버), Zustand (클라이언트, 선택) |
 | Routing | React Router v7 |
 | 앱인토스 | `@apps-in-toss/web-framework` ^2.x, `@toss/tds-mobile` ^2.x |
-| Dashboard | Express + SSE + chokidar |
+| Dashboard | Express(읽기 전용) + SSE + chokidar |
 
 ---
 
@@ -128,14 +128,16 @@ pnpm preflight    # Claude 스킬·에이전트 동작 환경 사전 체크 (MCP
 
 ## Dashboard
 
-`internal/dashboard/`는 로컬 웹 UI로 다음 기능을 제공한다:
+`internal/dashboard/`는 **읽기 전용 조망 + 명령 런처** 로컬 웹 UI다. 대시보드 안에서
+스킬을 직접 실행(`claude -p` spawn)하지 않는다 — 실제 작업은 터미널에서 Claude Code /
+Codex 로 한다.
 
-- 모든 앱과 완료 상태(3 레이어) 시각화
-- `.meta-dashboard.json` 메타데이터 인라인 편집
-- 스킬 트리거 (PRD 생성, UT, 에셋 생성, 전체 파이프라인)
-- SSE 기반 실시간 파일 감시
+- 모든 앱과 완료 상태(3 레이어) 시각화 (메타데이터 read)
+- 단계별 실행 명령(`claude "/ait-xxx"` · codex)을 복사 버튼으로 제공
+- `.meta-dashboard.json` 콘솔 텍스트 필드 인라인 편집 (콘솔 복붙 편의용)
+- SSE 기반 실시간 파일 감시 (`.meta-dashboard.json` · `.ait`)
 
-실행: `pnpm dev` (대시보드 포트 3000, API 서버 포트 3001)
+실행: `pnpm dev` (대시보드 포트 3000, 읽기 전용 API 서버 포트 3001)
 
 ---
 

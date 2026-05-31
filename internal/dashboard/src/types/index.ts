@@ -34,14 +34,6 @@ export interface AppConsoleConfig {
   // 문서 경로 (앱 폴더 기준 상대경로)
   prdPath: string | null;
   utPath: string | null;
-  /**
-   * 외부에서 업로드된 PRD 의 정책 검토 완료 시각.
-   * 업로드 직후엔 null 로 남아 "검토 필요" UI 가 뜬다.
-   * /ait-plan 재실행으로 검토를 마치면 타임스탬프가 세팅된다.
-   */
-  prdReviewedAt: string | null;
-  /** PRD 가 어떻게 들어왔는지. 'uploaded' 만 검토 배너 대상. */
-  prdSource: 'uploaded' | 'generated' | null;
   // 파이프라인 진행 상태 (step 번호 → 상태)
   pipelineProgress: Record<number, PipelineStepStatus>;
   updatedAt: string;
@@ -70,8 +62,6 @@ export const DEFAULT_CONSOLE_CONFIG: AppConsoleConfig = {
   screenshotPaths: [],
   prdPath: null,
   utPath: null,
-  prdReviewedAt: null,
-  prdSource: null,
   pipelineProgress: {},
   updatedAt: '',
 };
@@ -116,35 +106,7 @@ export interface AppInfo {
   };
 }
 
-// ──────────────────────────────────────────
-// 스킬 실행 모드
-//   interactive: 대화형 — 웹에서 직접 실행 불가, CLI 명령어 복사 제공
-//   automated:   자동 실행 가능 — 웹에서 바로 실행
-// ──────────────────────────────────────────
-export type SkillMode = 'interactive' | 'automated';
-
-// 파이프라인 단계의 **UI용 형상**(label/produces/requires 등)은 더 이상
-// 이 파일에 하드코딩하지 않는다. 런타임에 GET /api/skills 가 SKILL.md
-// frontmatter를 읽어 내려주며, 프론트는 useSkills() 훅으로 소비한다.
-// 여기서는 실행 허용 스킬의 **식별자(id)**만 타입 수준에서 고정한다.
-
-/** 8단계 순차 파이프라인 스킬 id */
-export type PipelineSkill =
-  | 'ait-plan'
-  | 'ait-assets'
-  | 'ait-scaffold'
-  | 'ait-tds-setup'
-  | 'ait-implement'
-  | 'ait-screenshots'
-  | 'ait-review'
-  | 'ait-build';
-
-/** 독립 실행 유틸리티 스킬 id */
-export type UtilitySkill = 'ait-meta' | 'ait-ut' | 'ait-launch';
-
-export type AllowedSkill = PipelineSkill | UtilitySkill;
-
-export interface SkillRunRequest {
-  skill: AllowedSkill;
-  app: string;
-}
+// 파이프라인 단계의 **UI용 형상**(label/produces/requires 등)과 실행 모드는
+// 런타임에 GET /api/skills 가 SKILL.md frontmatter 를 읽어 내려주며,
+// 프론트는 useSkills() 훅으로 소비한다. (대시보드는 스킬을 직접 실행하지 않고
+// CommandChips 로 claude/codex 실행 명령만 복사해 준다.)
