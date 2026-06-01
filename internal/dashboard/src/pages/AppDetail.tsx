@@ -7,7 +7,7 @@ import { useSkills } from '@/hooks/useSkills';
 import type { PipelineStep } from '@/hooks/useSkills';
 import AppAvatar from '@/components/AppAvatar';
 import CommandChips from '@/components/CommandChips';
-import type { AppConsoleConfig, PipelineStepStatus } from '@/types';
+import type { AppConsoleConfig } from '@/types';
 
 type ConsoleTextField = Extract<
   keyof AppConsoleConfig,
@@ -96,25 +96,60 @@ async function copyText(text: string) {
 // ── 파이프라인 단계 상태 판별 ──
 type StepState = 'completed' | 'running' | 'enabled' | 'locked';
 
+/**
+ * 의존성을 존중하는 "실질 완료" 단계 집합을 계산한다.
+ *
+ * 한 단계는 (1) 진행 기록(progress)이 있고 (2) 전제 단계가 모두 "실질 완료"일 때만
+ * 완료로 인정한다. 서버 `autoDetectPipelineProgress` 는 파일/의존성 존재만으로 단계를
+ * 완료 처리하므로(예: granite.config.ts 존재 → 스캐폴딩 완료), PRD 가 없어 기획이
+ * 비어 있는데도 스캐폴딩·TDS 가 완료로 찍히는 모순이 생길 수 있다. 이 함수는 그런
+ * "전제는 비었는데 뒷 단계만 완료"인 상태를 완료로 보지 않게 막아 스테퍼를 일관되게 만든다.
+ */
+function computeCompletedSteps(
+  pipeline: PipelineStep[],
+  progress: Record<number, unknown>
+): Set<number> {
+  const byStep = new Map<number, PipelineStep>(pipeline.map((s) => [s.step, s]));
+  const done = new Set<number>();
+  const visiting = new Set<number>();
+
+  function resolve(stepNum: number): boolean {
+    if (done.has(stepNum)) return true;
+    const step = byStep.get(stepNum);
+    if (!step) return false; // 알 수 없는 단계
+    if (progress[stepNum] == null) return false; // 진행 기록 없음
+    if (visiting.has(stepNum)) return false; // 순환 방어
+    visiting.add(stepNum);
+    const depsDone = step.requiresSteps.every((dep) => resolve(dep));
+    visiting.delete(stepNum);
+    if (depsDone) done.add(stepNum);
+    return depsDone;
+  }
+
+  for (const s of pipeline) resolve(s.step);
+  return done;
+}
+
+// completed: computeCompletedSteps() 가 의존성을 존중해 계산한 "실질 완료" 단계 집합.
+// 전제가 비어 있으면 progress 에 기록이 있어도 completed 에 포함되지 않으므로,
+// "전제는 미완료인데 뒷 단계만 완료(✓)"로 보이던 모순이 사라진다.
 function getStepState(
   step: PipelineStep,
-  progress: Record<number, PipelineStepStatus>,
+  completed: Set<number>,
   runningSkill: string | null = null
 ): StepState {
   if (runningSkill && runningSkill === step.skill) return 'running';
-  if (progress[step.step]) return 'completed';
-  if (step.requiresSteps.length === 0) return 'enabled';
-  const allDepsMet = step.requiresSteps.every((s) => !!progress[s]);
+  if (completed.has(step.step)) return 'completed';
+  const allDepsMet = step.requiresSteps.every((s) => completed.has(s));
   return allDepsMet ? 'enabled' : 'locked';
 }
 
 function getNextEnabledStep(
   pipeline: PipelineStep[],
-  progress: Record<number, PipelineStepStatus>
+  completed: Set<number>
 ): number | null {
   for (const step of pipeline) {
-    const state = getStepState(step, progress);
-    if (state === 'enabled') return step.step;
+    if (getStepState(step, completed) === 'enabled') return step.step;
   }
   return null;
 }
@@ -203,10 +238,14 @@ export default function AppDetail() {
     () => (app ? computeStoreProgress(app.console) : { filled: 0, total: 9 }),
     [app],
   );
-  const nextStep = useMemo(
+  const completedSteps = useMemo(
     () =>
-      app ? getNextEnabledStep(pipeline, app.console.pipelineProgress) : null,
+      app ? computeCompletedSteps(pipeline, app.console.pipelineProgress) : new Set<number>(),
     [pipeline, app],
+  );
+  const nextStep = useMemo(
+    () => getNextEnabledStep(pipeline, completedSteps),
+    [pipeline, completedSteps],
   );
   const nextStepItem = useMemo(
     () => (nextStep !== null ? pipeline.find((s) => s.step === nextStep) ?? null : null),
@@ -361,13 +400,11 @@ export default function AppDetail() {
           aria-label="출시 파이프라인 단계"
         >
           {pipeline.map((item, idx) => {
-            const state = getStepState(item, app.console.pipelineProgress);
+            const state = getStepState(item, completedSteps);
             const prevState =
-              idx > 0 ? getStepState(pipeline[idx - 1]!, app.console.pipelineProgress) : null;
+              idx > 0 ? getStepState(pipeline[idx - 1]!, completedSteps) : null;
             const isNextStep = nextStep === item.step && state === 'enabled';
-            const blockerSteps = item.requiresSteps.filter(
-              (s) => !app.console.pipelineProgress[s],
-            );
+            const blockerSteps = item.requiresSteps.filter((s) => !completedSteps.has(s));
             return (
               <li key={item.skill} className="pipeline-stepper-item">
                 {idx > 0 && (

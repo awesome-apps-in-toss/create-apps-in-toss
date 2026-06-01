@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
+import { DEMO_SKILLS } from '@/data/demoSkills';
 
 const IS_STATIC = import.meta.env.PROD;
 
@@ -48,19 +49,6 @@ export interface PipelineStep {
   requires: string | null;
   produces: string;
 }
-
-// GitHub Pages demo fallback — 서버가 없을 때 로드맵 8단계 기본 shape만 흉내 낸다.
-// 실제 로컬 개발 시에는 서버 응답이 항상 우선.
-const DEMO_SKILLS: SkillMeta[] = [
-  { id: 'ait-plan', name: 'ait-plan', description: '정책 검토 + PRD 생성', mode: 'interactive', step: 1, label: '기획', produces: 'PRD 문서', requires: [], inputs: [], outputs: [], idempotencyKey: 'ait-plan' },
-  { id: 'ait-assets', name: 'ait-assets', description: '로고+가로 썸네일+텍스트 리소스 생성', mode: 'interactive', step: 2, label: '에셋', produces: '로고, 가로형 썸네일', requires: [], inputs: [], outputs: [], idempotencyKey: 'ait-assets' },
-  { id: 'ait-scaffold', name: 'ait-scaffold', description: '프로젝트 생성 + 설정', mode: 'interactive', step: 3, label: '스캐폴딩', produces: '프로젝트 구조, granite.config.ts', requires: ['ait-plan'], inputs: [], outputs: [], idempotencyKey: 'ait-scaffold' },
-  { id: 'ait-tds-setup', name: 'ait-tds-setup', description: 'TDS 패키지 설치 + 검증', mode: 'automated', step: 4, label: 'TDS', produces: 'TDS 패키지, Provider 설정', requires: ['ait-scaffold'], inputs: [], outputs: [], idempotencyKey: 'ait-tds-setup' },
-  { id: 'ait-implement', name: 'ait-implement', description: '기획서 기반 기능 구현', mode: 'automated', step: 5, label: '구현', produces: '기능 코드, 라우팅', requires: ['ait-plan', 'ait-tds-setup'], inputs: [], outputs: [], idempotencyKey: 'ait-implement' },
-  { id: 'ait-screenshots', name: 'ait-screenshots', description: 'dev 서버 기동 후 세로 스크린샷 3장 캡처', mode: 'interactive', step: 6, label: '스크린샷', produces: '세로형 스크린샷 3장', requires: ['ait-implement'], inputs: [], outputs: [], idempotencyKey: 'ait-screenshots' },
-  { id: 'ait-review', name: 'ait-review', description: '검수 체크리스트 점검', mode: 'automated', step: 7, label: '검수', produces: '검수 리포트', requires: ['ait-screenshots'], inputs: [], outputs: [], idempotencyKey: 'ait-review' },
-  { id: 'ait-build', name: 'ait-build', description: '빌드 + 콘솔 업로드 안내', mode: 'automated', step: 8, label: '빌드', produces: '.ait 번들', requires: ['ait-review'], inputs: [], outputs: [], idempotencyKey: 'ait-build' },
-];
 
 interface SkillsContextValue {
   raw: SkillMeta[];
