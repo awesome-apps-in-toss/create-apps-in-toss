@@ -6,6 +6,20 @@
 
 ---
 
+## 0. v0.4 방향 전환 — 대시보드 축소 (2026-06)
+
+> 아래 §1.2 와 §3 Week 3 · §4 Phase 1 의 일부 항목은 이 전환으로 **대체(superseded)** 됐습니다.
+
+대시보드 안에서 `claude -p` 로 스킬을 직접 실행하던 **오케스트레이션 계층을 제거**하고, 대시보드를 **읽기 전용 조망 + 명령 런처**로 축소했습니다. 실제 작업(8단계 파이프라인)은 터미널에서 **Claude Code / Codex** 로 진행합니다.
+
+- **제거**: `/api/orchestrations`·`/api/diagnostics`·dev-server·create-app 라우트, RunSession/SQLite(`better-sqlite3`), `<RunTimeline>`·`<ClaudeStatus>`·`<Wizard>`(`/wizard/:appId`)·`<ArtifactReviewCard>`·`<SkillInputForm>`·NewApp 페이지
+- **유지**: 3-레이어 메타데이터 조망, 읽기 전용 미니 스테퍼, `.meta-dashboard.json` 콘솔 필드 인라인 편집, SSE 파일 감시
+- **신규**: 단계별 `claude "/ait-xxx"` · codex 실행 명령 **복사 칩**(CommandChips)
+
+§1.2 의 "대시보드 GUI 위저드 / 터미널·코드 편집 없음" 전제는 **"대시보드로 조망 + 터미널에서 claude/codex 실행"** 으로 재정의됩니다. 비개발자 친화(§1.2 목표 자체)는 유지하되, 수단이 위저드 자동 실행 → 명령 복사로 바뀌었습니다. Phase 2·3(§5·§6)의 세부 재계획은 별도 논의로 남겨 둡니다.
+
+---
+
 ## 1. 목표 (North Star)
 
 1. **템플릿 단일화**: `npx create-apps-in-toss`로 생성된 모든 프로젝트가 upstream 변경(보안 패치, 앱인토스 SDK 호환성, 신규 스킬)을 **안전하게 자동 수신**한다.

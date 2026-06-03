@@ -1,25 +1,13 @@
-import { useState, useEffect, useRef, useCallback, useId, useMemo } from 'react';
+import { useState, useEffect, useRef, useId, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import ReactMarkdown from 'react-markdown';
-import {
-  Monitor,
-  MessageSquare,
-  FileText,
-  Loader2,
-  ShieldCheck,
-  Lock,
-  Check,
-  ChevronDown,
-  Copy,
-  CheckCircle2,
-} from 'lucide-react';
+import { Lock, Check, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { useApps } from '@/hooks/useApps';
 import { useSkills } from '@/hooks/useSkills';
 import type { PipelineStep } from '@/hooks/useSkills';
 import AppAvatar from '@/components/AppAvatar';
-import RunTimeline from '@/components/RunTimeline';
-import { startRun } from '@/hooks/useRuns';
-import type { AppConsoleConfig, AllowedSkill, PipelineStepStatus } from '@/types';
+import CommandChips from '@/components/CommandChips';
+import type { AppConsoleConfig } from '@/types';
 
 type ConsoleTextField = Extract<
   keyof AppConsoleConfig,
@@ -108,25 +96,60 @@ async function copyText(text: string) {
 // ── 파이프라인 단계 상태 판별 ──
 type StepState = 'completed' | 'running' | 'enabled' | 'locked';
 
+/**
+ * 의존성을 존중하는 "실질 완료" 단계 집합을 계산한다.
+ *
+ * 한 단계는 (1) 진행 기록(progress)이 있고 (2) 전제 단계가 모두 "실질 완료"일 때만
+ * 완료로 인정한다. 서버 `autoDetectPipelineProgress` 는 파일/의존성 존재만으로 단계를
+ * 완료 처리하므로(예: granite.config.ts 존재 → 스캐폴딩 완료), PRD 가 없어 기획이
+ * 비어 있는데도 스캐폴딩·TDS 가 완료로 찍히는 모순이 생길 수 있다. 이 함수는 그런
+ * "전제는 비었는데 뒷 단계만 완료"인 상태를 완료로 보지 않게 막아 스테퍼를 일관되게 만든다.
+ */
+function computeCompletedSteps(
+  pipeline: PipelineStep[],
+  progress: Record<number, unknown>
+): Set<number> {
+  const byStep = new Map<number, PipelineStep>(pipeline.map((s) => [s.step, s]));
+  const done = new Set<number>();
+  const visiting = new Set<number>();
+
+  function resolve(stepNum: number): boolean {
+    if (done.has(stepNum)) return true;
+    const step = byStep.get(stepNum);
+    if (!step) return false; // 알 수 없는 단계
+    if (progress[stepNum] == null) return false; // 진행 기록 없음
+    if (visiting.has(stepNum)) return false; // 순환 방어
+    visiting.add(stepNum);
+    const depsDone = step.requiresSteps.every((dep) => resolve(dep));
+    visiting.delete(stepNum);
+    if (depsDone) done.add(stepNum);
+    return depsDone;
+  }
+
+  for (const s of pipeline) resolve(s.step);
+  return done;
+}
+
+// completed: computeCompletedSteps() 가 의존성을 존중해 계산한 "실질 완료" 단계 집합.
+// 전제가 비어 있으면 progress 에 기록이 있어도 completed 에 포함되지 않으므로,
+// "전제는 미완료인데 뒷 단계만 완료(✓)"로 보이던 모순이 사라진다.
 function getStepState(
   step: PipelineStep,
-  progress: Record<number, PipelineStepStatus>,
+  completed: Set<number>,
   runningSkill: string | null = null
 ): StepState {
   if (runningSkill && runningSkill === step.skill) return 'running';
-  if (progress[step.step]) return 'completed';
-  if (step.requiresSteps.length === 0) return 'enabled';
-  const allDepsMet = step.requiresSteps.every((s) => !!progress[s]);
+  if (completed.has(step.step)) return 'completed';
+  const allDepsMet = step.requiresSteps.every((s) => completed.has(s));
   return allDepsMet ? 'enabled' : 'locked';
 }
 
 function getNextEnabledStep(
   pipeline: PipelineStep[],
-  progress: Record<number, PipelineStepStatus>
+  completed: Set<number>
 ): number | null {
   for (const step of pipeline) {
-    const state = getStepState(step, progress);
-    if (state === 'enabled') return step.step;
+    if (getStepState(step, completed) === 'enabled') return step.step;
   }
   return null;
 }
@@ -175,22 +198,10 @@ export default function AppDetail() {
   const [edit, setEdit] = useState<EditState>({ field: null, value: '' });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
-  const [runningSkill, setRunningSkill] = useState<string | null>(null);
-  const [runError, setRunError] = useState<{ skill: string; message: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [pipelineExpanded, setPipelineExpanded] = useState(true);
-  const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [lookupFailed, setLookupFailed] = useState(false);
   const [brandOpen, setBrandOpen] = useState(false);
   const [storeOpen, setStoreOpen] = useState(false);
-
-  async function copyCliCommand(skill: string) {
-    const cmd = `claude -p /${skill}`;
-    await copyText(cmd);
-    setCopiedCmd(skill);
-    setTimeout(() => setCopiedCmd(null), 2000);
-  }
 
   // 앱 직후 생성 시 SSE refresh 가 살짝 늦게 오는 경우가 있어,
   // 목록에 아직 없으면 짧게 재시도 해서 "불러오는 중..." 이 멈춰 있지 않도록 한다.
@@ -227,10 +238,18 @@ export default function AppDetail() {
     () => (app ? computeStoreProgress(app.console) : { filled: 0, total: 9 }),
     [app],
   );
-  const nextStep = useMemo(
+  const completedSteps = useMemo(
     () =>
-      app ? getNextEnabledStep(pipeline, app.console.pipelineProgress) : null,
+      app ? computeCompletedSteps(pipeline, app.console.pipelineProgress) : new Set<number>(),
     [pipeline, app],
+  );
+  const nextStep = useMemo(
+    () => getNextEnabledStep(pipeline, completedSteps),
+    [pipeline, completedSteps],
+  );
+  const nextStepItem = useMemo(
+    () => (nextStep !== null ? pipeline.find((s) => s.step === nextStep) ?? null : null),
+    [pipeline, nextStep],
   );
 
   // 파이프라인 현재 단계에 맞춰 자동으로 해당 섹션을 펼치기.
@@ -328,40 +347,6 @@ export default function AppDetail() {
     setTimeout(() => setCopied(null), 1500);
   }
 
-  // 예전엔 별도의 /api/run-skill 스트림 엔드포인트를 썼지만, 상태머신·AskUserQuestion
-  // 라우팅·히스토리 리플레이가 모두 빠져 있어 통일된 /api/orchestrations 경로로 옮겼다.
-  // 시작 후엔 아래 "출시 파이프라인" 섹션으로 스크롤해서 RunTimeline 의 실시간 패널이 뜨게 한다.
-  async function runSkill(skill: AllowedSkill) {
-    if (running || !app || isDemo) return;
-    setRunning(true);
-    setRunningSkill(skill);
-    setPipelineExpanded(true);
-    setRunError(null);
-    try {
-      await startRun({
-        skill,
-        appName: app.folderName,
-        forceRerun: true,
-      });
-      if (typeof window !== 'undefined') {
-        const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-        document.querySelector('.pipeline-section')?.scrollIntoView({
-          behavior: reduced ? 'auto' : 'smooth',
-          block: 'start',
-        });
-      }
-      // RunTimeline 의 useRuns 훅이 refetch 되면서 새 run 을 픽업하고 라이브 패널을 연다.
-      void refetch();
-    } catch (e) {
-      // 시작 자체에 실패했으면 사용자에게 알린다 (디스크 권한 / Claude CLI 미설치 등).
-      const message = e instanceof Error ? e.message : String(e);
-      setRunError({ skill, message });
-    } finally {
-      setRunning(false);
-      setRunningSkill(null);
-    }
-  }
-
   function getFieldDisplayValue(field: (typeof CONSOLE_TEXT_FIELDS)[number]): string | null {
     const raw = app!.console[field.key];
     if (Array.isArray(raw)) return raw.length > 0 ? raw.join(', ') : null;
@@ -402,45 +387,11 @@ export default function AppDetail() {
       <section className="detail-section pipeline-section">
         <div className="pipeline-header">
           <h2 className="detail-section-title">출시 파이프라인</h2>
-          <div className="pipeline-header-actions">
-            <button
-              type="button"
-              className="btn-pipeline-toggle"
-              onClick={() => setPipelineExpanded((v) => !v)}
-              aria-expanded={pipelineExpanded}
-              aria-controls="pipeline-timeline"
-            >
-              {pipelineExpanded ? '간단히 보기' : '자세히 보기'}
-            </button>
-          </div>
         </div>
-
-        {runError && (
-          <div className="run-start-error" role="alert">
-            <div className="run-start-error-body">
-              <strong>실행을 시작하지 못했어요</strong>
-              <p>Claude CLI 가 설치/로그인 되어 있고 디스크 권한이 열려 있는지 확인해 주세요.</p>
-              <p className="run-start-error-detail">{runError.message}</p>
-            </div>
-            <div className="run-start-error-actions">
-              <button
-                type="button"
-                className="btn-pipeline-toggle"
-                onClick={() => void runSkill(runError.skill as AllowedSkill)}
-                disabled={running}
-              >
-                다시 시도
-              </button>
-              <button
-                type="button"
-                className="btn-pipeline-toggle"
-                onClick={() => setRunError(null)}
-              >
-                닫기
-              </button>
-            </div>
-          </div>
-        )}
+        <p className="pipeline-intro">
+          각 단계는 터미널에서 Claude Code 또는 Codex 로 진행해요. 대시보드는 진행 상태를 읽어 보여주고,
+          실행 명령을 복사해 드려요.
+        </p>
 
         {/* 라벨 + 번호가 항상 보이는 스테퍼 */}
         <ol
@@ -449,13 +400,11 @@ export default function AppDetail() {
           aria-label="출시 파이프라인 단계"
         >
           {pipeline.map((item, idx) => {
-            const state = getStepState(item, app.console.pipelineProgress, runningSkill);
+            const state = getStepState(item, completedSteps);
             const prevState =
-              idx > 0 ? getStepState(pipeline[idx - 1]!, app.console.pipelineProgress) : null;
+              idx > 0 ? getStepState(pipeline[idx - 1]!, completedSteps) : null;
             const isNextStep = nextStep === item.step && state === 'enabled';
-            const blockerSteps = item.requiresSteps.filter(
-              (s) => !app.console.pipelineProgress[s],
-            );
+            const blockerSteps = item.requiresSteps.filter((s) => !completedSteps.has(s));
             return (
               <li key={item.skill} className="pipeline-stepper-item">
                 {idx > 0 && (
@@ -512,40 +461,29 @@ export default function AppDetail() {
           })}
         </ol>
 
-        {/* CLI 한 방에 실행 (보조 affordance) */}
-        <div className="pipeline-cli-row">
-          <span className="pipeline-cli-row-label">전체 파이프라인을 터미널에서 한 번에 실행:</span>
-          <button
-            type="button"
-            className={`btn-cli-chip ${copiedCmd === 'ait-launch' ? 'btn-cli-chip--copied' : ''}`}
-            onClick={() => void copyCliCommand('ait-launch')}
-            title="앱 폴더에서 실행하세요"
-            aria-label="전체 실행 명령어 복사"
-          >
-            <code>claude -p /ait-launch</code>
-            <Copy size={12} strokeWidth={2} aria-hidden="true" />
-            <span className="btn-cli-chip-feedback">
-              {copiedCmd === 'ait-launch' ? '복사됨' : '복사'}
-            </span>
-          </button>
-        </div>
-
-        {/* 실행 기록/현재 진행 (오케스트레이션 API 기반) */}
-        {pipelineExpanded && (
-          <RunTimeline
-            id="pipeline-timeline"
-            appName={app.folderName}
-            pipeline={pipeline}
-            isDemo={isDemo}
-            onInteractiveStep={(step) => {
-              // 입력 폼·CTA 는 Wizard 에만 있으므로 해당 step 으로 바로 점프.
-              // (예전엔 plan 섹션으로만 스크롤해서 Step 2+ 에선 의미 없는 이동이었음)
-              void navigate(`/wizard/${app.folderName}?skill=${encodeURIComponent(step.skill)}`);
-            }}
-            onRunComplete={() => void refetch()}
-          />
+        {/* 다음에 진행할 단계의 실행 명령 */}
+        {nextStepItem ? (
+          <div className="pipeline-next">
+            <div className="pipeline-next-head">
+              <span className="pipeline-next-eyebrow">다음 단계</span>
+              <span className="pipeline-next-title">
+                {nextStepItem.step}단계 · {nextStepItem.label}
+              </span>
+            </div>
+            <p className="pipeline-next-desc">{nextStepItem.description}</p>
+            <CommandChips skill={nextStepItem.skill} />
+          </div>
+        ) : (
+          <div className="pipeline-next pipeline-next--done">
+            <span className="pipeline-next-title">모든 단계를 완료했어요 🎉</span>
+          </div>
         )}
 
+        {/* 전체 파이프라인을 한 번에 (보조 affordance) */}
+        <div className="pipeline-cli-row">
+          <span className="pipeline-cli-row-label">전체 파이프라인을 한 번에 실행:</span>
+          <CommandChips skill="ait-launch" />
+        </div>
       </section>
 
       {/* ── 기획 (PRD) ── */}
@@ -554,19 +492,6 @@ export default function AppDetail() {
         {app.docs.prd.exists ? (
           /* PRD가 있을 때: 경로 + 뷰어 */
           <div className="plan-existing">
-            {app.console.prdSource !== 'generated' && !app.console.prdReviewedAt && !isDemo && (
-              <PlanReviewBanner
-                appId={app.folderName}
-                prdSource={app.console.prdSource}
-                onMarkedReviewed={() => void refetch()}
-                onReviewByPlan={() => {
-                  const prdPath = app.docs.prd.path ?? app.console.prdPath ?? '';
-                  void navigate(
-                    `/wizard/${app.folderName}?skill=ait-plan&mode=review&prd=${encodeURIComponent(prdPath)}`,
-                  );
-                }}
-              />
-            )}
             <div className="doc-path-row">
               <PathField
                 label="PRD 경로"
@@ -587,49 +512,12 @@ export default function AppDetail() {
             </div>
           </div>
         ) : (
-          /* PRD가 없을 때: 3가지 진입점 */
+          /* PRD가 없을 때: 터미널에서 기획하도록 명령 안내 */
           <div className="plan-empty">
-            <p className="plan-empty-desc">기획서(PRD)가 아직 없어요. 아래 방법 중 하나로 시작해 보세요.</p>
-            <div className="plan-entries">
-              <PrdDropZone
-                appId={app.folderName}
-                onUploaded={() => void refetch()}
-                isDemo={isDemo}
-              />
-              <div className="plan-entry">
-                <div className="plan-entry-icon"><Monitor size={20} strokeWidth={1.75} /></div>
-                <div className="plan-entry-title">CLI에서 직접 실행</div>
-                <p className="plan-entry-desc">
-                  터미널이 익숙하다면, 앱 폴더에서 명령어를 실행해 AI와 대화하며 기획할 수 있어요.
-                </p>
-                <button
-                  type="button"
-                  className={`btn-cli-chip ${copiedCmd === 'ait-plan' ? 'btn-cli-chip--copied' : ''}`}
-                  onClick={() => void copyCliCommand('ait-plan')}
-                  title="앱 폴더에서 실행하세요"
-                  aria-label="기획 명령어 복사"
-                >
-                  <code>claude -p /ait-plan</code>
-                  <Copy size={12} strokeWidth={2} aria-hidden="true" />
-                  <span className="btn-cli-chip-feedback">
-                    {copiedCmd === 'ait-plan' ? '복사됨' : '복사'}
-                  </span>
-                </button>
-              </div>
-              <button
-                type="button"
-                className="plan-entry plan-entry--clickable"
-                onClick={() => void navigate(`/wizard/${app.folderName}`)}
-                disabled={isDemo}
-                title={isDemo ? '로컬에서 pnpm dev 실행 시 사용 가능' : '웹 위저드로 이동'}
-              >
-                <div className="plan-entry-icon"><MessageSquare size={20} strokeWidth={1.75} /></div>
-                <div className="plan-entry-title">웹에서 기획</div>
-                <p className="plan-entry-desc">
-                  브라우저 위저드에서 AI와 대화하며 기획 · 스캐폴딩 · TDS 를 이어서 진행해요.
-                </p>
-              </button>
-            </div>
+            <p className="plan-empty-desc">
+              기획서(PRD)가 아직 없어요. 터미널에서 기획 단계를 실행하면 PRD 가 생성돼요.
+            </p>
+            <CommandChips skill="ait-plan" />
           </div>
         )}
       </section>
@@ -760,17 +648,9 @@ export default function AppDetail() {
                     <span className="asset-path">{app.console.logoPath}</span>
                   </div>
                 ) : (
-                  <div className="meta-display">
+                  <div className="meta-display meta-display--stack">
                     <span className="meta-empty">아직 없어요 · 600×600 px 로고 필요</span>
-                    <button
-                      type="button"
-                      className="btn-skill btn-skill-sm"
-                      onClick={() => void runSkill('ait-assets')}
-                      disabled={running || isDemo}
-                      title={isDemo ? '내 PC에서 대시보드를 실행한 뒤 사용할 수 있어요' : undefined}
-                    >
-                      이미지 만들기
-                    </button>
+                    <CommandChips skill="ait-assets" />
                   </div>
                 )}
               </div>
@@ -880,17 +760,9 @@ export default function AppDetail() {
                     <span className="asset-path">{app.console.thumbnailPath}</span>
                   </div>
                 ) : (
-                  <div className="meta-display">
+                  <div className="meta-display meta-display--stack">
                     <span className="meta-empty">아직 없어요 · 1932×828 px 썸네일 필요</span>
-                    <button
-                      type="button"
-                      className="btn-skill btn-skill-sm"
-                      onClick={() => void runSkill('ait-assets')}
-                      disabled={running || isDemo}
-                      title={isDemo ? '내 PC에서 대시보드를 실행한 뒤 사용할 수 있어요' : undefined}
-                    >
-                      이미지 만들기
-                    </button>
+                    <CommandChips skill="ait-assets" />
                   </div>
                 )}
               </div>
@@ -946,17 +818,7 @@ export default function AppDetail() {
             onChange={(v) => setEdit({ field: 'utPath', value: v })}
           />
           <div className="doc-actions">
-            {!app.docs.ut.exists && (
-              <button
-                type="button"
-                className="btn-skill btn-skill-sm"
-                onClick={() => void runSkill('ait-ut')}
-                disabled={running || isDemo}
-                title={isDemo ? '내 PC에서 대시보드를 실행한 뒤 사용할 수 있어요' : undefined}
-              >
-                테스트 리포트 만들기
-              </button>
-            )}
+            {!app.docs.ut.exists && <CommandChips skill="ait-ut" />}
           </div>
         </div>
       </section>
@@ -1200,187 +1062,6 @@ function MarkdownViewer({
         </div>
       )}
     </>
-  );
-}
-
-function PrdDropZone({
-  appId,
-  onUploaded,
-  isDemo,
-}: {
-  appId: string;
-  onUploaded: () => void;
-  isDemo?: boolean;
-}) {
-  const [dragOver, setDragOver] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleFile = useCallback(
-    async (file: File) => {
-      if (isDemo) return;
-      if (!file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
-        setError('.md 또는 .txt 파일만 업로드할 수 있어요.');
-        return;
-      }
-      setError(null);
-      setUploading(true);
-      try {
-        const content = await file.text();
-        const res = await fetch(`/api/apps/${appId}/upload-prd`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: file.name, content }),
-        });
-        if (!res.ok) {
-          const data = (await res.json()) as { error?: string };
-          throw new Error(data.error ?? '업로드에 실패했어요.');
-        }
-        onUploaded();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : '업로드에 실패했어요.');
-      } finally {
-        setUploading(false);
-      }
-    },
-    [appId, isDemo, onUploaded]
-  );
-
-  return (
-    <div
-      className={`plan-entry plan-entry--drop ${dragOver && !isDemo ? 'plan-entry--drag-over' : ''} ${isDemo ? 'plan-entry--disabled' : ''}`}
-      role="button"
-      tabIndex={isDemo ? -1 : 0}
-      aria-label="PRD 파일 업로드 (드래그앤드롭 또는 클릭)"
-      aria-disabled={isDemo}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDragOver(true);
-      }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const file = e.dataTransfer.files[0];
-        if (file) void handleFile(file);
-      }}
-      onClick={() => {
-        if (isDemo) return;
-        inputRef.current?.click();
-      }}
-      onKeyDown={(e) => {
-        if (isDemo) return;
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          inputRef.current?.click();
-        }
-      }}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".md,.txt"
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void handleFile(file);
-          e.target.value = '';
-        }}
-      />
-      <div className="plan-entry-icon">
-        {uploading ? (
-          <span role="status" aria-label="업로드 중">
-            <Loader2 size={20} strokeWidth={1.75} className="spin" />
-          </span>
-        ) : (
-          <FileText size={20} strokeWidth={1.75} />
-        )}
-      </div>
-      <div className="plan-entry-title">PRD 업로드</div>
-      <p className="plan-entry-desc">
-        {uploading
-          ? '업로드 중…'
-          : dragOver
-            ? '여기에 놓으세요'
-            : '기획서 파일(.md)을 드래그하거나 클릭하세요'}
-      </p>
-      {error && <p className="plan-entry-error">{error}</p>}
-    </div>
-  );
-}
-
-function PlanReviewBanner({
-  appId,
-  prdSource,
-  onMarkedReviewed,
-  onReviewByPlan,
-}: {
-  appId: string;
-  prdSource: AppConsoleConfig['prdSource'];
-  onMarkedReviewed: () => void;
-  onReviewByPlan: () => void;
-}) {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function markReviewed() {
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/apps/${appId}/console`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prdReviewedAt: new Date().toISOString(),
-          // 수동 "검토 완료" 는 source 도 확정시켜 배너가 다시 뜨지 않도록.
-          prdSource: 'generated',
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      onMarkedReviewed();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '처리 실패');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const headline =
-    prdSource === 'uploaded'
-      ? '외부에서 가져온 기획서예요'
-      : '직접 작성한 기획서를 아직 검토받지 않았어요';
-
-  return (
-    <div className="plan-review-banner" role="status">
-      <div className="plan-review-banner-head">
-        <ShieldCheck size={16} strokeWidth={1.75} />
-        <span className="plan-review-banner-title">{headline}</span>
-      </div>
-      <p className="plan-review-banner-desc">
-        <strong>AI 검토</strong> 기능으로 이 기획서를 앱인토스 정책 · 비즈니스 모델 · 리스크 관점에서 짚어드릴 수 있어요.
-        이미 검토를 마쳤으면 "검토 완료"로 배지만 제거할 수 있어요.
-      </p>
-      <div className="plan-review-banner-actions">
-        <button
-          type="button"
-          className="plan-review-banner-btn plan-review-banner-btn--primary"
-          onClick={onReviewByPlan}
-          disabled={saving}
-        >
-          AI에게 검토 맡기기 →
-        </button>
-        <button
-          type="button"
-          className="plan-review-banner-btn"
-          onClick={() => void markReviewed()}
-          disabled={saving}
-        >
-          {saving ? '처리 중…' : '검토 완료로 표시'}
-        </button>
-      </div>
-      {error && <div className="plan-review-banner-error" role="alert">{error}</div>}
-    </div>
   );
 }
 

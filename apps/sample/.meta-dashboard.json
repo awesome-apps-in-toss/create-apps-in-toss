@@ -7,15 +7,11 @@
   "subtitle": "샘플입니다.",
   "description": "샘플입니다.",
   "keywords": [],
-  "logoPath": "",
-  "thumbnailPath": "",
+  "logoPath": "assets/logo.png",
+  "thumbnailPath": "assets/thumbnail-wide.png",
   "screenshotPaths": [],
-  "prdPath": "docs/prd/test.md",
+  "prdPath": "",
   "utPath": "",
-  "pipelineProgress": {
-    "2": {
-      "completedAt": "2026-04-12"
-    }
-  },
+  "pipelineProgress": {},
   "updatedAt": "2026-04-12"
 }

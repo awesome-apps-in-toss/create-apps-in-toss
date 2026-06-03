@@ -119,7 +119,7 @@ apps/<app-name>/assets/
 | `keywords` | console-text.md §5 키워드 | `console-text.md §5` 의 키워드는 **쉼표 단독 구분자**(`,`) 로 분리. 키워드 내부에 쉼표 사용 금지 (한글 쉼표 포함). 각 토큰은 앞뒤 공백 제거 후 빈 문자열 제외. 예: `"퀴즈, 성향, 재미"` → `["퀴즈","성향","재미"]`. |
 | `isGame` | §2 결정 결과 | `console-text.md §2` 에 **명시적으로** `게임` / `비게임` 결정이 적혀있을 때만 덮어쓴다. 명시 없으면 기존 값을 유지 (특히 기존이 `true` 인 게임 앱을 false 로 덮을 위험 방지). |
 
-> 그 외 필드(`nameKo`, `description`, `logoPath`, `thumbnailPath`, `screenshotPaths`, `prdPath`, `prdReviewedAt`, `prdSource`, `pipelineProgress`, `updatedAt`)는 **건드리지 않습니다.** 각각 다른 주체(ait-plan, 대시보드 서버, wizard)가 소유합니다.
+> 그 외 필드(`nameKo`, `description`, `logoPath`, `thumbnailPath`, `screenshotPaths`, `prdPath`, `pipelineProgress`, `updatedAt`)는 **건드리지 않습니다.** 각각 다른 주체(ait-plan, 대시보드 서버)가 소유합니다.
 
 ### 반영 방법
 

@@ -10,7 +10,6 @@ import type {
   PipelineStepStatus,
 } from '../../src/types/index.js';
 import { DEFAULT_CONSOLE_CONFIG } from '../../src/types/index.js';
-import { getDefaultRunStore, type RunStore } from '../lib/orchestration/run-store.js';
 
 const router: Router = Router();
 const APPS_DIR = path.resolve(process.cwd(), '../../apps');
@@ -233,27 +232,15 @@ const ASSET_LOGO_CANDIDATES = ['assets/logo.png', 'assets/logo.svg'];
 const ASSET_THUMBNAIL_CANDIDATES = ['assets/thumbnail-wide.png', 'assets/thumbnail-wide.svg'];
 const ASSET_SCREENSHOT_DIR = 'assets/screenshots';
 
+// 읽기 전용 대시보드: 산출물은 "파일이 존재하면 감지" 한다. (예전엔 ait-assets/
+// ait-screenshots 의 최근 성공 run 기록으로 게이트했지만, 오케스트레이션 계층을
+// 걷어내면서 run-store 가 사라져 파일 유무만으로 단순 판정한다.)
 async function autoDetectAssets(
   appDir: string,
   console_: AppConsoleConfig,
-  appName: string,
-  runStore: RunStore | null,
 ): Promise<void> {
-  // 산출물별로 "그 산출물을 만든 스킬" 의 최근 성공 여부를 따로 본다.
-  //   - 로고/가로 썸네일: ait-assets 가 책임 (step 2)
-  //   - 세로 스크린샷:    ait-screenshots 가 책임 (step 6)
-  // 이렇게 분리하지 않으면 사용자가 ait-screenshots 만 단독 실행했을 때 화면에 캡처된 PNG 가
-  // 있는데도 ait-assets 성공 기록이 없다는 이유로 screenshotPaths 가 비게 된다.
-  const lastSuccessOf = (skill: string): boolean =>
-    runStore
-      ? Boolean(runStore.findLatestSuccess({ skill, appName, idempotencyKey: null }))
-      : false;
-
-  const assetsOk = lastSuccessOf('ait-assets');
-  const screenshotsOk = lastSuccessOf('ait-screenshots');
-
-  // 로고: ait-assets 성공 시에만
-  if (assetsOk && !console_.logoPath) {
+  // 로고
+  if (!console_.logoPath) {
     for (const candidate of ASSET_LOGO_CANDIDATES) {
       if (await fileExists(path.join(appDir, candidate))) {
         console_.logoPath = candidate;
@@ -261,8 +248,8 @@ async function autoDetectAssets(
       }
     }
   }
-  // 가로 썸네일: ait-assets 성공 시에만
-  if (assetsOk && !console_.thumbnailPath) {
+  // 가로 썸네일
+  if (!console_.thumbnailPath) {
     for (const candidate of ASSET_THUMBNAIL_CANDIDATES) {
       if (await fileExists(path.join(appDir, candidate))) {
         console_.thumbnailPath = candidate;
@@ -270,8 +257,8 @@ async function autoDetectAssets(
       }
     }
   }
-  // 세로 스크린샷: ait-screenshots 성공 시에만 (assets/screenshots/*.png 모두 수집)
-  if (screenshotsOk && console_.screenshotPaths.length === 0) {
+  // 세로 스크린샷 (assets/screenshots/*.png 모두 수집)
+  if (console_.screenshotPaths.length === 0) {
     const screenshotDir = path.join(appDir, ASSET_SCREENSHOT_DIR);
     try {
       const files = await fs.readdir(screenshotDir);
@@ -295,10 +282,6 @@ async function loadAllApps(): Promise<AppInfo[]> {
     .filter((e) => e.isDirectory() && e.name !== 'dashboard')
     .map((e) => e.name);
 
-  // autoDetectAssets 의 "최근 성공 run" gate 용. runStore 가 어떤 이유로든 실패하면
-  // null 을 그대로 넘겨 "감지 무시" 쪽으로 안전하게 폴백한다.
-  const runStore = await getDefaultRunStore().catch(() => null);
-
   const results = await Promise.all(
     appFolders.map(async (folderName) => {
       const appDir = path.join(APPS_DIR, folderName);
@@ -319,9 +302,8 @@ async function loadAllApps(): Promise<AppInfo[]> {
           readConsoleConfig(appDir),
         ]);
         const docs = await readDocs(appDir, consoleConfig);
-        // 에셋 자동 감지 → config 보강 (logoPath, thumbnailPath 등).
-        // 단, ait-assets 스킬이 성공으로 끝난 적 있을 때만 반영 (부분 산출물 오인 방지).
-        await autoDetectAssets(appDir, consoleConfig, folderName, runStore);
+        // 에셋 자동 감지 → config 보강 (logoPath, thumbnailPath 등). 파일 존재 기반.
+        await autoDetectAssets(appDir, consoleConfig);
         const pipelineProgress = await autoDetectPipelineProgress(appDir, granite, consoleConfig, docs, deps);
         // consoleConfig에 자동 감지 결과 반영
         consoleConfig.pipelineProgress = pipelineProgress;

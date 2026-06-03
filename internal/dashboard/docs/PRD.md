@@ -1,6 +1,11 @@
-# Barreleye Dashboard PRD v0.3
+# Barreleye Dashboard PRD v0.4
 
-_One place to manage every mini-app — and a landing page to show the world how it works_
+_모든 미니앱을 한곳에서 조망하고, 다음에 할 일을 터미널 명령으로 안내한다_
+
+> **v0.4 방향 전환**: 대시보드 안에서 `claude -p` 로 스킬을 직접 실행하던 오케스트레이션
+> 계층을 전부 걷어냈다. 대시보드는 이제 **(1) 메타데이터를 읽어 전체 앱을 조망**하고
+> **(2) 단계별 실행 명령(claude / codex)을 복사**해 주는 데 집중한다. 실제 작업은
+> 터미널에서 Claude Code / Codex 로 진행한다. 콘솔 텍스트 필드 인라인 편집만 편의상 유지.
 
 ---
 
@@ -42,7 +47,7 @@ Barreleye 프로젝트에 관심 있는 외부 개발자
 **"아이디어에서 앱인토스 출시까지, 8단계 AI 파이프라인으로"**
 
 1. **상태 파악** — 3가지 정보 레이어로 각 앱의 준비 상태를 한눈에
-2. **원클릭 실행** — 스킬 버튼 하나로 PRD·에셋·코드·검수를 AI가 처리
+2. **명령 복사** — 단계별 `claude "/ait-xxx"` · codex 실행 명령을 복사해 터미널에서 진행
 3. **콘솔 복붙 준비** — 생성된 결과물을 대시보드에서 바로 확인 + 앱인토스 콘솔 업로드
 
 ---
@@ -50,15 +55,15 @@ Barreleye 프로젝트에 관심 있는 외부 개발자
 ## 4. 두 가지 모드
 
 ### 로컬 모드 (`pnpm dev`)
-- Express API 서버(포트 3001) + Vite 개발 서버(포트 3000) 동시 실행
-- 실제 앱 데이터를 파일 시스템에서 읽음
-- 편집·스킬 실행·파일 업로드 등 모든 기능 사용 가능
-- SSE로 파일 변경 감지 → 목록 자동 갱신
+- 읽기 전용 Express API 서버(포트 3001) + Vite 개발 서버(포트 3000) 동시 실행
+- 실제 앱 데이터를 파일 시스템에서 읽음 (조망)
+- 콘솔 텍스트 필드 인라인 편집 + 단계별 실행 명령 복사
+- SSE로 파일 변경 감지(`.meta-dashboard.json` · `.ait`) → 목록 자동 갱신
 
 ### 데모 모드 (GitHub Pages)
 - API 호출 없이 mock 데이터로 즉시 렌더링
 - 상단 배너: "📌 데모 모드 — 실제 기능은 로컬에서 `pnpm dev` 실행 후 사용 가능"
-- 편집·스킬 실행 버튼은 비활성화 (tooltip으로 로컬 실행 안내)
+- 편집 버튼은 비활성화 (tooltip으로 로컬 실행 안내)
 - 랜딩페이지로 활용: 방문자가 UI와 기능 구조를 탐색 가능
 
 ---
@@ -143,11 +148,15 @@ ait-plan  ait-assets ait-scaffold ait-tds  ait-impl  ait-screenshots  ait-review
 | 7    | `ait-review`       | automated   | 스크린샷 완료       | 검수 리포트                       |
 | 8    | `ait-build`        | automated   | 검수 통과           | .ait 번들                         |
 
-- **interactive**: CLI에서 AI와 대화형으로 진행. 대시보드에서 CLI 명령어를 클립보드에 복사 제공
-- **automated**: 대시보드 버튼 클릭 → Claude Code 자동 실행 → SSE 로그 스트리밍
-- **`/ait-launch`**: 8단계를 순차 실행하는 오케스트레이터. "claude -p /ait-launch" 복사 버튼 제공
+모든 단계는 **터미널에서** Claude Code(`claude "/ait-xxx"`) 또는 Codex 로 실행한다.
+대시보드는 단계별로 두 도구의 실행 명령을 **복사 버튼(`CommandChips`)** 으로 제공하고,
+산출물 존재 여부로 진행 상태를 읽어 스테퍼에 표시할 뿐 직접 실행하지 않는다.
 
-파이프라인 진행 상태는 `.meta-dashboard.json`의 `pipelineProgress` 필드에 저장된다.
+- **`/ait-launch`**: 8단계를 순차 실행하는 오케스트레이터. "다음 단계" 카드와 별개로
+  전체 파이프라인 실행 명령을 복사 제공.
+
+파이프라인 진행 상태는 산출물(파일) 존재 여부로 자동 감지되며, 일부는
+`.meta-dashboard.json`의 `pipelineProgress` 필드에도 저장된다.
 
 ---
 
@@ -210,15 +219,13 @@ Layer 3 (개발 헬퍼)   — PRD, UT 리포트: 각 15점 (30점)
 | 앱 상세 페이지        | 3개 레이어 섹션 + 파이프라인 섹션                           |
 | 좌측 사이드바         | 앱 목록 퀵점프, 홈 네비게이션                               |
 | Layer 1 읽기          | granite.config.ts 파싱 (읽기 전용)                          |
-| Layer 2 편집          | `.meta-dashboard.json` 인라인 편집 + 저장                   |
+| Layer 2 편집          | `.meta-dashboard.json` 텍스트 필드 인라인 편집 + 저장        |
 | Layer 2 이미지 미리보기 | 로고, 가로 썸네일, 세로 스크린샷 인라인 표시              |
 | Layer 3 감지          | PRD/UT 파일 존재 여부 자동 감지 + 마크다운 뷰어             |
-| 8단계 파이프라인 UI   | 미니 스테퍼 + 개별 단계 펼침 + 진행 상태 저장              |
-| 스킬 트리거           | 버튼 클릭 → Claude Code CLI 자동 실행                       |
-| SSE 로그 스트리밍     | 스킬 실행 중 실시간 로그 출력                               |
+| 8단계 파이프라인 UI   | 미니 스테퍼(읽기 전용 진행 시각화) + 다음 단계 안내         |
+| 명령 런처 (CommandChips) | 단계별 `claude "/ait-xxx"` · codex 실행 명령 복사       |
 | 파일 변경 감지        | chokidar → 목록 자동 갱신                                   |
-| PRD 업로드            | drag & drop 또는 파일 선택으로 .md 업로드                   |
-| 클립보드 복사         | Layer 2 텍스트 필드 복사 + CLI 명령어 복사                  |
+| 클립보드 복사         | Layer 2 텍스트 필드 복사 + 실행 명령 복사                   |
 | GitHub Pages 배포     | main 머지 시 자동 배포 (GitHub Actions)                     |
 | 데모 모드             | 정적 배포 시 mock 데이터 + 쓰기 기능 비활성화               |
 
@@ -227,12 +234,13 @@ Layer 3 (개발 헬퍼)   — PRD, UT 리포트: 각 15점 (30점)
 | 기능                     | 설명                                          |
 | ------------------------ | --------------------------------------------- |
 | 홈 랜딩 섹션             | 데모 모드 전용 Hero 섹션 (이 PRD 8절 참고)    |
-| 스킬 실행 히스토리       | 언제 어떤 스킬을 실행했는지 기록              |
 | 앱인토스 카테고리 드롭다운 | 콘솔 구조 파싱으로 선택형 UI 제공           |
-| 스크린샷 자동 생성       | Playwright로 앱 캡처                          |
 
 ### ❌ Won't
 
+- 대시보드 내 스킬 실행 (`claude -p` spawn) — v0.4에서 제거, 터미널에서 직접 실행
+- 대시보드 내 새 앱 생성 — `pnpm new-app` 또는 `/ait-scaffold`(CLI)로 대체
+- PRD 업로드 — 터미널 기획(`/ait-plan`)으로 대체
 - 실제 앱 실행 (dev server 임베딩)
 - 다중 사용자/권한 관리
 
@@ -259,30 +267,29 @@ Layer 3 (개발 헬퍼)   — PRD, UT 리포트: 각 15점 (30점)
 ### 앱 상세 페이지 — 파이프라인 섹션
 
 ```
-출시 파이프라인                    [claude -p /ait-launch]  [접기]
+출시 파이프라인                                          전체: [claude "/ait-launch"] [codex ...]
 
   ✓ ─── ✓ ─── ✓ ─── ✓ ─── ✓ ─── ○ ─── ○
  기획   에셋  스캐폴 TDS   구현   검수   빌드
 
-  STEP 1  기획   정책 검토 + PRD 생성 → PRD 문서        [기획하기]
-  STEP 2  에셋   이미지/텍스트 리소스 생성 → 로고, 썸네일  [실행]
+  다음 단계 · STEP 6  스크린샷   세로 3장 캡처
+    [Claude Code: claude "/ait-screenshots"]  [Codex: codex "..."]
   ...
 ```
 
-### 스킬 트리거 플로우 (로컬 모드)
+### 명령 복사 플로우 (로컬 모드)
 
 ```
-[실행] 클릭
-→ GET /api/run-skill/stream?skill=ait-assets&app=dating-quiz
-→ Express가 Claude Code CLI 실행 (cwd: apps/dating-quiz)
-→ SSE로 로그 스트리밍
-→ 완료 시 chokidar가 파일 변경 감지 → 목록 자동 갱신
+[복사] 클릭 (CommandChips: Claude Code / Codex)
+→ 클립보드에 `claude "/ait-assets"` 또는 codex 명령 복사
+→ 사용자가 앱 폴더(apps/<name>)에서 직접 실행
+→ 산출물 저장 시 chokidar가 .meta-dashboard.json / .ait 변경 감지 → 목록 자동 갱신
 ```
 
-### 스킬 트리거 플로우 (데모 모드)
+### 명령 복사 플로우 (데모 모드)
 
 ```
-[실행] 버튼 (disabled)
+[복사] 버튼은 동작 (명령 문자열만 복사) · 편집 버튼은 disabled
 → hover: "로컬에서 pnpm dev 실행 시 사용 가능"
 ```
 
@@ -297,13 +304,13 @@ React 18 + TypeScript + Vite 6
 React Router v7
 ```
 
-### 백엔드 (로컬 서버)
+### 백엔드 (로컬 서버, 읽기 전용)
 
 ```
-Express 5          API 서버 (포트 3001)
-child_process      Claude Code CLI 실행
-SSE                실시간 로그 스트리밍
-chokidar           파일 변경 감지
+Express 5          읽기 전용 API 서버 (포트 3001) — apps/meta GET, console PUT, 에셋 서빙
+SSE                파일 변경 브로드캐스트
+chokidar           .meta-dashboard.json / .ait 변경 감지
+gray-matter        SKILL.md frontmatter 파싱 (파이프라인 메타)
 concurrently       pnpm dev 시 프론트 + 서버 동시 실행
 ```
 
@@ -355,12 +362,12 @@ UT 리포트  apps/{앱명}/docs/user-test/report.md  (또는 utPath 필드)
 | 리스크                      | 가능성 | 대응                                            |
 | --------------------------- | ------ | ----------------------------------------------- |
 | granite.config.ts 파싱 실패 | 낮음   | 정규식 실패 시 null 처리, 섹션 미표시           |
-| Claude CLI 경로 문제        | 중간   | `which claude`로 경로 검증 후 실행              |
-| 스킬 실행 중 에러           | 높음   | stderr 스트리밍 + 실패 상태 표시                |
+| 산출물 부분 생성 오인       | 중간   | 파일 존재 기반 감지 — 읽기 전용 뷰어라 허용 가능 |
 | 이미지 에셋 경로 싱크       | 중간   | 앱 폴더명 기준 상대경로 통일                    |
+| 복사한 명령의 cwd 혼동      | 낮음   | CommandChips 에 "앱 폴더에서 실행" 안내 + codex 는 `../../` 상대경로 |
 
 **가정**
 
-- Claude Code CLI가 로컬에 설치되어 있고 PATH에 등록됨
-- 스킬은 앱 폴더 컨텍스트에서 실행 (`cwd: apps/{앱명}`)
+- 실행은 사용자가 터미널에서 Claude Code / Codex 로 직접 한다 (대시보드는 명령만 복사)
+- 복사한 명령은 앱 폴더(`apps/{앱명}`)에서 실행한다
 - `.meta-dashboard.json`은 Git에 커밋 (콘솔 정보 버전 관리)

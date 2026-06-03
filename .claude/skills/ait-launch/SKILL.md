@@ -30,13 +30,11 @@ idempotencyKey: ait-launch
 | 3 | 스캐폴딩 + 추가 기능 | `/ait-scaffold` | 라우팅/쿼리/TDS 자동 판단. **커밋** |
 | 4 | TDS (STEP 3 누락 시) | `/ait-tds-setup` | `@toss/tds-mobile` 있으면 스킵 |
 | 5 | 구현 | `/ait-implement` | 병렬 에이전트 활용. **커밋** |
-| 6 | 세로 스크린샷 3장 | `/ait-screenshots` | dev 서버 자동 기동 후 캡처 |
+| 6 | 세로 스크린샷 3장 | `/ait-screenshots` | dev 서버 기동 후 캡처 |
 | 7 | 검수 | `/ait-review` full | 자동 수정. **커밋** |
 | 8 | 빌드 & 배포 | `/ait-build` | typecheck→lint→build, 콘솔 업로드 안내 |
 
-> STEP 6 은 dev 서버 기동이 필요하다. 두 가지 경로:
->   - **dashboard 위저드 사용 시 (권장, 비개발자 친화)**: 위저드가 STEP 6 카드 진입 시 dev 서버를 자동 기동하고 `/ait-screenshots` 캡처가 끝나면 자동 종료. 사용자 개입 0.
->   - **CLI 단독 (`claude -p /ait-launch`) 사용 시**: STEP 5 가 끝나면 사용자에게 "다른 터미널에서 `pnpm --filter <package> dev` 를 띄워달라" 고 안내하고, 사용자 확인을 받은 뒤 STEP 6 진행. 캡처 후 사용자가 직접 종료.
+> STEP 6 은 dev 서버 기동이 필요하다. STEP 5 가 끝나면 사용자에게 "다른 터미널에서 `pnpm --filter <package> dev` 를 띄워달라" 고 안내하고, 사용자 확인을 받은 뒤 STEP 6 진행. 캡처 후 사용자가 직접 종료한다.
 
 ## 운영 원칙
 

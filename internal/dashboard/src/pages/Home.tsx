@@ -5,7 +5,6 @@ import { useApps } from '@/hooks/useApps';
 import { useSkills } from '@/hooks/useSkills';
 import type { PipelineStep } from '@/hooks/useSkills';
 import AppAvatar from '@/components/AppAvatar';
-import ClaudeStatus from '@/components/ClaudeStatus';
 import type { AppInfo } from '@/types';
 
 type AppFilter = 'all' | 'brand' | 'store' | 'prd' | 'ut';
@@ -135,9 +134,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Claude CLI 상태 ── */}
-      {!isDemo && <ClaudeStatus />}
-
       {/* ── 다음 할 일 (로컬 모드) ── */}
       {!isDemo && urgentApp && nextStep && (
         <button
@@ -203,15 +199,12 @@ export default function Home() {
             <>
               <p className="apps-empty-title">아직 등록된 앱이 없어요</p>
               <p className="apps-empty-desc">
-                새 앱을 추가해 첫 미니앱을 만들어보세요.
+                터미널에서 새 앱을 만들면 여기에 자동으로 나타나요.
               </p>
-              <button
-                type="button"
-                className="btn-cta btn-cta--primary"
-                onClick={() => void navigate('/new-app')}
-              >
-                새 앱 만들기
-              </button>
+              <code className="apps-empty-cmd">pnpm new-app &lt;앱이름&gt;</code>
+              <p className="apps-empty-desc">
+                또는 <code>claude "/ait-scaffold"</code> 로 AI와 함께 스캐폴딩할 수 있어요.
+              </p>
             </>
           ) : (
             <>

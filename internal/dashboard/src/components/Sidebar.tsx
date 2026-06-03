@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router';
-import { CheckCircle2, Plus } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import type { AppInfo } from '@/types';
 import { getFallbackColor, hexToRgba } from '@/lib/palette';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -80,11 +80,6 @@ export default function Sidebar({ apps, mobileOpen, onMobileClose }: SidebarProp
 
   const handleHeaderClick = () => {
     void navigate('/');
-    onMobileClose?.();
-  };
-
-  const handleNewAppClick = () => {
-    void navigate('/new-app');
     onMobileClose?.();
   };
 
@@ -178,17 +173,6 @@ export default function Sidebar({ apps, mobileOpen, onMobileClose }: SidebarProp
             </NavLink>
           );
         })}
-
-        <button
-          type="button"
-          className="sidebar-new-app-btn"
-          onClick={handleNewAppClick}
-        >
-          <span className="sidebar-new-app-icon" aria-hidden="true">
-            <Plus size={14} strokeWidth={2.25} />
-          </span>
-          <span>새 앱 만들기</span>
-        </button>
       </nav>
 
       <div className="sidebar-footer">

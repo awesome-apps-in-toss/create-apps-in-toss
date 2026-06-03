@@ -30,7 +30,7 @@ idempotencyKey: ait-scaffold
 
 ### 0. Idempotent 체크
 
-`apps/<app-name>/` 이 이미 존재하고 `package.json` 이 stub(`barreleye:stub: true`) 이 아니면, step 1 은 스킵하고 바로 step 2 로 넘어간다. 대시보드의 `full` 모드는 NewApp 단계에서 이미 `pnpm new-app` 을 끝내고 진입하므로 이 경로가 기본이다.
+`apps/<app-name>/` 이 이미 존재하고 `package.json` 이 stub(`barreleye:stub: true`) 이 아니면, step 1 은 스킵하고 바로 step 2 로 넘어간다. `pnpm new-app <app-name>` 으로 앱 폴더를 먼저 만든 뒤 진입한 경우 이 경로를 탄다.
 
 ### 1. 최소 스캐폴딩 (필요 시만)
 
